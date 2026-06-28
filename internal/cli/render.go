@@ -73,14 +73,7 @@ func runRender(ctx context.Context, options Options, f renderFlags, ref string) 
 // renderLoader returns a LocalLoader when --dir is set and an OCILoader
 // (honoring CUE_REGISTRY in the process environment) otherwise.
 func renderLoader(f renderFlags) (render.ModuleLoader, error) {
-	if f.dir != "" {
-		return render.LocalLoader{Dir: f.dir}, nil
-	}
-	loader, err := render.NewOCILoader(render.OCIConfig{})
-	if err != nil {
-		return nil, fmt.Errorf("cannot build OCI loader: %w", err)
-	}
-	return loader, nil
+	return moduleLoader(f.dir)
 }
 
 // readRenderInputs reads the XR (required) and environment (optional) YAML files

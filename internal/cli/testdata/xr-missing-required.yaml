@@ -1,0 +1,6 @@
+apiVersion: platform.example.com/v1alpha1
+kind: XWidget
+metadata:
+  name: demo
+spec:
+  replicas: 2

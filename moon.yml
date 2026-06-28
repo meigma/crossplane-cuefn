@@ -38,6 +38,14 @@ fileGroups:
     # if caching is ever enabled.
     - 'example/**/*.cue'
     - 'internal/render/testdata/**/*.cue'
+    # The author-time codegen fixtures (de-risked, no-status, and the negative
+    # type-crossing-disjunction module) consumed by the schema unit tests and the
+    # chainsaw CRD.
+    - 'internal/schema/testdata/**/*.cue'
+  # Declarative chainsaw assets the build-tagged schema-test harness stages and
+  # applies against an envtest apiserver.
+  chainsawAssets:
+    - 'test/chainsaw/**/*.yaml'
   # The controller-gen deepcopy source: the Input type and its package markers.
   # Bumping either must invalidate the generate-check task.
   generateSources:
@@ -131,6 +139,27 @@ tasks:
       - '@group(goSources)'
       - '@group(cueModules)'
       - '@group(exampleAssets)'
+    options:
+      cache: false
+
+  # Server-side author-time schema proof: boots an envtest apiserver, generates
+  # the de-risked module's XRD, wraps it as a real CRD, and drives chainsaw plus a
+  # typed client to exercise structural acceptance, apiserver defaulting, unknown-
+  # field pruning, and a status subresource round-trip. Gated behind the `envtest`
+  # build tag and the chainsaw/setup-envtest binaries (pinned in mise); self-skips
+  # without them. Kept OUT of the default `check` graph (mirroring render-test) so
+  # `moon run root:check` stays green without those tools.
+  schema-test:
+    # Run under `mise exec` so the mise-pinned chainsaw and setup-envtest win over
+    # any proto shims on PATH. Install the envtest binaries (idempotent), then run
+    # the build-tagged harness; the harness resolves KUBEBUILDER_ASSETS itself via
+    # `setup-envtest` (and honors the env var when set), so no command
+    # substitution is needed.
+    command: "mise exec -- bash -c 'setup-envtest use 1.35.0 -p path && go test -tags envtest ./internal/schema/... -run TestSchema_Chainsaw -count 1'"
+    inputs:
+      - '@group(goSources)'
+      - '@group(cueModules)'
+      - '@group(chainsawAssets)'
     options:
       cache: false
 

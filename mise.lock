@@ -104,6 +104,54 @@ checksum = "sha256:f6f06d94b6241521c53d15450c5209b028270bf966f842afb11c030c79f5b
 url = "https://github.com/golangci/golangci-lint/releases/download/v2.12.2/golangci-lint-2.12.2-darwin-amd64.tar.gz"
 provenance = "github-attestations"
 
+[[tools."aqua:kubernetes-sigs/controller-runtime/setup-envtest"]]
+version = "0.20.4"
+backend = "aqua:kubernetes-sigs/controller-runtime/setup-envtest"
+
+[tools."aqua:kubernetes-sigs/controller-runtime/setup-envtest"."platforms.linux-arm64"]
+url = "https://github.com/kubernetes-sigs/controller-runtime/releases/download/v0.20.4/setup-envtest-linux-arm64"
+
+[tools."aqua:kubernetes-sigs/controller-runtime/setup-envtest"."platforms.linux-x64"]
+url = "https://github.com/kubernetes-sigs/controller-runtime/releases/download/v0.20.4/setup-envtest-linux-amd64"
+
+[tools."aqua:kubernetes-sigs/controller-runtime/setup-envtest"."platforms.macos-arm64"]
+url = "https://github.com/kubernetes-sigs/controller-runtime/releases/download/v0.20.4/setup-envtest-darwin-arm64"
+
+[tools."aqua:kubernetes-sigs/controller-runtime/setup-envtest"."platforms.macos-x64"]
+url = "https://github.com/kubernetes-sigs/controller-runtime/releases/download/v0.20.4/setup-envtest-darwin-amd64"
+
+[[tools."aqua:kyverno/chainsaw"]]
+version = "0.2.15"
+backend = "aqua:kyverno/chainsaw"
+
+[tools."aqua:kyverno/chainsaw"."platforms.linux-arm64"]
+checksum = "sha256:fecf5f3ea74d11da2cd5d95a4c016d5d2543cbc4844ce21adf5e727e7ffd9e44"
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/chainsaw_linux_arm64.tar.gz"
+
+[tools."aqua:kyverno/chainsaw"."platforms.linux-arm64".provenance.slsa]
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/multiple.intoto.jsonl"
+
+[tools."aqua:kyverno/chainsaw"."platforms.linux-x64"]
+checksum = "sha256:295d226c89f126c0a97775d364be149f47a810c8a3f9829ee410583d0c1abe3c"
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/chainsaw_linux_amd64.tar.gz"
+
+[tools."aqua:kyverno/chainsaw"."platforms.linux-x64".provenance.slsa]
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/multiple.intoto.jsonl"
+
+[tools."aqua:kyverno/chainsaw"."platforms.macos-arm64"]
+checksum = "sha256:502bef17dd822217e82590e9ccf01c1e26a56b3fa34a835789b9af73e82a169a"
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/chainsaw_darwin_arm64.tar.gz"
+
+[tools."aqua:kyverno/chainsaw"."platforms.macos-arm64".provenance.slsa]
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/multiple.intoto.jsonl"
+
+[tools."aqua:kyverno/chainsaw"."platforms.macos-x64"]
+checksum = "sha256:ddb56002ff8c6265f55ec40c82eb0ef0dddec5127dd12d4fc5e7953453481f4b"
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/chainsaw_darwin_amd64.tar.gz"
+
+[tools."aqua:kyverno/chainsaw"."platforms.macos-x64".provenance.slsa]
+url = "https://github.com/kyverno/chainsaw/releases/download/v0.2.15/multiple.intoto.jsonl"
+
 [[tools."aqua:moonrepo/moon"]]
 version = "2.3.5"
 backend = "aqua:moonrepo/moon"

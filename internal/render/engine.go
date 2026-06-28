@@ -22,9 +22,7 @@ import (
 	"strings"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/errors"
-	"cuelang.org/go/cue/load"
 
 	"github.com/crossplane/function-sdk-go/resource"
 )
@@ -89,42 +87,13 @@ func New(loader ModuleLoader) *Engine {
 // readiness, and status it produces. It errors if the module is missing, fails
 // to evaluate, violates its #Spec, or leaves resources or status non-concrete.
 func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, error) {
-	ld, err := e.loader.Load(ctx, ref)
+	v, cleanup, err := LoadModule(ctx, e.loader, ref)
 	if err != nil {
-		return Result{}, fmt.Errorf("cannot load module %q: %w", ref, err)
+		return Result{}, err
 	}
-	defer ld.Cleanup()
+	defer cleanup()
 
-	cctx := cuecontext.New()
-
-	cfg := &load.Config{Dir: ld.Dir}
-	// A registry is supplied only by loaders that fetch from OCI; it resolves the
-	// module's transitive CUE dependencies at load time. An explicit registry is
-	// not strictly required: when cfg.Registry is nil (and not SkipImports), CUE's
-	// load.Config auto-creates one from CUE_REGISTRY via modconfig.NewRegistry over
-	// cfg.Env. OCILoader supplies its own anyway so the registry is built from the
-	// loader's controlled Env (with CUE_CACHE_DIR forced to a writable, non-$HOME
-	// path) and shares one modcache with the digest-aware root client. LocalLoader
-	// leaves it nil so a self-contained module loads offline and dep-free modules
-	// render identically whether the registry is set or not.
-	if ld.Registry != nil {
-		cfg.Registry = ld.Registry
-	}
-
-	insts := load.Instances([]string{"."}, cfg)
-	if len(insts) == 0 {
-		return Result{}, fmt.Errorf("module %q contains no CUE instances", ref)
-	}
-	if err = insts[0].Err; err != nil {
-		return Result{}, wrapCUE(err, "cannot load module %q", ref)
-	}
-
-	v := cctx.BuildInstance(insts[0])
-	if err = v.Err(); err != nil {
-		return Result{}, wrapCUE(err, "cannot build module %q", ref)
-	}
-
-	v, err = fillInput(cctx, v, in)
+	v, err = fillInput(v.Context(), v, in)
 	if err != nil {
 		return Result{}, err
 	}

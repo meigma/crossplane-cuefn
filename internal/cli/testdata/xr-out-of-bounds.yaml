@@ -1,0 +1,7 @@
+apiVersion: platform.example.com/v1alpha1
+kind: XWidget
+metadata:
+  name: demo
+spec:
+  image: ghcr.io/stefanprodan/podinfo:6.7.0
+  replicas: 99
