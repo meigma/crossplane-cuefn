@@ -64,5 +64,10 @@ The **DX half is the green-field** we build: (1) formalize a "module contract v2
 
 Remaining real risks: A (CUE→OpenAPI structural-schema fidelity — still the top unknown, spike never did codegen so untested), transitive OCI deps, digest lock-step (F). Next: align with developer on module-contract-v2 shape and whether to start with a codegen spike (de-risk A) before scaffolding the repo.
 
+## 2026-06-27 23:15 — Codegen spike done; risk A retired
+Ran the CUE→OpenAPI→XRD codegen spike (scratch `…/scratchpad/codegen-spike`), validated with the API server's own structural-schema validator. **It works** — a realistic `#Spec` produces an XRD a cluster would accept. Full findings + the two implementation gotchas (ExpandReferences bug; regular-field rejection) + the author guardrail (no type-crossing/struct disjunctions) + the validated module-contract-v2 shape are in TECH_NOTES "Codegen de-risk spike". Risk A is retired; the single scariest unknown is now a solved, ~80-LOC recipe.
+
+Next decision point for the developer: proceed to scaffold the real repo (rename module path → github.com/meigma/crossplane-cuefn, add proven deps + internal/render from the spike, stand up internal/schema codegen from this spike, cobra CLI skeleton), and pick the first build slice. Remaining unknowns are now lower-risk: transitive OCI module deps, xpkg/Configuration packaging (shell vs import), digest lock-step.
+
 
 

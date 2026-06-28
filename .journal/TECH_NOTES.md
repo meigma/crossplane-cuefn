@@ -39,3 +39,19 @@ Open / green-field (the DX half — not in the spike):
 - **CUE→OpenAPI:** `cuelang.org/go/encoding/openapi`; must yield K8s *structural* schema (risk area A). **Configuration gen+push:** spike already shells `crossplane xpkg` — importing Crossplane's xpkg code is the stretch goal for one-command UX.
 - **Digest lock-step (F):** spike pins module by tag `@v0.1.0`, not digest; generated Configuration must pin the digest it was built from.
 
+### Codegen de-risk spike — PROVEN (2026-06-27)
+
+Scratch: `…/scratchpad/codegen-spike` (throwaway). Built CUE `#Spec` → OpenAPI → wrapped as XRD → validated with the **API server's own** `apiextensions-apiserver/pkg/apiserver/schema` `NewStructural` + `ValidateStructural`. A PASS == a real cluster accepts the XRD. Risk A (CUE→OpenAPI structural fidelity) is **retired**: a realistic spec (required `!`, bounded int+default, string/int enums, regex, bool default, nested struct, list-of-objects, map patterns) generates a fully structural XRD.
+
+Two implementation gotchas (both fixed in-spike, must carry into the real `internal/schema` codegen):
+1. `openapi.Config{ExpandReferences:true}` is **buggy with bounded numbers** → "unsupported op for number &". Fix: generate with `ExpandReferences:false`, then inline `$ref`s ourselves (~30 LOC recursive inliner; cycle-detecting). K8s structural schemas forbid `$ref` anyway, so we must inline regardless.
+2. `openapi.Generate` **rejects regular (non-`#`) top-level fields** ("unsupported top-level field input/resources"). Fix: reduce the module value to definitions-only before generating (`v.Fields(cue.Definitions(true))`, keep `sel.IsDefinition()`, FillPath into a fresh struct).
+
+Author guardrail (the ONLY real constraint on schema CUE): **type-crossing disjunctions are not expressible.** `string|int` and struct unions `{a}|{b}` → `oneOf` → REJECTED structural. Same-type disjunctions (`"a"|"b"|"c"`, `80|443`) → `enum` → fine. This is a Kubernetes CRD limitation, not ours. Future nicety: detect `string|int` and emit `x-kubernetes-int-or-string: true`.
+
+Validated **module-contract-v2** shape (one module = source of truth):
+- `#API: {group, version, kind, plural, scope, ...}` — concrete; CLI `Decode`s it for the XRD envelope.
+- `#Spec: {...}` — authoritative closed spec schema; CLI → OpenAPI → XRD `.properties.spec`; runtime unifies XR spec against it; `validate` checks against it. (Optionally `#Status`.)
+- Transform (regular fields): `input: {spec: #Spec, metadata, environment}` + `resources: [...]`. Because `input.spec: #Spec`, the same defaults/constraints apply at render — XRD defaults (API-server-filled) and render defaults come from one place, so no drift.
+Codegen reduces to definitions-only, so the transform fields never interfere with OpenAPI generation. Confirmed `controller-tools`-free; pure CUE Go API + `apiextensions-apiserver` for the accept-check.
+
