@@ -35,6 +35,11 @@ python = "3.14.3"
 "aqua:chainguard-dev/apko"    = "1.2.19"
 "aqua:sigstore/cosign"        = "3.1.1"
 
+# Crossplane CLI, used by the moon `render-test` task to drive the end-to-end
+# `crossplane render` loop against a locally-served `cuefn function`. The render
+# test is gated to Docker + this CLI and self-skips when either is absent.
+"aqua:crossplane/crossplane"  = "2.3.3"
+
 [env]
 # Pin the Go toolchain: never auto-download a toolchain other than the one above.
 # The version here is authoritative and matches go.mod's `go 1.26.4`.

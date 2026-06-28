@@ -78,6 +78,7 @@ func NewRootCommand(options Options) *cobra.Command {
 	root.SetOut(options.Out)
 	root.SetErr(options.Err)
 	root.PersistentFlags().String("message", appinfo.Summary(), "message to print")
+	root.AddCommand(newFunctionCommand(options), newRenderCommand(options))
 	return root
 }
 

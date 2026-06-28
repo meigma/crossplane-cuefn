@@ -1,0 +1,20 @@
+# Function registrations for `crossplane render`. cuefn is annotated as a
+# Development runtime so render connects to a locally-served
+# `cuefn function --insecure` instead of pulling an image;
+# function-environment-configs is pulled normally to merge the EnvironmentConfig
+# into the pipeline context.
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: cuefn
+  annotations:
+    render.crossplane.io/runtime: Development
+spec:
+  package: xpkg.meigma.io/cuefn:v0
+---
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-environment-configs
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.2

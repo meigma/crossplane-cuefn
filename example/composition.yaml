@@ -1,0 +1,32 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xapp
+spec:
+  compositeTypeRef:
+    apiVersion: platform.meigma.io/v1alpha1
+    kind: XApp
+  mode: Pipeline
+  pipeline:
+    # Merge the referenced EnvironmentConfig into the pipeline context so cuefn
+    # can surface it to the CUE module under input.environment.
+    - step: function-environment-configs
+      functionRef:
+        name: function-environment-configs
+      input:
+        apiVersion: environmentconfigs.fn.crossplane.io/v1beta1
+        kind: Input
+        spec:
+          environmentConfigs:
+            - type: Reference
+              ref:
+                name: app-environment
+    # Fetch and evaluate the CUE module, emitting its composed resources and
+    # patching the composite status.
+    - step: cuefn
+      functionRef:
+        name: cuefn
+      input:
+        apiVersion: cuefn.meigma.io/v1beta1
+        kind: Input
+        module: cuefn.example/app@v0.1.0
