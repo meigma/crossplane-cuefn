@@ -1,4 +1,4 @@
-module github.com/meigma/template-go
+module github.com/meigma/crossplane-cuefn
 
 go 1.26.4
 

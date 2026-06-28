@@ -1,15 +1,15 @@
 version: 2
 
-project_name: template-go
+project_name: cuefn
 
 before:
   hooks:
     - go test ./...
 
 builds:
-  - id: template-go
-    main: ./cmd/template-go
-    binary: template-go
+  - id: cuefn
+    main: ./cmd/cuefn
+    binary: cuefn
     env:
       - CGO_ENABLED=0
     goos:
@@ -28,9 +28,9 @@ builds:
     mod_timestamp: '{{ .CommitTimestamp }}'
 
 archives:
-  - id: template-go
+  - id: cuefn
     ids:
-      - template-go
+      - cuefn
     formats:
       - binary
     name_template: >-

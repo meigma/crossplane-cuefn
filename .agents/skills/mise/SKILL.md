@@ -2,7 +2,7 @@
 name: mise
 description: >
   Operate mise as the single source of truth for tool versions and integrity in
-  template-go. Use when touching mise.toml or mise.lock, bumping or adding a pinned
+  crossplane-cuefn. Use when touching mise.toml or mise.lock, bumping or adding a pinned
   tool (go, python, uv, golangci-lint, moon, melange, apko, cosign), resolving
   "command not found"/PATH problems, fixing locked/trust failures, or wiring mise
   into moon, the CI workflow, or the local container task.
@@ -138,7 +138,7 @@ mise trust --all      # trust this dir and its parents
 mise trust --show     # inspect trust status without changing it
 ```
 
-The main checkout `/Users/josh/code/meigma/template-go` is already trusted.
+The main checkout `/Users/josh/code/meigma/crossplane-cuefn` is already trusted.
 
 ## Inspection / read-only ops
 
@@ -166,7 +166,7 @@ mise exec -- golangci-lint version   # run a pinned tool ad hoc, no shell activa
   uncommitted (see the `melange`/`apko` skills).
 - `[tasks.image-local]` passes `--runner docker` to melange (melange needs a Linux
   build sandbox) and loads/retags the host-arch image into Docker as
-  `template-go:dev`. Docker must be running on macOS.
+  `crossplane-cuefn:dev`. Docker must be running on macOS.
 
 ## Command reference
 

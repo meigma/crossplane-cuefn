@@ -54,15 +54,15 @@ in `--help` and the repo files below, not memory.
 
 ## melange.yaml anatomy
 
-- `package`: `name: template-go`, `version: "0.1.1"` (release-please marker), `epoch: 0`.
+- `package`: `name: cuefn`, `version: "0.1.0"` (release-please marker), `epoch: 0`.
 - `environment.contents`: the Wolfi `os` repository + its signing keyring, plus
   `packages: [go-1.26]` (the build toolchain). `environment.environment.CGO_ENABLED: "0"`.
 - `vars`: build-time defaults overridden by `--vars-file`.
-- `pipeline: - uses: go/build` with `packages: ./cmd/template-go`,
-  `output: template-go`, `go-package: go-1.26`, `modroot: .`, `strip: "-s -w"`, the
+- `pipeline: - uses: go/build` with `packages: ./cmd/cuefn`,
+  `output: cuefn`, `go-package: go-1.26`, `modroot: .`, `strip: "-s -w"`, the
   `ldflags` that stamp `main.version/commit/date` from `${{vars.*}}`, and
   `extra-args: "-mod=readonly -buildvcs=false"`. The `go/build` builtin auto-adds `-trimpath`
-  and installs to `/usr/bin/<output>` — apko's entrypoint `/usr/bin/template-go` depends on
+  and installs to `/usr/bin/<output>` — apko's entrypoint `/usr/bin/cuefn` depends on
   that path. The module source mounts in from `--source-dir`.
 
 ## Build the apk locally
@@ -124,7 +124,7 @@ key and apko rejects the apk as untrusted. See the `apko` skill.
   local nor CI uses melange's `--build-date` flag (that controls in-image file timestamps for
   reproducibility, a different concern from the ldflag date).
 - Do not override `output:` in the pipeline without updating `apko.yaml`'s `entrypoint.command`
-  and `contents.packages` — the binary path `/usr/bin/template-go` is contractual.
+  and `contents.packages` — the binary path `/usr/bin/cuefn` is contractual.
 - To add a build-time tool or a different Go toolchain, edit `environment.contents.packages`
   (Wolfi package names) in `melange.yaml`. Do not install inside the sandbox.
 
