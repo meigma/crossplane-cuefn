@@ -49,6 +49,27 @@ Two implementation gotchas (both fixed in-spike, must carry into the real `inter
 
 Author guardrail (the ONLY real constraint on schema CUE): **type-crossing disjunctions are not expressible.** `string|int` and struct unions `{a}|{b}` → `oneOf` → REJECTED structural. Same-type disjunctions (`"a"|"b"|"c"`, `80|443`) → `enum` → fine. This is a Kubernetes CRD limitation, not ours. Future nicety: detect `string|int` and emit `x-kubernetes-int-or-string: true`.
 
+## Design + plan (session 001)
+
+Authoritative spec: `.journal/001/DESIGN.md` (resolved decisions §13) and
+`.journal/001/PLAN.md` (8 phases + falsifiable success criteria). Runtime engine
+is the first implementation slice. Two non-obvious runtime traps surfaced by the
+plan review (do not re-learn the hard way):
+
+- **Strip `spec.crossplane`** (and legacy machinery keys) from the observed XR
+  spec before unifying with the *closed* `#Spec` — otherwise `resources` never
+  goes concrete in-cluster (the reference spike only worked because its
+  `input.spec` was open).
+- **No digest-by-ref:** CUE loads modules by **semver**, not OCI digest. Enforce
+  the schema↔runtime lock-step by recording the expected manifest digest and
+  **verifying it after fetch**, not by referencing the module by digest.
+
+Output contract: module returns `resources: {<stableName>: {object, ready?}}` +
+optional `status`; engine fills `input.{spec,metadata,environment}` via JSON
+marshal (float64-vs-int safety). Module cache must use a writable `CUE_CACHE_DIR`
+(function image is nonroot). Configuration/function xpkg are built in-process with
+go-containerregistry (Crossplane's xpkg builder is `internal/`, not importable).
+
 Validated **module-contract-v2** shape (one module = source of truth):
 - `#API: {group, version, kind, plural, scope, ...}` — concrete; CLI `Decode`s it for the XRD envelope.
 - `#Spec: {...}` — authoritative closed spec schema; CLI → OpenAPI → XRD `.properties.spec`; runtime unifies XR spec against it; `validate` checks against it. (Optionally `#Status`.)

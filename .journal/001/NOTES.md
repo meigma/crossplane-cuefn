@@ -95,5 +95,10 @@ Wrote `.journal/001/PLAN.md` (8 phases, each a PR), then ran a 5-lens adversaria
 
 Two blocker resolutions are technical refinements (not product forks) — flagged to developer. Ready to start P1 once the developer okays the plan.
 
+## 2026-06-28 09:18 — Close
+Session 001 closed (developer: LGTM). Implementation work for this session was PR #3 (the template-go → crossplane-cuefn rebrand), **merged** earlier this session; master fast-forwarded and the `chore/rebrand` worktree removed at that time. No other session-001 PRs (the two open Dependabot PRs #1/#2 are unrelated, untouched). No product code yet — that's intentional.
+
+Recorded: `SUMMARY.md` (postmortem + "For the next agent" hand-off, referencing DESIGN.md/PLAN.md and the reference spike); INDEX row → complete; TECH_NOTES gained a compact "Design + plan (session 001)" pointer with the two blocker traps. Hand-off: the next agent starts at **PLAN Phase 1** (render engine core + module contract) — read `.session.md` → SKILLS → TECH_NOTES → DESIGN.md → PLAN.md, then port `internal/render` from the reference spike adapted to the richer contract. DESIGN.md + PLAN.md are the authoritative spec.
+
 
 
