@@ -171,3 +171,29 @@ packaging de-risk spike (confirm crossplane's xpkg builder is non-importable
 internal/; prototype Configuration + embed-runtime Function xpkg; validate with
 `crossplane xpkg`) — findings → TECH_NOTES at the gate. Uses the now-hardened
 harness (full run, free-text work agents).
+
+## 2026-06-28 15:19 — Phase 5 signed off + merged; Phase 6 launched
+Phase 5 (PR #8) outcome — all 4 criteria **met**, 0 blockers, 0 fix rounds; the
+hardened harness ran a full phase cleanly. I independently re-ran `moon run
+root:check` (green) + the Docker/crossplane-gated pkg+cli tests (push→pull
+round-trip, `crossplane xpkg extract`, full `cuefn publish` end-to-end with the
+real digest lock-step) — all pass. Squash-merged → `master` `fc3d388`.
+
+The **digest lock-step is now closed end-to-end**: publish records the module's
+real resolved manifest digest into the Composition input; the P3 runtime accepts
+it and rejects a drifted digest (tested).
+
+Spike findings promoted to TECH_NOTES (importable escape hatch
+`crossplane-runtime/v2/pkg/xpkg`; `crossplane xpkg extract` is the acceptance
+check since inspect/validate don't exist in 2.3.3; Function-xpkg prototype only
+over empty.Image). Carry-forwards recorded: **dep-bloat decision for P6** (publish's
+cosign/sigstore deps bloat the shared serve binary → decide build-tag split vs
+accept), the `--dir` footgun, and the deprecated `dependsOn.function` field (P8).
+
+Phase 6 in flight: worktree `phase-6-funcpkg` off `fc3d388`. Scope = ship the
+function as a SIGNED Crossplane **Function** xpkg: `package/crossplane.yaml`
+(kind Function) + embedded Input CRD; build via the P5 assembler over a REAL apko
+runtime base (first real embed-runtime use); cosign-sign + SBOM + provenance;
+wire release.yml/release-dry-run.yml/security-scan.yml; AND resolve the dep-bloat
+decision (measure + build-tag-split publish out of the image binary if needed).
+The "release dry-run green in CI" criterion confirms on the PR (CI runs it).

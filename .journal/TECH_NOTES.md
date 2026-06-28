@@ -246,3 +246,53 @@ present), add a no-args apko image test, and add an `example/xrd.yaml` drift che
 (it is a committed generated artifact with no guard). Chainsaw cluster suites are
 already run-or-fail; this debt is the Go testcontainers/build-tagged suites.
 
+## Phase 5 — Configuration packaging + publish (implemented + merged 2026-06-28, PR #8)
+
+`internal/pkg` + `cuefn publish` build and push an installable Crossplane
+**Configuration** xpkg from one CUE module, closing the digest lock-step.
+- `internal/pkg`: `image.go` (`BuildXpkgImage`), `composition.go`
+  (`GenerateComposition`, embeds `input/v1beta1.Input{Module, ExpectedDigest}` as
+  the cuefn pipeline step), `meta.go` (`dependsOn` the function), `configuration.go`
+  (`BuildConfigurationImage`), `push.go` (`Push` — the only network seam).
+- `internal/render/oci.go` gained `OCILoader.ResolveDigest` (live manifest digest,
+  no cache fallback) — reused by publish.
+- `cuefn publish <module-ref> --package … --function-ref/--function-version/--dir`.
+- Proven (gated, ran under mise exec): push→pull byte-identical round-trip;
+  `crossplane xpkg extract` accepts the Configuration; the **real resolved digest**
+  flows into the Composition input and the P3 runtime accepts it / rejects drift.
+
+### XPKG PACKAGING SPIKE FINDINGS (de-risks P6)
+
+- **`crossplane/crossplane/internal/xpkg` is NON-importable** (under `internal/`).
+  The importable escape hatch is **`crossplane-runtime/v2/pkg/xpkg`**, exporting
+  `Layer`, `AnnotateLayers`, `ExtractPackageYAML`, and the
+  `StreamFile`/`PackageAnnotation`/`AnnotationKey` constants.
+- **Validated assembler layout:** `empty.Image` → `xpkg.Layer(stream,
+  "package.yaml", base, …)` → `mutate.AppendLayers`/`Config` → `xpkg.AnnotateLayers`
+  (`io.crossplane.xpkg=base`) → `remote.Write`. We own the YAML bytes, so we skip
+  the heavier `xpkg.Builder`/`parser.Backend` plumbing.
+- **`crossplane xpkg inspect`/`validate` DO NOT EXIST in crossplane 2.3.3** — only
+  `build/extract/batch/init/install/push`. Use **`crossplane xpkg extract`** as the
+  "crossplane accepts it" check (it parses the full package stream). Note this
+  deviation from the spec's "inspect" wording.
+- A prototype **Function** xpkg passes the same path — but only over `empty.Image`,
+  NOT a real runtime base. The embed-runtime (non-empty base) path of
+  `BuildXpkgImage` is implemented + documented (internal/pkg/doc.go) but **first
+  exercised for real in P6**.
+
+### Phase 5 follow-ups carried into P6 / later (non-blocking)
+
+- **DEP-BLOAT (P6 decision):** the importable `crossplane-runtime/.../xpkg` drags
+  sigstore/cosign + pkcs7 + cloud-credential SDKs into the **same `cuefn` binary
+  that serves as the function runtime** (cmd/cuefn imports internal/pkg via
+  `publish`). This will inflate the P6 function runtime image even though signing
+  is out of scope for the runtime. **P6 must decide:** exclude `publish` from the
+  image binary via a build tag (keep the runtime lean) vs. accept the measured size.
+- **`--dir` publish footgun:** XRD/Composition are generated from the LOCAL module
+  dir while `ExpectedDigest` is resolved from the REGISTRY — unpublished local edits
+  can ship an inconsistent package. Documented, not guarded.
+- **`dependsOn[].function`** uses the deprecated typed field; P8 must confirm the
+  cluster package manager still resolves the function dependency via this form.
+- crossplane-CLI validation here is annotation/parse-level (kinds present via
+  `extract`), not schema-level; full structural acceptance is P4 envtest + P8 install.
+
