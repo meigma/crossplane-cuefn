@@ -6,9 +6,31 @@ registry** — paired with `cuefn`, an operator CLI that turns one CUE module in
 a versioned Crossplane Configuration.
 
 > **Status: early development.** The toolchain, CI, and release scaffolding are
-> in place and exercised. The composition-function runtime and the `cuefn` CLI
-> commands are under active construction; the binary today is a placeholder.
+> in place and exercised. The composition-function runtime (`cuefn function`) and
+> the local author command (`cuefn render`) work end to end against a CUE module
+> over OCI; Configuration packaging and XRD codegen are still under construction.
 > Expect the surfaces described below to change.
+
+## Commands
+
+- `cuefn function` serves the Crossplane v2 composition function over gRPC. It
+  fetches the CUE module named in each pipeline step's `Input` from the OCI
+  registry (`CUE_REGISTRY`), evaluates it against the observed XR and the merged
+  `EnvironmentConfig`, and returns the rendered objects as desired composed
+  resources plus a patched composite status. Crossplane connects over mTLS by
+  default; pass `--insecure` for local `crossplane render`. This is the image's
+  default command.
+- `cuefn render <module-ref> --xr <file> [--env <file>] [--dir <dir>]` evaluates a
+  module against an XR locally and prints the rendered resources and status as
+  YAML — cluster-free and crossplane-CLI-free. `--dir` serves the module from a
+  local directory offline; otherwise it is fetched over OCI.
+
+The `example/` directory contains a runnable render loop: an XRD, a pipeline
+Composition (`function-environment-configs` → `cuefn`), an XR, an
+`EnvironmentConfig`, and a `functions.yaml`. With the module published to a
+registry and `cuefn function --insecure` running, `crossplane render` over those
+assets produces the composed resources and an env-driven field sourced from the
+`EnvironmentConfig`.
 
 ## The idea
 

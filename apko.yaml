@@ -20,6 +20,10 @@ contents:
 
 entrypoint:
   command: /usr/bin/cuefn
+# Serve the composition function by default: bare `cuefn` prints help and would
+# not serve, so the image's default command is the `function` subcommand. An
+# operator can still override the args (e.g. `render`) at runtime.
+cmd: function
 
 # Create the nonroot user/group (uid/gid 65532) and run as it — Wolfi has no
 # `nonroot` package; the user is defined here, mirroring distroless:nonroot.

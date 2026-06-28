@@ -1,0 +1,31 @@
+# Hand-written XRD for the example XApp platform API. It mirrors the example
+# module's #API (group/kind/plural/scope) and #Spec (image, replicas). Codegen
+# of this envelope from the module lands in a later phase; for now it is written
+# by hand so `crossplane render` has a composite type to validate against.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xapps.platform.meigma.io
+spec:
+  scope: Namespaced
+  group: platform.meigma.io
+  names:
+    kind: XApp
+    plural: xapps
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                image:
+                  type: string
+                replicas:
+                  type: integer
+                  minimum: 1
+                  maximum: 10

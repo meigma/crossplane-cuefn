@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"cuelang.org/go/mod/modconfig"
@@ -305,9 +306,9 @@ func resolveCacheDir(explicit string, env []string) (string, error) {
 // mirror process-environment override semantics.
 func getEnv(env []string, key string) string {
 	prefix := key + "="
-	for i := len(env) - 1; i >= 0; i-- {
-		if strings.HasPrefix(env[i], prefix) {
-			return env[i][len(prefix):]
+	for _, e := range slices.Backward(env) {
+		if strings.HasPrefix(e, prefix) {
+			return e[len(prefix):]
 		}
 	}
 	return ""

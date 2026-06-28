@@ -64,6 +64,22 @@ url = "https://github.com/chainguard-dev/melange/releases/download/v0.54.0/melan
 checksum = "sha256:e7b44654803809bf9f79daec70097bbede9a5d33c1d925888ef1e19d5b4cb1a7"
 url = "https://github.com/chainguard-dev/melange/releases/download/v0.54.0/melange_0.54.0_darwin_amd64.tar.gz"
 
+[[tools."aqua:crossplane/crossplane"]]
+version = "2.3.3"
+backend = "aqua:crossplane/crossplane"
+
+[tools."aqua:crossplane/crossplane"."platforms.linux-arm64"]
+url = "https://releases.crossplane.io/stable/v2.3.3/bin/linux_arm64/crank"
+
+[tools."aqua:crossplane/crossplane"."platforms.linux-x64"]
+url = "https://releases.crossplane.io/stable/v2.3.3/bin/linux_amd64/crank"
+
+[tools."aqua:crossplane/crossplane"."platforms.macos-arm64"]
+url = "https://releases.crossplane.io/stable/v2.3.3/bin/darwin_arm64/crank"
+
+[tools."aqua:crossplane/crossplane"."platforms.macos-x64"]
+url = "https://releases.crossplane.io/stable/v2.3.3/bin/darwin_amd64/crank"
+
 [[tools."aqua:golangci/golangci-lint"]]
 version = "2.12.2"
 backend = "aqua:golangci/golangci-lint"
