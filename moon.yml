@@ -29,6 +29,12 @@ fileGroups:
     - '.golangci.yml'
     - 'mise.toml'
     - 'mise.lock'
+  cueModules:
+    # CUE fixtures the render tests evaluate offline: the canonical example
+    # module and the per-case testdata modules. Listed as test inputs so the
+    # test task stays correct if caching is ever enabled.
+    - 'example/**/*.cue'
+    - 'internal/render/testdata/**/*.cue'
   releaseConfig:
     - '.goreleaser.yaml'
     - 'ghd.toml'
@@ -68,6 +74,7 @@ tasks:
     command: 'go test ./...'
     inputs:
       - '@group(goSources)'
+      - '@group(cueModules)'
     options:
       cache: false
 
@@ -81,6 +88,7 @@ tasks:
     inputs:
       - '@group(goSources)'
       - '@group(lintConfig)'
+      - '@group(cueModules)'
       - '@group(releaseConfig)'
     options:
       cache: false
