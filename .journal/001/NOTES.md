@@ -57,5 +57,12 @@ Key design decisions / risks I flagged back to the developer (to resolve before/
 - (F) Version/digest lock-step — generated XRD/Configuration must pin the exact module digest it was generated from, so schema and runtime transformation never drift.
 - Repo fit: template-go already has Cobra/Viper → operator CLI = cobra subcommands; runtime function = server binary (shared CUE engine core). melange/apko/cosign → sign function image (and maybe module/Configuration).
 
+## 2026-06-27 22:30 — Reviewed reference spike; runtime half proven
+Read the full spike at catalyst-infra .../platform/mvp/cuefn (details + adopted stack in TECH_NOTES "Reference spike"). Verdict: the **runtime half is done and clean** — adopt `internal/render` (Engine + ModuleLoader/OCILoader/LocalLoader), the `input{spec,metadata,environment}`→`resources` contract, the JSON-marshal/float trick, the OCI modregistry loader, and the fn.go wiring largely as-is. Resolves my open questions B (module pull — solved), D (contract — defined, minus strict schema), E (env from context — confirmed, needs function-environment-configs upstream).
+
+The **DX half is the green-field** we build: (1) formalize a "module contract v2" with a strict `#Spec` + API metadata so one module drives everything; (2) CLI `generate` (CUE→OpenAPI→XRD via `encoding/openapi`); (3) `package/publish` (wrap XRD + generated Composition into a Configuration, xpkg build/push — shell out like the spike, import Crossplane as stretch); (4) bonus `validate` (XR vs `#Spec`). Plus repo-ification: rename module path to `github.com/meigma/crossplane-cuefn`, add deps, swap ko→melange/apko/cosign, function server + cobra CLI sharing `internal/render`.
+
+Remaining real risks: A (CUE→OpenAPI structural-schema fidelity — still the top unknown, spike never did codegen so untested), transitive OCI deps, digest lock-step (F). Next: align with developer on module-contract-v2 shape and whether to start with a codegen spike (de-risk A) before scaffolding the repo.
+
 
 
