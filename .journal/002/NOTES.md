@@ -60,3 +60,27 @@ Phase 1 in flight:
 Open question for the user (non-blocking, answer before P1 lands): after sign-off
 should I (a) squash-merge + auto-start the next phase, or (b) wait for an explicit
 "go" each time; and (c) does the user merge or do I, post-sign-off.
+
+## 2026-06-28 11:00 — Phase 1 signed off + merged; Phase 2 launched
+User chose **auto-continue** (I squash-merge on sign-off, then immediately start
+the next phase) and **I merge after approval**.
+
+Phase 1 (PR #4) outcome — all 7 success criteria verdicted **met** by independent
+adversarial verifiers + an independent gate runner; I also re-ran `go build`/`go
+test` in the worktree myself (green). Squash-merged → `master` is now `b3a15d1`.
+`internal/render` (engine + LocalLoader + reserved-key projection), `example/module/`,
+3 testdata fixtures, 15 tests. phase-1-engine worktree + local/remote branch
+cleaned up. Non-blocking carry-forwards: OCILoader load-failure branches dead
+until P2; `#API` only structurally present until P4 codegen; core couples to
+dir-based `load.Instances` by design (port yields a dir, not fs.FS).
+
+Harness hardening: the `understand:design` sub-agent had returned placeholder
+text ("test fact one") in P1 — outcome was unaffected (full phase spec is embedded
+in the Plan/Implement prompts), but I added a `NO_PLACEHOLDER` instruction to all
+three understand prompts.
+
+Phase 2 in flight: worktree `phase-2-oci` off `b3a15d1`; run `wf_2eb7d664-3d3`
+(task `w911fuob4`). Scope: OCILoader (modconfig/modregistry → zip → unzip →
+engine), transitive OCI deps, nonroot `CUE_CACHE_DIR`, digest verify-after-fetch;
+opens with a de-risk spike whose findings I will promote to TECH_NOTES at the gate.
+Needs Docker (testcontainers) — a new risk vs P1's pure-offline run.
