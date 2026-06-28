@@ -45,4 +45,17 @@ Prior art (study, don't necessarily copy):
 
 Open question for the developer: what specifically is the build brief, and how does it differ from `function-cue` (my guess: first-class CUE **modules consumed from an OCI registry**, leveraging this repo's supply-chain tooling).
 
+## 2026-06-27 22:05 — Brief confirmed (see TECH_NOTES "Project" section)
+Developer confirmed the build. Two halves: (1) runtime Go function that pulls a CUE module from OCI, injects XR spec + EnvironmentConfig under a well-known path, renders k8s objects; (2) operator CLI that does CUE→OpenAPI→XRD and packages/pushes a Configuration from the same module, plus a bonus XR-validate command. Full description recorded in TECH_NOTES.
+
+Key design decisions / risks I flagged back to the developer (to resolve before/while building):
+- (A) CUE→OpenAPI structural-schema fidelity — K8s CRDs require *structural* OpenAPI v3; not all CUE (disjunctions, custom error(), some regex) maps cleanly. Biggest unknown. `cuelang.org/go/encoding/openapi` is the tool; may need feature constraints on the schema portion + post-processing.
+- (B) Pulling the *main* CUE module from OCI at runtime — CUE module tooling is built to pull *dependencies*, not evaluate a fetched root module. Needs a spike: `mod/modregistry` client to fetch+unpack, then `load.Instances` with `modconfig` registry for transitive deps. Cache by digest; pin by digest.
+- (C) Reusing Crossplane's xpkg build/push for the Configuration — may live under `internal/` (non-importable). Fallbacks: shell out to `crossplane` CLI, or build the xpkg OCI artifact with go-containerregistry per the xpkg media-type spec.
+- (D) The injection/output contract — exact well-known paths for XR spec, EnvironmentConfig, and returned resources; how desired-composed-resource *names* (stable keys) are derived; whether the module also returns XR status; readiness handling (function-auto-ready vs in-module).
+- (E) EnvironmentConfig sourcing — read from pipeline context (key `apiextensions.crossplane.io/environment`, populated by function-environment-configs upstream) vs fetching EnvironmentConfigs ourselves via required resources.
+- (F) Version/digest lock-step — generated XRD/Configuration must pin the exact module digest it was generated from, so schema and runtime transformation never drift.
+- Repo fit: template-go already has Cobra/Viper → operator CLI = cobra subcommands; runtime function = server binary (shared CUE engine core). melange/apko/cosign → sign function image (and maybe module/Configuration).
+
+
 
