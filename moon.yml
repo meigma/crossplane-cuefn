@@ -142,6 +142,24 @@ tasks:
     options:
       cache: false
 
+  # Configuration packaging + push proof: assembles a Crossplane Configuration
+  # xpkg (and a prototype Function xpkg) from a CUE module, pushes it to a
+  # throwaway OCI registry, round-trips the contents, and validates the package
+  # with the pinned crossplane CLI (`crossplane xpkg extract`). The push/round-trip
+  # cases need a Docker daemon; the xpkg-validate cases need the crossplane CLI.
+  # Both self-skip when their tool is absent, but the task is kept OUT of the
+  # default `check` graph (mirroring render-test) so `moon run root:check` needs
+  # neither Docker nor crossplane. Run under `mise exec` so the pinned crossplane
+  # CLI wins over any binary on PATH.
+  publish-test:
+    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... -run 'TestPublish|TestConfigurationRoundTrip|TestXpkgValidate|TestFunctionXpkgValidate' -count 1"
+    inputs:
+      - '@group(goSources)'
+      - '@group(cueModules)'
+      - '@group(exampleAssets)'
+    options:
+      cache: false
+
   # Server-side author-time schema proof: boots an envtest apiserver, generates
   # the de-risked module's XRD, wraps it as a real CRD, and drives chainsaw plus a
   # typed client to exercise structural acceptance, apiserver defaulting, unknown-

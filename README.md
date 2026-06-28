@@ -8,7 +8,8 @@ a versioned Crossplane Configuration.
 > **Status: early development.** The toolchain, CI, and release scaffolding are
 > in place and exercised. The composition-function runtime (`cuefn function`) and
 > the local author command (`cuefn render`) work end to end against a CUE module
-> over OCI; Configuration packaging and XRD codegen are still under construction.
+> over OCI; XRD codegen (`cuefn generate`) and Configuration packaging + push
+> (`cuefn publish`) are implemented and validated against the `crossplane` CLI.
 > Expect the surfaces described below to change.
 
 ## Commands
@@ -24,6 +25,21 @@ a versioned Crossplane Configuration.
   module against an XR locally and prints the rendered resources and status as
   YAML — cluster-free and crossplane-CLI-free. `--dir` serves the module from a
   local directory offline; otherwise it is fetched over OCI.
+- `cuefn generate <module-ref> [--dir <dir>] [-o <file>]` emits the structural
+  Crossplane v2 XRD generated from the module's `#API`/`#Spec`/`#Status`.
+- `cuefn publish <module-ref> --package <oci-ref> [flags]` builds and pushes an
+  installable Crossplane **Configuration** package (`xpkg`) from one CUE module in
+  a single command: it generates the XRD, builds a pipeline Composition wired to
+  `function-environment-configs` then `cuefn`, writes the package metadata
+  (`crossplane.yaml`, depending on the cuefn function), and pushes the assembled
+  package to the destination registry. The Composition records both the module's
+  semver ref **and** its resolved OCI manifest digest, so the runtime verifies the
+  module has not drifted (the author half of the digest lock-step). `--insecure`
+  pushes over plain HTTP for a local/dev registry; `--function-ref` /
+  `--function-version` set the `dependsOn` function. The package is assembled with
+  [go-containerregistry](https://github.com/google/go-containerregistry) and the
+  public `crossplane-runtime/v2/pkg/xpkg` primitives — no `crossplane` CLI is
+  needed to build it.
 
 The `example/` directory contains a runnable render loop: an XRD, a pipeline
 Composition (`function-environment-configs` → `cuefn`), an XR, an

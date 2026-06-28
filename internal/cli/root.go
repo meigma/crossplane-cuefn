@@ -83,6 +83,7 @@ func NewRootCommand(options Options) *cobra.Command {
 		newRenderCommand(options),
 		newGenerateCommand(options),
 		newValidateCommand(options),
+		newPublishCommand(options),
 	)
 	return root
 }

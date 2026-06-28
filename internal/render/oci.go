@@ -150,6 +150,31 @@ func (o *OCILoader) Load(ctx context.Context, ref string) (Loaded, error) {
 	return o.loaded(dir), nil
 }
 
+// ResolveDigest resolves ref ("path@version") to its current OCI manifest digest
+// ("sha256:...") by querying the same registry the loader fetches modules from.
+// It is the publish-time half of the schema<->runtime digest lock-step: the
+// author records this real, resolved digest in the Composition's cuefn input so
+// the runtime loader (OCIConfig.Expect) can verify the module it later fetches
+// has not drifted. A malformed ref, a non-existent module, or an unreachable
+// registry surfaces as a clear error naming ref; no digest cache fallback is
+// used because publish must observe the live digest.
+func (o *OCILoader) ResolveDigest(ctx context.Context, ref string) (string, error) {
+	mv, err := module.ParseVersion(ref)
+	if err != nil {
+		return "", fmt.Errorf("invalid module reference %q (want path@version): %w", ref, err)
+	}
+
+	m, err := o.client.GetModule(ctx, mv)
+	if err != nil {
+		if errors.Is(err, modregistry.ErrNotFound) {
+			return "", fmt.Errorf("module %q not found in registry: %w", ref, err)
+		}
+		return "", fmt.Errorf("cannot resolve digest for module %q: %w", ref, err)
+	}
+
+	return m.ManifestDigest().String(), nil
+}
+
 // loadOffline handles a failed online resolve. A non-existent ref is propagated;
 // a transport/dial failure falls back to the last-known digest recorded for ref,
 // if any, and otherwise surfaces an unreachable-registry error.

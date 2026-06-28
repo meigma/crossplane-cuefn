@@ -168,6 +168,44 @@ func TestOCI_ExpectedDigestMismatch(t *testing.T) {
 	})
 }
 
+// TestOCI_ResolveDigest proves the publish-time digest seam returns the same
+// manifest digest the registry reports, and that it errors cleanly (no panic) on
+// a malformed or unpublished ref. This is the author half of the digest
+// lock-step: the value recorded in a published Composition's cuefn input.
+func TestOCI_ResolveDigest(t *testing.T) {
+	reg := startRegistry(t)
+	reg.publishModule(t, exampleRef, "../../example/module")
+
+	loader, err := render.NewOCILoader(render.OCIConfig{Env: reg.env(cacheDir(t))})
+	require.NoError(t, err)
+
+	t.Run("matches registry digest", func(t *testing.T) {
+		got, err := loader.ResolveDigest(context.Background(), exampleRef)
+		require.NoError(t, err)
+		assert.Equal(t, reg.manifestDigest(t, exampleRef), got)
+		assert.True(t, strings.HasPrefix(got, "sha256:"), "digest must be a sha256 ref, got %q", got)
+	})
+
+	t.Run("malformed ref", func(t *testing.T) {
+		var err error
+		require.NotPanics(t, func() {
+			_, err = loader.ResolveDigest(context.Background(), "cuefn.test/noversion")
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cuefn.test/noversion")
+	})
+
+	t.Run("unpublished ref", func(t *testing.T) {
+		var err error
+		require.NotPanics(t, func() {
+			_, err = loader.ResolveDigest(context.Background(), "cuefn.test/missing@v0.1.0")
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "cuefn.test/missing@v0.1.0")
+		assert.Contains(t, err.Error(), "not found")
+	})
+}
+
 // TestOCI_ErrorPaths proves the loader classifies failures and never panics: a
 // missing ref, a malformed ref, and an unreachable registry each produce a
 // wrapped error naming the ref or cause (criterion C6).
