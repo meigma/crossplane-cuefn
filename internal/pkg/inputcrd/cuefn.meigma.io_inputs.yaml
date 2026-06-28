@@ -1,0 +1,70 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.20.0
+  name: inputs.cuefn.meigma.io
+spec:
+  group: cuefn.meigma.io
+  names:
+    categories:
+    - crossplane
+    kind: Input
+    listKind: InputList
+    plural: inputs
+    singular: input
+  scope: Namespaced
+  versions:
+  - name: v1beta1
+    schema:
+      openAPIV3Schema:
+        description: |-
+          Input configures the cuefn composition function for one pipeline step. It is
+          embedded directly in a Composition's pipeline step input (apiVersion
+          cuefn.meigma.io/v1beta1, kind Input); the function decodes it with
+          request.GetInput before rendering.
+
+          The embedded ObjectMeta is the upstream function-Input convention: it makes
+          controller-gen emit a CustomResourceDefinition for the type, which ships
+          inside the Function xpkg (Crossplane reads the Input CRD from the package to
+          validate pipeline step inputs). The runtime ignores any metadata an author
+          happens to set; request.GetInput decodes only the typed fields below.
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          expectedDigest:
+            description: |-
+              ExpectedDigest is the OCI manifest digest the resolved Module must match,
+              in "sha256:..." form. When set it drives the runtime half of the
+              schema<->runtime digest lock-step: the loader verifies the fetched
+              manifest digest against it and fails the render on a mismatch. When empty
+              the module is resolved by version with no digest check.
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          module:
+            description: |-
+              Module is the CUE module to fetch and evaluate, in "path@version" semver
+              form (e.g. "cuefn.example/app@v0.1.0"). It is resolved against the
+              CUE_REGISTRY the function is configured with; the version selects the
+              module, not a digest.
+            type: string
+        required:
+        - module
+        type: object
+    served: true
+    storage: true

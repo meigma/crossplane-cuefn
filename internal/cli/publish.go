@@ -1,3 +1,5 @@
+//go:build !noxpkg
+
 package cli
 
 import (
@@ -28,7 +30,11 @@ type publishFlags struct {
 }
 
 const (
-	defaultFunctionRef     = "xpkg.meigma.io/cuefn"
+	// defaultFunctionRef is the cuefn Function package repo (Crossplane's
+	// function-* convention; its own repo, distinct from the runtime image repo)
+	// recorded in a published Configuration's dependsOn. It is where
+	// `cuefn publish-function` ships the Function xpkg.
+	defaultFunctionRef     = "ghcr.io/meigma/function-cuefn"
 	defaultFunctionVersion = ">=v0.0.0"
 )
 

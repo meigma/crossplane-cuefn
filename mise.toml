@@ -35,6 +35,13 @@ python = "3.14.3"
 "aqua:chainguard-dev/apko"    = "1.2.19"
 "aqua:sigstore/cosign"        = "3.1.1"
 
+# SBOM generator for the local Function xpkg supply-chain proof (moon
+# `funcpkg-test`): syft scans the pushed package image and the test parses the
+# SPDX output. CI uses anchore/sbom-action to fetch syft; this pin makes the
+# local proof reproducible. Consumed only by the gated funcpkg-test, which
+# self-skips when syft is absent, so the default check graph never needs it.
+"aqua:anchore/syft"           = "1.46.0"
+
 # Crossplane CLI, used by the moon `render-test` task to drive the end-to-end
 # `crossplane render` loop against a locally-served `cuefn function`. The render
 # test is gated to Docker + this CLI and self-skips when either is absent.
@@ -80,4 +87,22 @@ apko build apko.yaml crossplane-cuefn:dev image.tar --arch "$arch" --keyring-app
 docker load < image.tar
 docker tag "crossplane-cuefn:dev-$arch" crossplane-cuefn:dev
 echo "loaded crossplane-cuefn:dev (host arch $arch)"
+'''
+
+# Local Function xpkg packaging proof: assemble the Function package over the
+# apko-built crossplane-cuefn:dev runtime image (build it first with
+# `mise run image-local`) and push it to a destination ref. The package image IS
+# the runtime image plus the package.yaml layer, so it both installs as a
+# Crossplane Function and serves `cuefn function`. Pass the destination ref and
+# any flags after `--`, e.g.
+#   mise run package-function -- --package localhost:5005/function-cuefn:dev --insecure
+[tasks.package-function]
+description = "Assemble + push the Function xpkg over crossplane-cuefn:dev (image.tar)"
+run = '''
+set -euo pipefail
+if [ ! -f image.tar ]; then
+  echo "image.tar not found; run 'mise run image-local' first" >&2
+  exit 1
+fi
+go run ./cmd/cuefn publish-function --runtime-image image.tar "$@"
 '''

@@ -13,6 +13,12 @@ const (
 	// crossplane.yaml package metadata object for a Configuration.
 	configurationMetaAPIVersion = "meta.pkg.crossplane.io/v1"
 	configurationMetaKind       = "Configuration"
+
+	// functionMetaAPIVersion / functionMetaKind identify the crossplane.yaml
+	// package metadata object for a Function. They share the meta.pkg.crossplane.io
+	// group/version with the Configuration; only the kind differs.
+	functionMetaAPIVersion = "meta.pkg.crossplane.io/v1"
+	functionMetaKind       = "Function"
 )
 
 // ConfigurationMeta names the Configuration package and its dependency on the
@@ -65,5 +71,47 @@ func GenerateConfigurationMeta(m ConfigurationMeta) (*metav1cp.Configuration, er
 			Name: m.Name,
 		},
 		Spec: metav1cp.ConfigurationSpec{MetaSpec: spec},
+	}, nil
+}
+
+// FunctionMeta names the Function package and its optional Crossplane
+// compatibility constraint and capabilities.
+type FunctionMeta struct {
+	// Name is the package metadata.name (e.g. "function-cuefn").
+	Name string
+	// CrossplaneConstraint is an optional semver constraint on the Crossplane
+	// version the package supports (e.g. ">=v2.0.0-0"); omitted when empty.
+	CrossplaneConstraint string
+	// Capabilities are optional opaque capability strings advertised by the
+	// package; omitted when empty.
+	Capabilities []string
+}
+
+// GenerateFunctionMeta builds the meta.pkg.crossplane.io/v1 Function object (the
+// package's crossplane.yaml). A Function package carries no dependsOn — it is the
+// leaf a Configuration depends on — so the spec is just the optional Crossplane
+// constraint and capabilities.
+func GenerateFunctionMeta(m FunctionMeta) (*metav1cp.Function, error) {
+	if strings.TrimSpace(m.Name) == "" {
+		return nil, errors.New("function meta requires a name")
+	}
+
+	spec := metav1cp.MetaSpec{}
+	if strings.TrimSpace(m.CrossplaneConstraint) != "" {
+		spec.Crossplane = &metav1cp.CrossplaneConstraints{Version: m.CrossplaneConstraint}
+	}
+	if len(m.Capabilities) > 0 {
+		spec.Capabilities = m.Capabilities
+	}
+
+	return &metav1cp.Function{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: functionMetaAPIVersion,
+			Kind:       functionMetaKind,
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: m.Name,
+		},
+		Spec: metav1cp.FunctionSpec{MetaSpec: spec},
 	}, nil
 }

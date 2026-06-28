@@ -24,7 +24,16 @@
 // — yields a package that `crossplane xpkg inspect` accepts, without any
 // dependency on the crossplane CLI for building.
 //
-// The same BuildXpkgImage shape generalizes to a Function xpkg (P6): a Function
-// meta document as the package layer over a runtime image base, rather than an
-// empty base. The Configuration path here proves the layout for both.
+// # Function xpkg (embed-runtime)
+//
+// The same BuildXpkgImage shape ships the Function xpkg (function.go). The
+// package layer is a meta.pkg.crossplane.io Function plus the Input CRD
+// generated from input/v1beta1 (Crossplane reads the Input CRD from the package
+// to validate pipeline step inputs), and the base is the apko-built runtime
+// image rather than empty.Image — so the package image IS the runtime image plus
+// the package layer, and `crossplane` both accepts the package and runs the
+// embedded `cuefn function` entrypoint. BuildFunctionIndex/PushIndex extend this
+// to a multi-arch index for a real release, since the package image is the
+// runtime and must run on every node arch. The Configuration path (empty base)
+// and the Function path (runtime base) share the one assembler.
 package pkg

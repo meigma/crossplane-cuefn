@@ -53,6 +53,28 @@ func TestRootCommandPrintsConfiguredMessage(t *testing.T) {
 	}
 }
 
+// TestPackagingCommandsRegistered proves the default (untagged) build wires the
+// packaging commands into the tree. The `noxpkg` image build registers none of
+// them (packaging_noxpkg.go) so the runtime binary omits internal/pkg's heavy
+// dependency graph; this test runs untagged, guarding that the full CLI keeps
+// publish and publish-function.
+func TestPackagingCommandsRegistered(t *testing.T) {
+	t.Parallel()
+
+	root := NewRootCommand(Options{})
+
+	registered := map[string]bool{}
+	for _, c := range root.Commands() {
+		registered[c.Name()] = true
+	}
+	if !registered["publish"] {
+		t.Errorf("publish command not registered in the default build")
+	}
+	if !registered["publish-function"] {
+		t.Errorf("publish-function command not registered in the default build")
+	}
+}
+
 func TestRootCommandReadsMessageFromEnvironment(t *testing.T) {
 	t.Setenv("CUEFN_MESSAGE", "hello from viper")
 

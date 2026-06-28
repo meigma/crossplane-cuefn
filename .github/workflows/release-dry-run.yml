@@ -1,10 +1,20 @@
 # This workflow rehearses the release paths without uploading GitHub release
-# assets or publishing container images. It is intended for release PRs and
-# manual checks before changing release automation.
+# assets or publishing container images. It is intended for release PRs, PRs
+# that touch the release machinery itself, and manual checks before changing
+# release automation.
 #
 # Keep the pull_request trigger broad so required check contexts still report
-# on normal PRs. The jobs intentionally skip unless the PR head branch is a
-# Release Please branch, which avoids spending runner time on routine changes.
+# on normal PRs. The jobs intentionally skip UNLESS one of the following holds,
+# which avoids spending runner time on routine changes:
+#   * the run was started manually (workflow_dispatch), or
+#   * the PR head branch is a Release Please branch, or
+#   * the PR changes release-relevant paths (the release workflows, GoReleaser /
+#     ghd / melange / apko config, or the binary/packaging source). This makes
+#     the rehearsal actually execute on the PR that introduces or edits release
+#     plumbing, instead of only self-skipping on routine branches.
+#
+# The detect-release-changes job computes that last condition once and the
+# rehearsal jobs gate on its `run` output.
 
 name: Release Dry Run
 
@@ -17,9 +27,61 @@ on:
 permissions: {}
 
 jobs:
+  detect-release-changes:
+    name: Detect Release-Relevant Changes
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      run: ${{ steps.filter.outputs.run }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect changes to release-relevant paths
+        id: filter
+        env:
+          # Empty on workflow_dispatch; the rehearsal jobs already force-run then.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+
+          # Paths whose changes warrant a full release rehearsal: the release
+          # workflows, the GoReleaser / ghd / melange / apko packaging config, the
+          # Go module graph, and the binary + xpkg packaging source.
+          patterns='^(\.github/workflows/(release|release-dry-run|security-scan)\.yml|\.goreleaser\.ya?ml|ghd\.toml|melange\.yaml|apko\.yaml|go\.(mod|sum)|cmd/|internal/cli/(packaging|publish)|internal/pkg/|input/)'
+
+          # Fail open: when we cannot compute a diff (no base, shallow history),
+          # run the rehearsal rather than wrongly skipping it.
+          if [ -z "${BASE_SHA:-}" ]; then
+            echo "no base sha available; running rehearsal" >&2
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          changed="$(git diff --name-only "$BASE_SHA" HEAD || true)"
+          if [ -z "$changed" ]; then
+            echo "empty/failed diff against $BASE_SHA; running rehearsal" >&2
+            echo "run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          printf 'changed files:\n%s\n' "$changed" >&2
+          if printf '%s\n' "$changed" | grep -qE "$patterns"; then
+            echo "release-relevant change detected; running rehearsal" >&2
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "no release-relevant change; skipping rehearsal" >&2
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
   binary-release-dry-run:
     name: Binary Release Dry Run
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--') }}
+    needs: detect-release-changes
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--') || needs.detect-release-changes.outputs.run == 'true' }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -132,7 +194,8 @@ jobs:
   # assemble the image with apko, WITHOUT pushing, signing, or attesting.
   melange-build-dry-run:
     name: Melange Build Dry Run (${{ matrix.arch }})
-    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--') }}
+    needs: detect-release-changes
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--') || needs.detect-release-changes.outputs.run == 'true' }}
     runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
@@ -202,8 +265,9 @@ jobs:
   container-image-dry-run:
     name: Container Image Dry Run
     needs:
+      - detect-release-changes
       - melange-build-dry-run
-    if: ${{ always() && (github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--')) }}
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'release-please--') || needs.detect-release-changes.outputs.run == 'true') }}
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -224,6 +288,12 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
 
       - name: Setup mise
         uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
@@ -252,3 +322,22 @@ jobs:
 
           docker run --rm crossplane-cuefn:dry-run --version
           docker run --rm crossplane-cuefn:dry-run --message "hello from container"
+
+      # Rehearse the Function xpkg packaging over the dry-run runtime image: build
+      # the package locally (no push/sign/attest) and prove `crossplane xpkg
+      # extract` accepts it and it embeds both the Function meta and the Input CRD.
+      - name: Build Function xpkg and extract (no push)
+        run: |
+          set -euo pipefail
+
+          go run ./cmd/cuefn publish-function \
+            --runtime-image image.tar \
+            --output function.xpkg \
+            --crossplane-constraint '>=v2.0.0-0'
+
+          mise exec -- crossplane xpkg extract --from-xpkg function.xpkg -o function.gz
+
+          kinds="$(gzip -dc function.gz | grep -E '^kind:' | sort -u)"
+          printf '%s\n' "$kinds"
+          grep -q 'kind: Function' <<< "$kinds"
+          grep -q 'kind: CustomResourceDefinition' <<< "$kinds"
