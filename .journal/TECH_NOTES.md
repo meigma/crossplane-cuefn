@@ -193,3 +193,56 @@ polling, and a Chainsaw CI job **runs-or-fails (no silent `t.Skip`)**.
 - `example/functions.yaml` (committed quickstart) isn't the exact artifact the
   render-loop test validates (the test writes its own with a per-run target/port).
 
+## Phase 4 — schema CLI (implemented + merged 2026-06-28, PR #7)
+
+`internal/schema` turns CUE `#API`/`#Spec`/`#Status` into a structural XRD via the
+de-risked recipe, plus `cuefn generate` and `cuefn validate`.
+- `openapi.go` (generate with `ExpandReferences:false` + `checkDisjunctions`/
+  `walkForOneOf` to reject type-crossing disjunctions naming the field),
+  `inline.go` (cycle-detecting `$ref` inliner), `structural.go`
+  (`apiextensions-apiserver` `NewStructural`+`ValidateStructural` self-check on
+  every generate), `xrd.go` (envelope from `#API`; `.properties.status` emitted
+  IFF `#Status`), `validate.go` (unify XR spec vs `#Spec`, `Concrete(true)` so a
+  passing validate proves defaults applied), `errors.go` (`DisjunctionError`).
+- P1's `engine.go` was refactored to extract a shared **`render.LoadModule`**
+  (new `internal/render/load.go`), reused by `internal/schema` — so schema depends
+  on render (sibling core packages, no cycle, no edge-adapter leakage).
+- **Chainsaw + envtest** debut (the DECISION above): `chainsaw 0.2.15` +
+  `setup-envtest 0.20.4` pinned in mise; a build-tagged (`envtest`),
+  self-skipping `moon run root:schema-test` task wraps the generated XRD schema as
+  a real CRD and applies it to an envtest apiserver. Proven (ran it):
+  structural CRD acceptance, API-server **defaulting** (`replicas`→3),
+  unknown-field **pruning**, and a **status subresource round-trip**. The
+  envtest↔chainsaw bridge: `setup-envtest use 1.35.0 -p path` provides
+  KUBEBUILDER_ASSETS; the Go harness boots envtest and points chainsaw at it.
+
+### LESSON — workflow harness crash + recovery (the P4 run)
+
+The first P4 workflow **crashed fatally** after ~48 min: a *direct* `await
+agent({schema})` (the Implement agent) hit the StructuredOutput retry cap (5
+failed validations) and threw; unlike `parallel()` (which coalesces failures to
+null), a direct throw aborts the whole run. The implementation was already
+written to the worktree (uncommitted) and survived. Fixes applied to
+`phase-build.workflow.js`:
+- **Big work agents (understand/plan/implement/fix) now return FREE TEXT** — no
+  schema — so a StructuredOutput failure can never abort a run. Schemas remain
+  only on small decision-driving agents (verify/critic/check/PR).
+- Added a **`startAt:"verify"` finish-mode** to drive an existing worktree through
+  verify→fix→PR without re-implementing (used to recover P4 → PR #7).
+- General rule for future phases: the deliverable is the code on disk + the small
+  verdicts, never a big structured summary.
+
+### CI-EXECUTION-ASSURANCE DEBT (consolidated — address in P8 CI hardening)
+
+Recurring across phases: heavy/tool-gated tests **self-skip silently** when their
+tool (or network for asset download) is absent, so a green CI check may never run
+the proof. Instances so far: P2 OCI tests (Docker), P3 render-loop (a generic
+`crossplane` shim shadowing the mise binary), P3 apko image default-`cmd` (the
+test overrides CMD so `cmd: function` is unasserted), P4 `schema-test`
+(chainsaw/envtest + envtest-asset download). They are mise-pinned and almost
+certainly run on GitHub runners, but it is "probably," not "asserted." **P8 CI
+hardening:** make these suites **fail-rather-than-skip** in CI (assert tools
+present), add a no-args apko image test, and add an `example/xrd.yaml` drift check
+(it is a committed generated artifact with no guard). Chainsaw cluster suites are
+already run-or-fail; this debt is the Go testcontainers/build-tagged suites.
+

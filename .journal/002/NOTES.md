@@ -142,3 +142,32 @@ detecting $ref inliner, XRD envelope), `cuefn generate` + `cuefn validate`, the
 Go structural self-check (apiextensions-apiserver), AND the Chainsaw+envtest
 server-side accept/default/status checks. New tools: apiextensions-apiserver
 (dep), Chainsaw + setup-envtest (pinned in mise, dedicated moon/CI task).
+
+## 2026-06-28 14:41 — Phase 4 (recovered) signed off + merged; Phase 5 launched
+Phase 4 was a saga. The first full workflow **crashed fatally** at ~48 min: the
+Implement agent (a direct schema'd `agent()`) hit the StructuredOutput retry cap
+and threw, aborting the run (parallel() coalesces such failures to null, but a
+direct await does not). The implementation had been written to the worktree
+(uncommitted) and survived. I: (1) hardened the harness — big work agents now
+return free text, schemas only on small decision agents, plus a `startAt:"verify"`
+finish-mode; (2) independently confirmed the salvaged work (build, unit tests, and
+the envtest+chainsaw proof — CRD accept + defaulting + pruning + status
+round-trip, all pass); (3) ran the harness in finish-mode → PR #7, all 5 criteria
+met, 0 blockers, 0 fix rounds. I re-ran `moon run root:check` (green) + the
+validate behaviors + the envtest proof myself. Squash-merged → `master` `c76e1a8`.
+
+Recorded in TECH_NOTES: Phase 4 summary, the harness-crash LESSON, and a
+consolidated **CI-execution-assurance debt** (4 self-skip instances; fix as a P8
+CI-hardening pass — fail-rather-than-skip + no-args image test + example/xrd.yaml
+drift check). User chose to keep momentum: track it for P8, not a separate pass now.
+
+Phase 5 in flight: worktree `phase-5-publish` off `c76e1a8`. Scope = `internal/pkg`
++ `cuefn publish`: build & push an installable Crossplane **Configuration** xpkg
+(XRD from P4 + a pipeline Composition `function-environment-configs`→`cuefn` +
+`crossplane.yaml` dependsOn the function) from Go via go-containerregistry, with
+the **digest lock-step recorded** (Composition input carries module semver ref +
+the expected manifest digest resolved at publish time). Opens with the xpkg
+packaging de-risk spike (confirm crossplane's xpkg builder is non-importable
+internal/; prototype Configuration + embed-runtime Function xpkg; validate with
+`crossplane xpkg`) — findings → TECH_NOTES at the gate. Uses the now-hardened
+harness (full run, free-text work agents).
