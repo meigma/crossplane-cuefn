@@ -80,6 +80,9 @@ Scope notes: the 3 exploration agents missed `.github/scripts/` and `.agents/ski
 
 Verified: `git grep template-go` = 0 hits; `go build/test`, `gofmt` clean; `.github/scripts` py tests 11/11; `goreleaser check` ok; `moon run root:check` all 7 tasks pass (incl. strict docs build). Opened **PR #3** (https://github.com/meigma/crossplane-cuefn/pull/3); CI running. `.wt/chore-rebrand` worktree stays until merge.
 
+## 2026-06-28 00:45 — Rebrand merged
+PR #3 squash-merged to master (`29685c2`); worktree removed, local+remote `chore/rebrand` deleted, local master fast-forwarded. Sanity on master: module path, `cmd/cuefn`, `internal/appinfo`, zero template-go residue, DELETE_ME gone, dual LICENSE present. Repo is now cleanly branded; ready to start engine/CLI + xpkg work.
+
 Next: land xpkg packaging + start the engine (`internal/render` from the spike) and `internal/schema` codegen (from the de-risk spike) behind cobra subcommands.
 
 
