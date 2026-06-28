@@ -43,6 +43,10 @@ type OCIConfig struct {
 	// map are not digest-checked. This is the runtime half of the schema<->runtime
 	// digest lock-step: CUE references modules by semver, not digest, so the
 	// expected digest is verified after fetch rather than referenced directly.
+	//
+	// Only the root module ref passed to Load is verified. Transitive dependency
+	// refs in this map are ignored: deps are resolved immutably by version through
+	// CUE's module cache, so a per-dep digest lock is out of scope here.
 	Expect map[string]string
 }
 
@@ -336,9 +340,9 @@ func dirExists(path string) bool {
 	return err == nil && info.IsDir()
 }
 
-// unzipModule extracts a CUE module zip into dir. CUE module zips prefix each
-// entry with "<module>@<version>/", which is stripped so dir becomes the module
-// root.
+// unzipModule extracts a CUE module zip into dir. The zip returned by the CUE
+// registry (modregistry GetZip) has module-root-relative entries (e.g.
+// "cue.mod/module.cue", "api.cue"), so each entry maps directly under dir.
 func unzipModule(r io.Reader, dir string) error {
 	buf, err := io.ReadAll(r)
 	if err != nil {
@@ -349,24 +353,14 @@ func unzipModule(r io.Reader, dir string) error {
 		return err
 	}
 	for _, f := range zr.File {
-		name := stripModulePrefix(f.Name)
-		if name == "" || strings.HasSuffix(f.Name, "/") {
+		if f.Name == "" || strings.HasSuffix(f.Name, "/") {
 			continue
 		}
-		if err := writeZipEntry(f, filepath.Join(dir, filepath.FromSlash(name))); err != nil {
+		if err := writeZipEntry(f, filepath.Join(dir, filepath.FromSlash(f.Name))); err != nil {
 			return err
 		}
 	}
 	return nil
-}
-
-// stripModulePrefix removes a leading "<module>@<version>/" path segment if
-// present, leaving the module-root-relative path.
-func stripModulePrefix(name string) string {
-	if i := strings.IndexByte(name, '/'); i >= 0 && strings.Contains(name[:i], "@") {
-		return name[i+1:]
-	}
-	return name
 }
 
 // writeZipEntry writes one zip entry to dest, creating parent directories.
