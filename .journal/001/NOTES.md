@@ -69,5 +69,18 @@ Ran the CUE→OpenAPI→XRD codegen spike (scratch `…/scratchpad/codegen-spike
 
 Next decision point for the developer: proceed to scaffold the real repo (rename module path → github.com/meigma/crossplane-cuefn, add proven deps + internal/render from the spike, stand up internal/schema codegen from this spike, cobra CLI skeleton), and pick the first build slice. Remaining unknowns are now lower-risk: transitive OCI module deps, xpkg/Configuration packaging (shell vs import), digest lock-step.
 
+## 2026-06-28 00:30 — Repo rebrand template-go → crossplane-cuefn (PR #3)
+Per developer request, branded the repo off the template-go scaffold (no product code yet). Plan: `/Users/josh/.claude/plans/let-s-just-proceed-with-wise-nygaard.md` (approved). Worked in worktree `.wt/chore-rebrand` off origin/master.
+
+Decisions: binary `cuefn` (env prefix `CUEFN`); image/repo-ish names → `crossplane-cuefn` (GHCR `ghcr.io/meigma/crossplane-cuefn`); dual-license **Apache-2.0 OR MIT**; reset versioning → **0.1.0**.
+
+Done: module path → `github.com/meigma/crossplane-cuefn`; `cmd/template-go`→`cmd/cuefn`; `internal/templateinfo`→`internal/appinfo`; rebranded moon/goreleaser/ghd/melange/apko/mise/release-please/workflows + `.github/scripts/*` (incl. tests) + vendored apko/melange/mise SKILL.md; rewrote README/docs/SECURITY; regen `docs/uv.lock`; `is_template=false`; added LICENSE-APACHE/MIT; removed DELETE_ME.md.
+
+Scope notes: the 3 exploration agents missed `.github/scripts/` and `.agents/skills/` — both carried template-go names; rebranded them too (kept the Python tests green). Deferred (NOT done): Crossplane **xpkg** packaging adaptation (template still builds a normal GHCR image), and all engine/CLI code.
+
+Verified: `git grep template-go` = 0 hits; `go build/test`, `gofmt` clean; `.github/scripts` py tests 11/11; `goreleaser check` ok; `moon run root:check` all 7 tasks pass (incl. strict docs build). Opened **PR #3** (https://github.com/meigma/crossplane-cuefn/pull/3); CI running. `.wt/chore-rebrand` worktree stays until merge.
+
+Next: land xpkg packaging + start the engine (`internal/render` from the spike) and `internal/schema` codegen (from the de-risk spike) behind cobra subcommands.
+
 
 
