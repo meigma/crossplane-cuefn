@@ -85,5 +85,15 @@ PR #3 squash-merged to master (`29685c2`); worktree removed, local+remote `chore
 
 Next: land xpkg packaging + start the engine (`internal/render` from the spike) and `internal/schema` codegen (from the de-risk spike) behind cobra subcommands.
 
+## 2026-06-28 01:30 — DESIGN locked + phased PLAN (reviewed)
+Walked the developer through 7 open design questions one-by-one; all resolved and folded into `.journal/001/DESIGN.md` (§13): one `cuefn` binary (`cuefn function` = server/entrypoint); full output contract (keyed-map `resources` + readiness + `status`); author-controlled resource keys; single XRD version in v1; self-contained xpkg packaging (go-containerregistry); transitive CUE deps supported; runtime engine is the first slice.
+
+Wrote `.journal/001/PLAN.md` (8 phases, each a PR), then ran a 5-lens adversarial review **workflow** (ordering / sizing / completeness / criteria / risk; 5 agents, ~311k tokens). It found 2 blockers + many majors. Integrated:
+- **Blocker 1 — `spec.crossplane`:** v2 XRs nest machinery under `spec.crossplane`; filling a *closed* `#Spec` with the full spec conflicts. Fix (DESIGN §3/§4 + PLAN P1): engine strips reserved keys before unifying. Spike's `input.spec` was open, hiding this.
+- **Blocker 2 — digest lock-step:** CUE refs are **semver**, not OCI digests (`module.ParseVersion` rejects non-semver). Fix (DESIGN §4/§6 + PLAN P2/P5): record semver ref + expected manifest digest; runtime **verifies after fetch**, rejects drift.
+- Also integrated: nonroot `CUE_CACHE_DIR` writability; xpkg builder is `internal/` (non-importable) → P5 packaging spike; missing `cuefn render` → added to P3; tool provisioning (crossplane CLI/controller-tools/cue/kind pinned per phase); sharpened, falsifiable success criteria everywhere (float64 proof, keyed-key verbatim, readiness 3-state, digest-keyed-not-tag cache, RunFunction observables, XRD fidelity not just structural, external xpkg validation, concrete cluster observables); merged `validate` into P4; split docs (P7) from kind e2e (P8); P2 & P5 now open with de-risk spikes. One review finding discarded as stale (claimed repo still `template-go` — rename is merged), but its apko-entrypoint sub-point (→ `cuefn function`) was valid and integrated.
+
+Two blocker resolutions are technical refinements (not product forks) — flagged to developer. Ready to start P1 once the developer okays the plan.
+
 
 

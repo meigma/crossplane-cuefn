@@ -97,6 +97,14 @@ status?: #Status
 `input.spec: #Spec` keeps XRD-defaults (API-server-filled) and render-defaults
 from the same source → no drift.
 
+> **Reserved-key projection (plan-review blocker #1).** Crossplane v2 XRs nest
+> machinery under `spec.crossplane` (compositionRef, resourceRefs, …). The engine
+> must project the XR's **user** spec into `input.spec` with the reserved
+> `crossplane` key (and any legacy machinery keys) **removed**, so a *closed*
+> `#Spec` doesn't conflict and `resources` can go concrete in-cluster. `#Spec`
+> stays closed (authoring stays strict); the stripping happens in the engine, not
+> the contract.
+
 ## 4. Runtime function (`internal/render` + `cuefn function`)
 
 Port the spike's engine, adapted to the richer contract:
@@ -110,12 +118,17 @@ Port the spike's engine, adapted to the richer contract:
   Patch `status` onto the desired composite. (Readiness uses the SDK's
   `resource.Ready` enum; absent `ready` → unspecified.)
 - **OCI load with deps:** `modconfig.NewResolver`/`NewRegistry` →
-  `modregistry.GetModule` → `GetZip` → unzip → `load.Instances` with
-  **`load.Config{Registry: ...}`** so a module may `import` other OCI modules.
-  Honors `CUE_REGISTRY` (+`+insecure`). **Cache fetched modules + deps on disk,
-  keyed by digest**; pin by digest.
-- **fn.go:** read `Input.Module` (`path@version` or digest), observed XR
-  spec/metadata, env from context key `apiextensions.crossplane.io/environment`.
+  `modregistry.GetModule` → `GetZip` → unzip → `load.Instances`. Transitive deps
+  resolve through CUE's module machinery from `CUE_REGISTRY` (verify in the
+  Phase-2 spike whether an explicit `load.Config{Registry}` is even needed, or
+  CUE auto-creates the registry when nil). Honors `+insecure`.
+- **Module cache (nonroot-safe).** Use CUE's module cache; set **`CUE_CACHE_DIR`**
+  to a writable path and give the function pod a writable cache mount (the image
+  runs as nonroot uid 65532, often with a read-only root fs). Don't assume the
+  default `$HOME/.cache`.
+- **fn.go:** read `Input.Module` (`path@version` — CUE refs are **semver**, not
+  OCI digests), observed XR spec/metadata (reserved keys stripped, above), env
+  from context key `apiextensions.crossplane.io/environment`.
 - **Pipeline requirement:** `function-environment-configs` upstream populates env.
 - **First slice ends** at a working `crossplane render` loop against an example
   module (publish module → run `cuefn function` → render → see resources+status).
@@ -146,11 +159,17 @@ Same-type disjunctions (enums) are fine. Future: detect `string|int` →
   as input) + `crossplane.yaml` (`meta.pkg.crossplane.io`, `dependsOn` this
   function).
 - **Self-contained build/push:** assemble + push the Configuration xpkg from Go
-  (go-containerregistry). First check whether Crossplane's xpkg builder is an
-  importable package and reuse it; otherwise implement against the xpkg
-  media-type spec. **No dependency on an external `crossplane` CLI.**
-- **Digest lock-step:** the generated Composition pins the module by **digest**,
-  so XRD schema and runtime transform can't drift.
+  (go-containerregistry). Crossplane's xpkg builder lives under `internal/` and is
+  **not importable**, so implement against the xpkg media-type/annotation spec
+  (confirm + prototype in a packaging spike). **No dependency on an external
+  `crossplane` CLI.**
+- **Digest lock-step (plan-review blocker #2).** CUE loads modules by **semver**,
+  not OCI digest, so we can't *reference* the module by digest. Instead: the CLI
+  resolves the module version → manifest digest at generate time and records BOTH
+  the semver ref and the expected digest in the Composition input; the runtime
+  loads by semver and **verifies the fetched module's manifest digest matches the
+  expected one**, rejecting drift. (Validate the exact mechanism in the Phase-2
+  spike — recorded module sum vs. manifest-digest check.)
 - **Registry split:** function image/packages need HTTPS (Crossplane pkg manager
   is HTTPS-only); CUE modules can use any OCI registry (incl. plain-HTTP local).
 
