@@ -31,3 +31,32 @@ Current state of the world:
 Plan: re-read DESIGN §13 and PLAN Phase 1 in full, load the `cue` skill, start a
 fresh implementation worktree off `origin/master`, port + adapt the engine, write
 functional + unit tests offline, open one PR for the phase.
+
+## 2026-06-28 09:59 — Orchestration design + Phase 1 launched (ultracode)
+User switched to **ultracode** and asked for a workflow to complete **all 8
+phases**, with a hard rule: **manual human sign-off at the end of each phase
+before any PR is merged**; otherwise the workflow does whatever the plan/design
+requires.
+
+Key constraint resolved: a background Workflow runs to completion with no
+mid-run human-pause primitive, so a single all-phases workflow that merges would
+violate the gate. **Decision: one reusable per-phase workflow, run once per
+phase, with the main loop (me) holding the merge gate between runs.** Each run
+does understand → plan → implement (in an isolated worktree) → adversarially
+verify every PLAN success criterion (one verifier per criterion + completeness
+critic + independent build/test/check runner) → bounded fix loop → open a PR and
+**STOP**. The workflow has **no merge step** — nothing reaches master without
+explicit human sign-off.
+
+Reusable harness: `…/scratchpad/phase-build.workflow.js` (parameterized via
+`args` = phase spec + success criteria + worktree path + context pointers).
+Hit + fixed an args-stringification footgun (script now JSON.parses string args).
+
+Phase 1 in flight:
+- Worktree `phase-1-engine` at `.wt/phase-1-engine`, branched off `origin/master`.
+- Workflow run `wf_06e60105-ad4` (task `w1cdyeycc`) launched. Output = a PR
+  awaiting sign-off; I do NOT merge until the user approves.
+
+Open question for the user (non-blocking, answer before P1 lands): after sign-off
+should I (a) squash-merge + auto-start the next phase, or (b) wait for an explicit
+"go" each time; and (c) does the user merge or do I, post-sign-off.
