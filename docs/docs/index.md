@@ -1,16 +1,19 @@
 ---
-title: template-go Docs
+title: crossplane-cuefn
 slug: /
-description: Starting point for Meigma Go projects.
+description: Crossplane v2 composition function that renders Kubernetes resources from CUE modules.
 ---
 
-# template-go Docs
+# crossplane-cuefn
 
-This repository is the starting point for Meigma Go projects.
+A [Crossplane v2](https://crossplane.io) composition function that renders
+Kubernetes resources from CUE modules distributed over an OCI registry, paired
+with the `cuefn` operator CLI.
 
-Generated projects should replace this page with project-specific documentation after bootstrapping:
+!!! note "Early development"
+    The toolchain, CI, and release scaffolding are in place. The
+    composition-function runtime and the `cuefn` CLI commands are under active
+    construction. These docs will grow as those surfaces land.
 
-- project summary
-- quick start
-- operating notes
-- support and security paths
+See the [README](https://github.com/meigma/crossplane-cuefn#readme) for the
+current overview and development workflow.

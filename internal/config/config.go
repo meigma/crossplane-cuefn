@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/meigma/template-go/internal/templateinfo"
+	"github.com/meigma/crossplane-cuefn/internal/appinfo"
 )
 
 // Config contains runtime settings used by the starter CLI.
@@ -18,7 +18,7 @@ type Config struct {
 func Load(vp *viper.Viper) Config {
 	message := strings.TrimSpace(vp.GetString("message"))
 	if message == "" {
-		message = templateinfo.Summary()
+		message = appinfo.Summary()
 	}
 
 	return Config{

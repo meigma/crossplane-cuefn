@@ -1,7 +1,7 @@
 ---
 name: apko
 description: >
-  Assemble the runtime OCI image for template-go with apko (`apko.yaml`) — the
+  Assemble the runtime OCI image for crossplane-cuefn with apko (`apko.yaml`) — the
   Dockerfile-free, multi-arch, nonroot image built from the melange-produced apk plus a
   minimal Wolfi base. Use when changing image contents, the `image-local` mise task, the
   `apko build`/`apko publish` steps in `.github/workflows/release.yml` or
@@ -60,11 +60,11 @@ Read `apko.yaml` before changing anything. The load-bearing parts:
   never committed. Without the matching pub key in the keyring, apko refuses the `@local`
   apk as unsigned.
 - `contents.packages`: `wolfi-baselayout`, `ca-certificates-bundle`, `tzdata`, and
-  `template-go@local`. The `@local` suffix pins the package to the `@local` repository,
+  `cuefn@local`. The `@local` suffix pins the package to the `@local` repository,
   i.e. the apk melange just built (not anything from the Wolfi index).
 - `accounts`: defines group+user `nonroot` (gid/uid **65532**) and `run-as: 65532`. Wolfi has
   no `nonroot` package, so the user is created here. This mirrors `distroless:nonroot`.
-- `entrypoint.command: /usr/bin/template-go` — where the `go/build` melange pipeline
+- `entrypoint.command: /usr/bin/cuefn` — where the `go/build` melange pipeline
   installs the binary.
 - `archs: [amd64, arm64]` — the index architectures.
 - `annotations`: OCI labels. `org.opencontainers.image.version` carries the
@@ -73,21 +73,21 @@ Read `apko.yaml` before changing anything. The load-bearing parts:
 ## Local build (the `image-local` mise task)
 
 `mise run image-local` builds a single host-arch image and loads it into Docker as
-`template-go:dev` for local running/inspection. The apko step is:
+`crossplane-cuefn:dev` for local running/inspection. The apko step is:
 
 ```bash
-apko build apko.yaml template-go:dev image.tar \
+apko build apko.yaml crossplane-cuefn:dev image.tar \
   --arch "$arch" \
   --keyring-append ./melange.rsa.pub
 docker load < image.tar
-docker tag "template-go:dev-$arch" template-go:dev
+docker tag "crossplane-cuefn:dev-$arch" crossplane-cuefn:dev
 ```
 
 Non-obvious points:
 
 - **The retag is required, not cosmetic.** A single-arch `apko build` loads into Docker under
-  an arch-suffixed tag (`template-go:dev-amd64` / `-arm64`, using the Go arch name from
-  `go env GOARCH`). The task retags to the plain `template-go:dev` so it is easy to
+  an arch-suffixed tag (`crossplane-cuefn:dev-amd64` / `-arm64`, using the Go arch name from
+  `go env GOARCH`). The task retags to the plain `crossplane-cuefn:dev` so it is easy to
   `docker run`. `security-scan.yml` does the same (`...:security-scan-amd64` → `...:security-scan`).
 - `apko build` writes a tarball for `docker load`. The positional output can also be an
   `oci-layout-dir/`, but the repo uses a `.tar`.

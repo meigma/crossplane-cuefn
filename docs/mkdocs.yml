@@ -1,8 +1,8 @@
-site_name: template-go
-site_description: Meigma Go repository template
-site_url: https://meigma.github.io/template-go/
-repo_name: meigma/template-go
-repo_url: https://github.com/meigma/template-go
+site_name: crossplane-cuefn
+site_description: Crossplane v2 composition function that renders Kubernetes resources from CUE modules
+site_url: https://meigma.github.io/crossplane-cuefn/
+repo_name: meigma/crossplane-cuefn
+repo_url: https://github.com/meigma/crossplane-cuefn
 edit_uri: edit/master/docs/docs/
 docs_dir: docs
 site_dir: build

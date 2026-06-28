@@ -7,8 +7,8 @@ tags:
   - 'uv'
 
 project:
-  title: 'template-go docs'
-  description: 'MkDocs documentation site for the Meigma Go repository template.'
+  title: 'crossplane-cuefn docs'
+  description: 'MkDocs documentation site for crossplane-cuefn.'
   owner: 'meigma'
   maintainers:
     - 'meigma'
