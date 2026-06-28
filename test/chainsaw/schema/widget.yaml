@@ -1,0 +1,8 @@
+apiVersion: platform.example.com/v1alpha1
+kind: XWidget
+metadata:
+  name: chainsaw-widget
+spec:
+  # replicas is intentionally omitted so apiserver defaulting must fill it (3).
+  image: ghcr.io/podinfo:1
+  tier: premium

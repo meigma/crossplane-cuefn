@@ -1,31 +1,57 @@
-# Hand-written XRD for the example XApp platform API. It mirrors the example
-# module's #API (group/kind/plural/scope) and #Spec (image, replicas). Codegen
-# of this envelope from the module lands in a later phase; for now it is written
-# by hand so `crossplane render` has a composite type to validate against.
+# XRD for the example XApp platform API. This file is GENERATED from the example
+# module's #API/#Spec/#Status by `cuefn generate`; regenerate it with:
+#
+#   cuefn generate cuefn.example/app@v0 --dir example/module --output example/xrd.yaml
+#
+# The envelope (group/kind/plural/scope/version) comes from #API; the spec and
+# status schemas (including defaults and the replicas bounds) come from #Spec and
+# #Status, so the XRD and the runtime engine share one source of truth.
 apiVersion: apiextensions.crossplane.io/v2
 kind: CompositeResourceDefinition
 metadata:
   name: xapps.platform.meigma.io
 spec:
-  scope: Namespaced
   group: platform.meigma.io
   names:
     kind: XApp
     plural: xapps
+  scope: Namespaced
   versions:
-    - name: v1alpha1
-      served: true
-      referenceable: true
-      schema:
-        openAPIV3Schema:
-          type: object
-          properties:
-            spec:
-              type: object
-              properties:
-                image:
-                  type: string
-                replicas:
-                  type: integer
-                  minimum: 1
-                  maximum: 10
+  - name: v1alpha1
+    referenceable: true
+    schema:
+      openAPIV3Schema:
+        properties:
+          spec:
+            description: |-
+              #Spec is the authoritative, closed XR spec schema. It feeds runtime
+              defaults/validation from the same source the CLI uses for codegen. replicas is
+              bounded to demonstrate schema-driven validation.
+            properties:
+              image:
+                default: ghcr.io/stefanprodan/podinfo:6.7.0
+                type: string
+              replicas:
+                default: 1
+                maximum: 10
+                minimum: 1
+                type: integer
+            required:
+            - image
+            - replicas
+            type: object
+          status:
+            description: |-
+              #Status is the optional XR status schema. The transform returns a value of
+              this shape to be patched onto the composite.
+            properties:
+              ready:
+                type: boolean
+              url:
+                type: string
+            required:
+            - ready
+            - url
+            type: object
+        type: object
+    served: true

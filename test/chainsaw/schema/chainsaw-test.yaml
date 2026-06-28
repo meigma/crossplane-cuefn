@@ -1,0 +1,52 @@
+# Server-side proof that a cuefn-generated schema behaves on a real API server.
+#
+# The generated XRD's openAPIV3Schema is wrapped as a real CustomResourceDefinition
+# (crd.yaml is generated on the fly by the Go harness from the de-risked module,
+# since a bare apiserver has no Crossplane controllers) and applied to an envtest
+# apiserver. These steps exercise the pure apiserver behaviors chainsaw expresses
+# declaratively: structural ACCEPTANCE of the CRD and apiserver DEFAULTING of an
+# omitted field. PRUNING of an unknown field and the STATUS subresource
+# round-trip run in the Go harness via a typed client on the same apiserver:
+# chainsaw applies with strict field validation (which rejects unknown fields
+# rather than letting the apiserver prune them) and cannot write a subresource.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: schema-server-side
+spec:
+  # Generous timeouts so the apiserver has time to establish the freshly applied
+  # CRD before the first custom resource is created.
+  timeouts:
+    apply: 90s
+    assert: 90s
+    error: 90s
+  steps:
+    - name: install-crd
+      description: Applying the generated CRD proves structural acceptance.
+      try:
+        - apply:
+            file: crd.yaml
+        - assert:
+            resource:
+              apiVersion: apiextensions.k8s.io/v1
+              kind: CustomResourceDefinition
+              metadata:
+                name: xwidgets.platform.example.com
+              status:
+                (conditions[?type == 'Established'] | [0].status): "True"
+    - name: create-widget
+      description: Create a widget that omits the defaulted replicas field.
+      try:
+        - apply:
+            file: widget.yaml
+    - name: defaulting
+      description: The apiserver fills the omitted, #Spec-defaulted replicas field.
+      try:
+        - assert:
+            resource:
+              apiVersion: platform.example.com/v1alpha1
+              kind: XWidget
+              metadata:
+                name: chainsaw-widget
+              spec:
+                replicas: 3

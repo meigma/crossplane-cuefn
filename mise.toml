@@ -40,6 +40,14 @@ python = "3.14.3"
 # test is gated to Docker + this CLI and self-skips when either is absent.
 "aqua:crossplane/crossplane"  = "2.3.3"
 
+# Author-time schema server-side proof (moon `schema-test`): chainsaw drives the
+# declarative apply/assert against an envtest apiserver, and setup-envtest installs
+# the etcd + kube-apiserver binaries envtest boots. Both are consumed only by the
+# build-tagged `internal/schema` chainsaw harness, which self-skips when they are
+# absent, so the default check graph never needs them.
+"aqua:kyverno/chainsaw"                                  = "0.2.15"
+"aqua:kubernetes-sigs/controller-runtime/setup-envtest" = "0.20.4"
+
 [env]
 # Pin the Go toolchain: never auto-download a toolchain other than the one above.
 # The version here is authoritative and matches go.mod's `go 1.26.4`.
