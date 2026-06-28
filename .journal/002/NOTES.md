@@ -84,3 +84,34 @@ Phase 2 in flight: worktree `phase-2-oci` off `b3a15d1`; run `wf_2eb7d664-3d3`
 engine), transitive OCI deps, nonroot `CUE_CACHE_DIR`, digest verify-after-fetch;
 opens with a de-risk spike whose findings I will promote to TECH_NOTES at the gate.
 Needs Docker (testcontainers) — a new risk vs P1's pure-offline run.
+
+## 2026-06-28 12:29 — Phase 2 signed off + merged; Phase 3 launched
+Phase 2 (PR #5) outcome — all 7 criteria verdicted **met** by adversarial
+verifiers that ran the Docker-backed tests; 1 fix round (critic caught the spike
+findings weren't recorded → fixed). I independently re-ran build/vet/full-test
+(Docker present, OCI tests genuinely ran, 4.x s) — green.
+
+Before merge I applied two cleanups the critic surfaced (user agreed): removed the
+dead+buggy `stripModulePrefix` (GetZip entries are root-relative) and documented
+that `OCIConfig.Expect` verifies the **root module ref only**. Re-ran
+`moon run root:check` (green) → squash-merged. `master` is now `7fa2199`.
+phase-2-oci worktree + branches cleaned up.
+
+Spike findings promoted to TECH_NOTES ("Phase 2 — OCI loading"): explicit
+registry injection (not nil-auto, avoids races); `CUE_CACHE_DIR` nonroot caching;
+digest verify-after-fetch (semver not digest); **CUE modcache is keyed by
+module@version not content digest** → loader owns a digest-keyed root cache +
+ref→digest pointer; error classification; the read-only-tempdir cleanup gotcha.
+
+Follow-ups carried (non-blocking, in TECH_NOTES): CI doesn't *assert* the
+Docker-backed OCI tests ran (silent `t.Skip` without Docker — fine on
+ubuntu-latest today; harden when we touch CI); one untested offline branch.
+
+Phase 3 in flight: worktree `phase-3-function` off `7fa2199`; scope = wire the
+engine into a Crossplane v2 composition function (`cuefn function` gRPC server +
+image entrypoint), add `cuefn render` (cluster-free local eval), the `Input` type
+under `input/v1beta1` (semver ref + optional expected-digest), example XRD/
+Composition/XR/EnvironmentConfig/functions.yaml, and prove a real
+`crossplane render` loop. New tools this phase: protobuf, controller-tools, the
+`crossplane` CLI — must be pinned in mise + wired into moon/CI. Needs Docker for
+the `function-environment-configs` step of `crossplane render`.

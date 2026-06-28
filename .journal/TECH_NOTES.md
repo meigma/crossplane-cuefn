@@ -76,3 +76,52 @@ Validated **module-contract-v2** shape (one module = source of truth):
 - Transform (regular fields): `input: {spec: #Spec, metadata, environment}` + `resources: [...]`. Because `input.spec: #Spec`, the same defaults/constraints apply at render — XRD defaults (API-server-filled) and render defaults come from one place, so no drift.
 Codegen reduces to definitions-only, so the transform fields never interfere with OpenAPI generation. Confirmed `controller-tools`-free; pure CUE Go API + `apiextensions-apiserver` for the accept-check.
 
+## Phase 2 — OCI loading (implemented + merged 2026-06-28, PR #5)
+
+`internal/render` now has an `OCILoader` adapter beside `LocalLoader`. The
+`ModuleLoader` port returns a `Loaded{Dir, Registry modconfig.Registry, Cleanup}`
+value; `LocalLoader` returns `Registry: nil` + no-op cleanup (P1 offline path is
+byte-identical), `OCILoader` supplies a registry so the engine wires
+`load.Config.Registry` only when present.
+
+De-risk spike findings (now proven in code + tests):
+- **Transitive deps** resolve through `load.Config.Registry`. We **inject the
+  registry explicitly** rather than relying on CUE auto-creating one from
+  `CUE_REGISTRY` when `Registry` is nil — the nil-auto path is process-global and
+  races under parallel tests. No `cue.sum` is needed in the consumer fixture;
+  programmatic load via the injected registry resolves/verifies deps.
+- **Nonroot cache:** CUE honors `CUE_CACHE_DIR` (`internal/cueconfig.CacheDir`).
+  Point it (or `OCIConfig.CacheDir`) at a writable non-`$HOME` path for a
+  read-only-root / nonroot (uid 65532) runtime. `NewOCILoader` forces
+  `CUE_CACHE_DIR` to the resolved dir so both CUE's modcache and the loader's
+  extraction cache live there.
+- **Digest verify-after-fetch:** refs are **semver, not digests**;
+  `modregistry`'s `Module.ManifestDigest()` is verified after fetch against
+  `OCIConfig.Expect`. `Expect` checks the **root module ref only** — transitive
+  deps are immutable-by-version, so per-dep digest locks are out of scope.
+- **CRITICAL (drives the cache design):** CUE's modcache is keyed by
+  `module@version`, **NOT content digest**. Republishing different content under
+  the same `v0.1.0` yields a different manifest digest, but a version-keyed cache
+  would serve stale content. Hence the loader owns a **digest-keyed** cache for
+  the **root** module: `<cache>/cuefn-oci/<alg>/<digest>/` (atomic temp+rename) +
+  a `ref→digest` pointer file for offline serving. Transitive deps stay on CUE's
+  version-keyed cache (versions are immutable, so safe).
+- **Error classification:** `modregistry.ErrNotFound` (404 / NAME_UNKNOWN) →
+  non-existent-ref error; transport/dial failures → fall back to the cached
+  pointer, else an unreachable-registry error. All wrap `%w` and name the ref.
+- **Test gotcha:** `t.TempDir()` cleanup fails with EPERM (`unlinkat`) because CUE
+  marks extracted dependency files read-only — chmod the tree writable before
+  removal (the `cacheDir(t)` helper does this).
+- Fixtures are published via the **Go `modregistry` API** (`modzip.CreateFromDir`
+  + `PutModule`), no `cue` CLI; tests use a `registry:2.8.3` testcontainer and
+  `t.Skip` when Docker is absent. (Removed the spike's `<module>@<version>/`
+  prefix strip — `GetZip` returns module-root-relative entries.)
+
+Open follow-ups carried forward (non-blocking):
+- **CI does not *assert* the Docker-backed OCI tests ran** — they `t.Skip`
+  without Docker, so a green check could one day not exercise OCI. GitHub
+  `ubuntu-latest` has Docker preinstalled (they do run today). When hardening CI,
+  make it fail-rather-than-skip (assert Docker present for the integration tests).
+- Minor untested offline branch: pointer exists but the digest extraction dir is
+  missing (`cannot reach registry … and no cached copy`).
+
