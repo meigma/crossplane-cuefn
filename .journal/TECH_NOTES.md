@@ -125,3 +125,71 @@ Open follow-ups carried forward (non-blocking):
 - Minor untested offline branch: pointer exists but the digest extraction dir is
   missing (`cannot reach registry … and no cached copy`).
 
+## Phase 3 — function + render loop (implemented + merged 2026-06-28, PR #6)
+
+The library is now a Crossplane v2 composition function, kept as a clean adapter
+over the untouched `internal/render` core.
+- `input/v1beta1`: `Input` type (`Module` semver ref + optional `ExpectedDigest`
+  for the lock-step) with controller-gen deepcopy (`controller-gen` pinned via a
+  go.mod `tool` directive, wired into moon `generate`/`generate-check`).
+- `internal/function`: `RunFunction` adapter — decodes `Input`, builds
+  `render.Inputs` from the observed XR (spec via reserved-key projection +
+  metadata) and env from `request.GetContextKey(apiextensions.crossplane.io/environment)`,
+  calls `Engine.Render`, sets desired composed resources keyed by author names
+  verbatim with readiness → proto enum, patches desired composite status, sets a
+  `FunctionSuccess` condition, returns a single FATAL `(rsp, nil)` on any
+  malformed/unreachable input. `OCILoaderFactory` folds `ExpectedDigest` into
+  `OCIConfig.Expect`. All Crossplane proto/req/resp translation lives here, not in
+  the core (the core reaches it only through the `ModuleLoader` port).
+- `cuefn function` (gRPC serve, mTLS/insecure) + `cuefn render` (cluster-free
+  offline eval). `apko.yaml` gained `cmd: function` so the image serves by default.
+- `crossplane` CLI pinned in mise (v2.3.3). Example assets: XRD, pipeline
+  Composition (`function-environment-configs` → `cuefn`), XR, EnvironmentConfig,
+  functions.yaml.
+- Proven locally (Docker + crossplane present): the real `crossplane render` loop
+  runs end-to-end and asserts an EnvironmentConfig value (`tier: production`)
+  overrides the module default — env flows through; the apko image serves gRPC.
+
+### DECISION — Chainsaw is the e2e harness for API-server-facing tests (2026-06-28)
+
+For anything that needs a **real Kubernetes API server**, use **Chainsaw**
+(Kyverno's declarative apply/assert e2e tool) rather than hand-rolled client-go.
+Rationale: declarative `apply`/`assert` with built-in eventual-consistency
+polling, and a Chainsaw CI job **runs-or-fails (no silent `t.Skip`)**.
+- **P8 (kind e2e):** primary use — install Configuration + Function, instantiate
+  XR, assert reconcile to `Ready`, composed resources, status, env-merge, and the
+  digest-drift guard.
+- **P4 (server-side XRD checks):** use Chainsaw against a real apiserver (prefer
+  **envtest** — lightweight, no kubelet; these are pure apiserver behaviors). The
+  generated XRD `openAPIV3Schema` is wrapped as a real **CRD** and applied to the
+  apiserver to exercise structural acceptance + defaulting + status round-trip
+  (a bare apiserver has no Crossplane controllers, so test the schema via a CRD,
+  not by installing the XRD and expecting an XR API to appear). Keep the fast
+  `apiextensions-apiserver` `NewStructural`/`ValidateStructural` check as a Go
+  unit test alongside it.
+- **NOT for:** the render engine, OCI loader, `RunFunction` proto tests, `cuefn
+  render`, `crossplane render` loop, or the apko gRPC smoke — those stay
+  Go + testcontainers (no API server involved). Optional later nicety: assert
+  `crossplane render` output via `crossplane render | chainsaw assert`.
+- Confirm the current Chainsaw version + the exact envtest→kubeconfig bridge
+  pattern at P4 implementation time before wiring (don't trust memory of the API).
+- Pin Chainsaw (+ setup-envtest at P4, kind at P8) in mise; give the e2e suites a
+  dedicated moon/CI task.
+
+### Phase 3 follow-ups carried forward (non-blocking)
+
+- **CI-execution-assurance (recurring, now 3 items):** the Go integration tests
+  self-skip without their tool — P2 OCI tests skip without Docker; P3 render-loop
+  skips if a generic `crossplane` shim shadows the mise binary on `moon ci`'s PATH;
+  and the apko image test passes explicit `function` args that override the OCI
+  `CMD`, so apko's default `cmd: function` is asserted only manually, not by a test.
+  Fix when hardening CI (fold into P8): assert tools present (fail-rather-than-skip)
+  and add a no-args image test. (Chainsaw fixes this for the *cluster* suites only.)
+- Hexagonal seam: `internal/render` core exposes `resource.Ready` (a
+  function-sdk-go type) — spec-permitted, from P1/P2, but an adapter type on the
+  core boundary.
+- Partial `RunFunction` error-path coverage (input-decode / set-desired failure
+  branches not exercised).
+- `example/functions.yaml` (committed quickstart) isn't the exact artifact the
+  render-loop test validates (the test writes its own with a per-run target/port).
+

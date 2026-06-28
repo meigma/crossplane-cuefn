@@ -115,3 +115,30 @@ Composition/XR/EnvironmentConfig/functions.yaml, and prove a real
 `crossplane render` loop. New tools this phase: protobuf, controller-tools, the
 `crossplane` CLI — must be pinned in mise + wired into moon/CI. Needs Docker for
 the `function-environment-configs` step of `crossplane render`.
+
+## 2026-06-28 13:24 — Phase 3 signed off + merged; Chainsaw decision; Phase 4 launched
+Phase 3 (PR #6) outcome — all 4 criteria **met**, including the two heavy
+integration checks; 2 fix rounds (a gate failure, then a critic blocker). I
+independently re-ran the gate **and** the heavy tests under `mise exec`: `moon run
+root:check` green, and `go test ./internal/function/...` ran the real
+`crossplane render` loop (registry container + crossplane v2.3.3 + Docker +
+function-environment-configs) and the apko-image gRPC smoke — both passed on my
+machine. Squash-merged → `master` is now `6c36041`. phase-3 cleaned up.
+
+**Chainsaw decision** (user raised it; I agreed with a sharp boundary): Chainsaw
+is the harness for **API-server-facing** tests only — primary at **P8** (kind
+e2e) and brought forward to **P4** (server-side XRD accept/default/status via
+envtest, schema wrapped as a CRD). NOT for the engine/OCI/proto/render-loop/gRPC
+tests (those stay Go + testcontainers). Recorded in TECH_NOTES with the rationale,
+the envtest-CRD approach, and the instruction to confirm exact Chainsaw+envtest
+patterns at implementation time. This also gives the cluster suites run-or-fail CI
+(no silent skip) — but the Go-integration silent-skip gap (P2/P3) is separate and
+still tracked for a CI-hardening pass (fold into P8).
+
+Phase 4 in flight: worktree `phase-4-schema` off `6c36041`. Scope = `internal/schema`
+codegen (CUE #API/#Spec/#Status → structural XRD via the de-risked recipe:
+definitions-only reduction, `openapi.Generate` ExpandReferences:false, cycle-
+detecting $ref inliner, XRD envelope), `cuefn generate` + `cuefn validate`, the
+Go structural self-check (apiextensions-apiserver), AND the Chainsaw+envtest
+server-side accept/default/status checks. New tools: apiextensions-apiserver
+(dep), Chainsaw + setup-envtest (pinned in mise, dedicated moon/CI task).
