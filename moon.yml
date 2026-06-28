@@ -30,9 +30,11 @@ fileGroups:
     - 'mise.toml'
     - 'mise.lock'
   cueModules:
-    # CUE fixtures the render tests evaluate offline: the canonical example
-    # module and the per-case testdata modules. Listed as test inputs so the
-    # test task stays correct if caching is ever enabled.
+    # CUE fixtures the render tests evaluate: the canonical example module and
+    # the per-case testdata modules (including the OCI fixtures under
+    # internal/render/testdata/oci, published to a throwaway registry by the
+    # integration tests). Listed as test inputs so the test task stays correct
+    # if caching is ever enabled.
     - 'example/**/*.cue'
     - 'internal/render/testdata/**/*.cue'
   releaseConfig:
@@ -70,6 +72,10 @@ tasks:
     outputs:
       - 'bin/cuefn'
 
+  # The OCI loader integration tests publish CUE modules to a throwaway
+  # registry:2 container via testcontainers-go. They need a running Docker
+  # daemon (present on CI's ubuntu-latest runners) and self-skip when none is
+  # available, so this task stays green on a developer machine without Docker.
   test:
     command: 'go test ./...'
     inputs:

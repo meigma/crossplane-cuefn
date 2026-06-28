@@ -8,10 +8,11 @@
 // optional readiness hint) and an optional top-level status. Module authors
 // never see Crossplane's request/response internals.
 //
-// This package is pure and offline: a [ModuleLoader] port abstracts where the
-// module bytes come from, and the only adapter shipped here is [LocalLoader],
-// which serves a fixed directory. OCI loading, the gRPC function, and codegen
-// live in other packages.
+// The engine itself is pure: a [ModuleLoader] port abstracts where the module
+// bytes come from. Two adapters ship here — [LocalLoader] serves a fixed
+// directory offline, and [OCILoader] fetches a module (and its transitive CUE
+// dependencies) from an OCI registry per CUE_REGISTRY. The gRPC function and
+// codegen live in other packages.
 package render
 
 import (
@@ -88,15 +89,29 @@ func New(loader ModuleLoader) *Engine {
 // readiness, and status it produces. It errors if the module is missing, fails
 // to evaluate, violates its #Spec, or leaves resources or status non-concrete.
 func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, error) {
-	dir, cleanup, err := e.loader.Load(ctx, ref)
+	ld, err := e.loader.Load(ctx, ref)
 	if err != nil {
 		return Result{}, fmt.Errorf("cannot load module %q: %w", ref, err)
 	}
-	defer cleanup()
+	defer ld.Cleanup()
 
 	cctx := cuecontext.New()
 
-	insts := load.Instances([]string{"."}, &load.Config{Dir: dir})
+	cfg := &load.Config{Dir: ld.Dir}
+	// A registry is supplied only by loaders that fetch from OCI; it resolves the
+	// module's transitive CUE dependencies at load time. An explicit registry is
+	// not strictly required: when cfg.Registry is nil (and not SkipImports), CUE's
+	// load.Config auto-creates one from CUE_REGISTRY via modconfig.NewRegistry over
+	// cfg.Env. OCILoader supplies its own anyway so the registry is built from the
+	// loader's controlled Env (with CUE_CACHE_DIR forced to a writable, non-$HOME
+	// path) and shares one modcache with the digest-aware root client. LocalLoader
+	// leaves it nil so a self-contained module loads offline and dep-free modules
+	// render identically whether the registry is set or not.
+	if ld.Registry != nil {
+		cfg.Registry = ld.Registry
+	}
+
+	insts := load.Instances([]string{"."}, cfg)
 	if len(insts) == 0 {
 		return Result{}, fmt.Errorf("module %q contains no CUE instances", ref)
 	}

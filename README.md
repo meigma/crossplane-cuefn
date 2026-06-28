@@ -30,6 +30,53 @@ That single module is the source of truth for two things:
 The result: define a platform API once, in CUE; publish the module and an
 auto-generated Configuration; install and instantiate XRs.
 
+## Loading modules from an OCI registry
+
+The render engine (`internal/render`) is pure and offline; where a module's bytes
+come from is a pluggable `ModuleLoader` port. Two adapters ship today:
+
+- `LocalLoader` serves a fixed directory — used for tests and offline
+  development.
+- `OCILoader` fetches a module (and its transitive CUE dependencies) from an OCI
+  registry using the CUE module-registry protocol.
+
+`OCILoader` is configured with `OCIConfig` and honours the standard CUE
+environment:
+
+- **`CUE_REGISTRY`** selects the registry, including the `+insecure` suffix for a
+  plain-HTTP (e.g. localhost) registry. It is read from `OCIConfig.Env`; when
+  `Env` is nil the process environment is used. An explicit
+  `load.Config{Registry}` is **not required** for dependency resolution — when it
+  is nil CUE's loader auto-creates a registry from `CUE_REGISTRY` over the same
+  `Env`. `OCILoader` supplies its own registry anyway so it is built from the
+  loader's controlled `Env` (with `CUE_CACHE_DIR` forced) and shares one modcache
+  with the digest-aware root client.
+- **`CUE_CACHE_DIR`** (or `OCIConfig.CacheDir`, which takes precedence) points the
+  module cache at a **writable, non-`$HOME`** path. The function image runs
+  nonroot on a read-only root filesystem, so the cache must live somewhere
+  writable — set this to an `emptyDir`/tmp path in that deployment.
+- **`OCIConfig.Expect`** optionally pins the expected manifest digest for a ref.
+  CUE references modules by **semver, not digest**, so the loader verifies the
+  fetched module's manifest digest against the expected value *after* fetch and
+  rejects a mismatch — the runtime half of the schema↔runtime digest lock-step.
+
+### Two caches, by design
+
+A CUE module version is immutable by convention, and CUE's own module cache is
+keyed by `module@version`: once a version is extracted it is served from disk
+without re-resolving the tag. That is correct for **transitive dependencies**
+(resolved through CUE's version-keyed cache), but it cannot detect a **root
+module** whose content changed under the same tag.
+
+So `OCILoader` handles the root module digest-aware: every load re-resolves the
+tag to its current manifest digest and keys a small loader-owned extraction cache
+(under `<cache>/cuefn-oci/`) by that digest. Republished content under the same
+tag yields a new digest, a cache miss, and a re-render. A `ref → digest` pointer
+lets a fresh process serve the last-known digest from cache when the registry is
+unreachable, while a reachable registry always resolves digest-fresh. A
+non-existent ref propagates as an error; a transport failure falls back to the
+cache when possible.
+
 ## Local bootstrap
 
 Prerequisites:
