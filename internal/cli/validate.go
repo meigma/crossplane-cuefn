@@ -31,8 +31,8 @@ func newValidateCommand(options Options) *cobra.Command {
 		Short: "Validate a populated XR against a module's #Spec",
 		Long: "Read an XR YAML file and check its spec against the target module's #Spec " +
 			"using the same CUE evaluation the runtime engine uses. With --dir the module " +
-			"is served from a local directory offline; otherwise it is fetched from the OCI " +
-			"registry configured via CUE_REGISTRY. Exits non-zero on the first violation.",
+			"is served from a local directory; otherwise it is fetched from the OCI " +
+			"registry configured via CUE_REGISTRY (the central registry by default). Exits non-zero on the first violation.",
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,

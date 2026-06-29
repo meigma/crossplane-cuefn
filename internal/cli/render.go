@@ -32,8 +32,8 @@ func newRenderCommand(options Options) *cobra.Command {
 		Short: "Render a CUE module against an XR locally and print the result",
 		Long: "Evaluate a CUE module against an observed XR and optional environment, " +
 			"printing the rendered composed resources and composite status as YAML. " +
-			"With --dir the module is served from a local directory offline; otherwise " +
-			"it is fetched from the OCI registry configured via CUE_REGISTRY.",
+			"With --dir the module is served from a local directory; otherwise " +
+			"it is fetched from the OCI registry configured via CUE_REGISTRY (the central registry by default).",
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,

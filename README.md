@@ -25,7 +25,8 @@ a versioned Crossplane Configuration.
 - `cuefn render <module-ref> --xr <file> [--env <file>] [--dir <dir>]` evaluates a
   module against an XR locally and prints the rendered resources and status as
   YAML — cluster-free and crossplane-CLI-free. `--dir` serves the module from a
-  local directory offline; otherwise it is fetched over OCI.
+  local directory (its dependencies resolved from the registry — central by
+  default); otherwise it is fetched over OCI.
 - `cuefn generate <module-ref> [--dir <dir>] [-o <file>]` emits the structural
   Crossplane v2 XRD generated from the module's `#API`/`#Spec`/`#Status`.
 - `cuefn publish <module-ref> --package <oci-ref> [flags]` builds and pushes an
@@ -80,18 +81,23 @@ auto-generated Configuration; install and instantiate XRs.
 
 ## Loading modules from an OCI registry
 
-The render engine (`internal/render`) is pure and offline; where a module's bytes
-come from is a pluggable `ModuleLoader` port. Two adapters ship today:
+The render engine (`internal/render`) is pure; where a module's bytes come from is
+a pluggable `ModuleLoader` port. Two adapters ship today:
 
-- `LocalLoader` serves a fixed directory — used for tests and offline
-  development.
+- `LocalLoader` serves a fixed directory. Its zero value is offline (used by the
+  hermetic tests); `NewLocalLoader` attaches a registry so a local module's
+  transitive dependencies resolve too.
 - `OCILoader` fetches a module (and its transitive CUE dependencies) from an OCI
   registry using the CUE module-registry protocol.
 
 `OCILoader` is configured with `OCIConfig` and honours the standard CUE
 environment:
 
-- **`CUE_REGISTRY`** selects the registry, including the `+insecure` suffix for a
+- **`CUE_REGISTRY`** selects the module registry. When unset, the central registry
+  (`registry.cue.works`) is the default, so a module's public dependencies (e.g.
+  the example's `cue.dev/x/k8s.io` import) resolve automatically; set it only for a
+  private or override registry, using the `prefix=registry` form to keep central as
+  the fallback. It includes the `+insecure` suffix for a
   plain-HTTP (e.g. localhost) registry. It is read from `OCIConfig.Env`; when
   `Env` is nil the process environment is used. An explicit
   `load.Config{Registry}` is **not required** for dependency resolution — when it

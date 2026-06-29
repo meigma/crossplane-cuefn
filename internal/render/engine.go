@@ -10,9 +10,10 @@
 //
 // The engine itself is pure: a [ModuleLoader] port abstracts where the module
 // bytes come from. Two adapters ship here — [LocalLoader] serves a fixed
-// directory offline, and [OCILoader] fetches a module (and its transitive CUE
-// dependencies) from an OCI registry per CUE_REGISTRY. The gRPC function and
-// codegen live in other packages.
+// directory (offline for a self-contained module, or resolving dependencies
+// through a registry via [NewLocalLoader]), and [OCILoader] fetches a module
+// (and its transitive CUE dependencies) from an OCI registry per CUE_REGISTRY.
+// The gRPC function and codegen live in other packages.
 package render
 
 import (

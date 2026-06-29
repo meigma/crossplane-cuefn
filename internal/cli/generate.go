@@ -31,8 +31,9 @@ func newGenerateCommand(options Options) *cobra.Command {
 		Short: "Generate a structural XRD from a CUE module's #API/#Spec/#Status",
 		Long: "Load a CUE module and emit the Crossplane v2 CompositeResourceDefinition " +
 			"generated from its #API envelope and #Spec/#Status schemas as YAML. With " +
-			"--dir the module is served from a local directory offline; otherwise it is " +
-			"fetched from the OCI registry configured via CUE_REGISTRY.",
+			"--dir the module is served from a local directory; otherwise it is " +
+			"fetched over OCI. Either way its dependencies resolve from CUE_REGISTRY " +
+			"(the central registry by default).",
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,

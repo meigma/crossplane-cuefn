@@ -29,12 +29,33 @@ fetching command runs, these select the registry and cache.
 
 ### `CUE_REGISTRY`
 
-Selects the OCI registry the CUE module is fetched from. It supports the
-`+insecure` suffix for a plain-HTTP registry (e.g. a localhost throwaway):
+Selects the OCI registry CUE modules are fetched from. **You usually do not need
+to set it.** When `CUE_REGISTRY` is unset, the central registry
+(`registry.cue.works`) is the default, so a module's public dependencies — for
+example the official Kubernetes schema `cue.dev/x/k8s.io` the example module
+imports — resolve automatically.
+
+Set `CUE_REGISTRY` only to point at a **private or override** registry. To serve
+your own modules from a private registry while keeping central as the default for
+everything else, use the **prefix form** — central stays the catch-all, so no
+trailing `,registry.cue.works` is needed:
+
+```sh
+# your.org/* from the private registry; cue.dev/x/k8s.io etc. still from central
+export CUE_REGISTRY='your.org=registry.internal'
+```
+
+A **bare** value *replaces* the central default for all modules — the deliberate
+single-registry override for an air-gapped mirror or an offline/local registry. It
+supports the `+insecure` suffix for a plain-HTTP registry (e.g. a localhost
+throwaway):
 
 ```sh
 export CUE_REGISTRY=localhost:5000+insecure
 ```
+
+The longest matching module-path prefix wins, so you can combine entries (a
+comma-separated list) to route different prefixes to different registries.
 
 `CUE_REGISTRY` selects the **CUE module** registry only. It is independent of the
 registry a Configuration or Function package is pushed to, which must be HTTPS
@@ -42,9 +63,10 @@ registry a Configuration or Function package is pushed to, which must be HTTPS
 
 ### `CUE_CACHE_DIR` / `--cache-dir`
 
-Points the module cache at a writable directory. `--cache-dir` (or
-`OCIConfig.CacheDir` in code) takes precedence over `CUE_CACHE_DIR`, which takes
-precedence over the OS user-cache default.
+Points the module cache at a writable directory. `--cache-dir` is available on the
+fetching commands (`render`, `generate`, `validate`, `publish`, `function`) and
+(like `OCIConfig.CacheDir` in code) takes precedence over `CUE_CACHE_DIR`, which
+takes precedence over the OS user-cache default.
 
 !!! warning "Nonroot runtime requires a writable cache"
     The function runtime image runs as a nonroot user (uid 65532) on a read-only

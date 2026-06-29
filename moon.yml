@@ -250,6 +250,21 @@ tasks:
     options:
       cache: false
 
+  # Render smoke for the user-facing example: prove the example module still
+  # evaluates and renders its Kubernetes objects (instantiated from the official
+  # cue.dev/x/k8s.io schema, resolved from the default central registry) — the
+  # light "it doesn't break" check the example gets instead of being woven into
+  # the unit test suite. Like xrd-check it loads the example's dependency, so CI
+  # warms the CUE module cache (see .github/workflows/ci.yml).
+  example-check:
+    command: 'bash -c "mkdir -p bin && go run ./cmd/cuefn render cuefn.example/app@v0 --dir example/module --xr example/xr.yaml > bin/render.out && cat bin/render.out && grep -q Deployment bin/render.out && grep -q Service bin/render.out && grep -q ConfigMap bin/render.out"'
+    inputs:
+      - '@group(goSources)'
+      - 'example/module/**/*.cue'
+      - 'example/xr.yaml'
+    options:
+      cache: false
+
   # Kind end-to-end proof: boots a throwaway kind cluster, stands up a CA-trusted
   # HTTPS registry (Crossplane xpkgs) and a plain-HTTP registry (CUE modules),
   # installs Crossplane via helm, publishes + installs the Function (P6) and the
@@ -282,6 +297,7 @@ tasks:
       - 'root:test'
       - 'root:generate-check'
       - 'root:xrd-check'
+      - 'root:example-check'
       - 'docs:build'
     inputs:
       - '@group(goSources)'

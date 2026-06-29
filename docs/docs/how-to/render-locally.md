@@ -1,8 +1,8 @@
 # How to render a module locally
 
 `cuefn render` evaluates a module against an XR and prints the result — no
-cluster, no `crossplane` CLI, no registry. Use it as the inner dev loop while
-writing a module.
+cluster and no `crossplane` CLI. Use it as the inner dev loop while writing a
+module.
 
 ## Render from a local directory
 
@@ -16,6 +16,12 @@ cuefn render cuefn.example/app@v0 \
 
 The output is YAML: a `resources` map keyed by the module's resource names (each
 with its rendered `object` and a `ready` value) and an optional `status`.
+
+`--dir` serves the module from disk. A self-contained module renders fully
+offline; a module that imports public schemas (the example imports
+`cue.dev/x/k8s.io`) resolves those from the central registry on the first run and
+caches them, so it stays cluster-free. Use `--cache-dir` to point that cache at a
+specific writable directory.
 
 ## Supply an environment
 
@@ -36,8 +42,9 @@ datum from the `"unset"` default to `production`.
 
 ## Render from the registry
 
-Omit `--dir` to fetch the module over OCI instead. Set `CUE_REGISTRY` first
-(add `+insecure` for a plain-HTTP registry):
+Omit `--dir` to fetch the module itself over OCI. Set `CUE_REGISTRY` only to point
+at a private or local module registry (add `+insecure` for plain-HTTP); public
+dependencies still resolve from the central registry by default:
 
 ```sh
 export CUE_REGISTRY=localhost:5000+insecure

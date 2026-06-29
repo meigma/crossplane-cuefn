@@ -25,6 +25,12 @@ jobs:
       # Never auto-download a Go toolchain other than the mise-pinned one
       # (mise [env] is not carried by the action's shims, so set it on the job).
       GOTOOLCHAIN: local
+      # Pin the CUE module cache to a deterministic path the cache step below can
+      # persist. xrd-check and example-check resolve the example's
+      # cue.dev/x/k8s.io dependency from the default central registry (no
+      # CUE_REGISTRY set), so a warm cache keeps the blocking gate fast and
+      # resilient to a transient registry hiccup.
+      CUE_CACHE_DIR: ${{ github.workspace }}/.cue-cache
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -69,6 +75,14 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-golangci-lint-${{ hashFiles('mise.lock', '.golangci.yml', 'go.sum') }}-
             ${{ runner.os }}-golangci-lint-
+
+      - name: Cache CUE modules
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
+        with:
+          path: ${{ github.workspace }}/.cue-cache
+          key: ${{ runner.os }}-cue-mod-${{ hashFiles('example/module/cue.mod/module.cue') }}
+          restore-keys: |
+            ${{ runner.os }}-cue-mod-
 
       - name: Cache uv downloads
         uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
