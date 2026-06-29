@@ -6,49 +6,12 @@ import (
 
 	xpkg "github.com/crossplane/crossplane-runtime/v2/pkg/xpkg"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/meigma/crossplane-cuefn/internal/pkg"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
-
-// fixtureFunction builds a Function from the embedded Input CRD plus a generated
-// meta. It is the shared input for the function packaging tests.
-func fixtureFunction(t *testing.T) pkg.Function {
-	t.Helper()
-
-	meta, err := pkg.GenerateFunctionMeta(pkg.FunctionMeta{Name: "function-cuefn"})
-	require.NoError(t, err)
-
-	fn, err := pkg.DefaultFunction(meta)
-	require.NoError(t, err)
-	return fn
-}
-
-// fakeRuntimeBase builds a synthetic runtime image base standing in for the apko
-// image: a few random layers plus the entrypoint/cmd and os/arch the real image
-// carries. The tests assert the package layer rides on top of this without
-// disturbing the runtime config.
-func fakeRuntimeBase(t *testing.T, arch string) v1.Image {
-	t.Helper()
-
-	img, err := random.Image(256, 2)
-	require.NoError(t, err)
-
-	cfg, err := img.ConfigFile()
-	require.NoError(t, err)
-	cfg = cfg.DeepCopy()
-	cfg.OS = "linux"
-	cfg.Architecture = arch
-	cfg.Config.Entrypoint = []string{"/usr/bin/cuefn"}
-	cfg.Config.Cmd = []string{"function"}
-
-	img, err = mutate.ConfigFile(img, cfg)
-	require.NoError(t, err)
-	return img
-}
 
 // TestGenerateFunctionMeta proves the crossplane.yaml metadata is a
 // meta.pkg.crossplane.io Function with the optional constraint and capabilities.
@@ -83,10 +46,10 @@ func TestGenerateFunctionMeta_Optional(t *testing.T) {
 // TestFunctionPackageYAML proves the package.yaml stream carries the Function
 // meta first, then the Input CRD, with the right identities (criterion 1).
 func TestFunctionPackageYAML(t *testing.T) {
-	stream, err := fixtureFunction(t).PackageYAML()
+	stream, err := common.FixtureFunction(t).PackageYAML()
 	require.NoError(t, err)
 
-	docs := splitStream(t, stream)
+	docs := common.SplitStream(t, stream)
 	require.Len(t, docs, 2)
 
 	assert.Equal(t, "meta.pkg.crossplane.io/v1", docs[0].APIVersion)
@@ -114,11 +77,11 @@ func TestDefaultFunction_Errors(t *testing.T) {
 // annotation, and its bytes re-parse into the Function + Input CRD (criterion 1
 // + criterion 3's serving invariant).
 func TestBuildFunctionImage_EmbedsRuntime(t *testing.T) {
-	base := fakeRuntimeBase(t, "amd64")
+	base := common.FakeRuntimeBase(t, "amd64")
 	baseLayers, err := base.Layers()
 	require.NoError(t, err)
 
-	img, err := pkg.BuildFunctionImage(base, fixtureFunction(t))
+	img, err := pkg.BuildFunctionImage(base, common.FixtureFunction(t))
 	require.NoError(t, err)
 
 	// The runtime layers are preserved and exactly one package layer is appended.
@@ -153,7 +116,7 @@ func TestBuildFunctionImage_EmbedsRuntime(t *testing.T) {
 	stream, err := io.ReadAll(rc)
 	require.NoError(t, err)
 
-	docs := splitStream(t, stream)
+	docs := common.SplitStream(t, stream)
 	require.Len(t, docs, 2)
 	assert.Equal(t, "Function", docs[0].Kind)
 	assert.Equal(t, "CustomResourceDefinition", docs[1].Kind)
@@ -161,16 +124,16 @@ func TestBuildFunctionImage_EmbedsRuntime(t *testing.T) {
 
 // TestBuildFunctionImage_Errors proves a nil base errors rather than panicking.
 func TestBuildFunctionImage_Errors(t *testing.T) {
-	_, err := pkg.BuildFunctionImage(nil, fixtureFunction(t))
+	_, err := pkg.BuildFunctionImage(nil, common.FixtureFunction(t))
 	require.Error(t, err)
 }
 
 // TestBuildFunctionIndex proves the multi-arch index wraps each per-arch base
 // into a Function xpkg image and records its platform (release path).
 func TestBuildFunctionIndex(t *testing.T) {
-	bases := []v1.Image{fakeRuntimeBase(t, "amd64"), fakeRuntimeBase(t, "arm64")}
+	bases := []v1.Image{common.FakeRuntimeBase(t, "amd64"), common.FakeRuntimeBase(t, "arm64")}
 
-	idx, err := pkg.BuildFunctionIndex(bases, fixtureFunction(t))
+	idx, err := pkg.BuildFunctionIndex(bases, common.FixtureFunction(t))
 	require.NoError(t, err)
 
 	manifest, err := idx.IndexManifest()
@@ -200,6 +163,6 @@ func TestBuildFunctionIndex(t *testing.T) {
 
 // TestBuildFunctionIndex_Errors proves an empty base list errors.
 func TestBuildFunctionIndex_Errors(t *testing.T) {
-	_, err := pkg.BuildFunctionIndex(nil, fixtureFunction(t))
+	_, err := pkg.BuildFunctionIndex(nil, common.FixtureFunction(t))
 	require.Error(t, err)
 }

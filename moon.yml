@@ -44,7 +44,7 @@ fileGroups:
     - 'internal/schema/testdata/**/*.cue'
     # The kind e2e module fixture (an all-Ready variant of the example module),
     # published to the throwaway module registry by the e2e harness.
-    - 'internal/e2e/testdata/**/*.cue'
+    - 'internal/test/e2e/testdata/**/*.cue'
   # Declarative chainsaw assets the build-tagged schema-test harness stages and
   # applies against an envtest apiserver.
   chainsawAssets:
@@ -144,7 +144,7 @@ tasks:
   # fast and reliable. Run under `mise exec` so the pinned crossplane CLI wins
   # over any proto shim on PATH.
   render-test:
-    command: 'mise exec -- go test ./internal/function/... -run TestRenderLoop -count 1'
+    command: 'mise exec -- go test ./internal/test/integration/... -run TestRenderLoop -count 1'
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
@@ -159,7 +159,7 @@ tasks:
   # daemon. Env-gated (CUEFN_INTEGRATION) so `go test ./...` skips it; not a
   # dependency of `check`, so it runs only in the integration workflow.
   oci-test:
-    command: 'mise exec -- go test ./internal/render/... -run TestOCI -count 1'
+    command: 'mise exec -- go test ./internal/test/integration/... -run TestOCI -count 1'
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
@@ -177,7 +177,7 @@ tasks:
   # neither Docker nor crossplane. Run under `mise exec` so the pinned crossplane
   # CLI wins over any binary on PATH.
   publish-test:
-    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... -run 'TestPublish|TestConfigurationRoundTrip|TestXpkgValidate|TestFunctionXpkg|TestFunctionIndex' -count 1"
+    command: "mise exec -- go test ./internal/test/integration/... -run 'TestPublish|TestConfigurationRoundTrip|TestXpkgValidate|TestFunctionXpkg|TestFunctionIndex' -count 1"
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
@@ -201,7 +201,7 @@ tasks:
   # container-smoke cases run over the real image. Run under `mise exec` so the
   # pinned crossplane/cosign/syft win over any binaries on PATH.
   funcpkg-test:
-    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... ./internal/function/... -run 'TestFunctionXpkg|TestFunctionIndex|TestPublishFunction|TestFunctionPackageServesGRPC|TestImageServesFunction' -count 1"
+    command: "mise exec -- go test ./internal/test/integration/... -run 'TestFunctionXpkg|TestFunctionIndex|TestPublishFunction|TestFunctionPackageServesGRPC|TestImageServesFunction' -count 1"
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
@@ -234,7 +234,7 @@ tasks:
     # the build-tagged harness; the harness resolves KUBEBUILDER_ASSETS itself via
     # `setup-envtest` (and honors the env var when set), so no command
     # substitution is needed.
-    command: "mise exec -- bash -c 'setup-envtest use 1.35.0 -p path && go test -tags envtest ./internal/schema/... -run TestSchema_Chainsaw -count 1'"
+    command: "mise exec -- bash -c 'setup-envtest use 1.35.0 -p path && go test -tags envtest ./internal/test/integration/... -run TestSchema_Chainsaw -count 1'"
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
@@ -269,7 +269,7 @@ tasks:
   # `moon run root:check` stays green without a cluster. Run under `mise exec` so
   # the pinned kind/kubectl/helm/chainsaw/crossplane win over any binaries on PATH.
   e2e-test:
-    command: 'mise exec -- go test -tags e2e ./internal/e2e/... -run TestE2E_Kind -count 1 -timeout 30m'
+    command: 'mise exec -- go test -tags e2e ./internal/test/e2e/... -run TestE2E_Kind -count 1 -timeout 30m'
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:

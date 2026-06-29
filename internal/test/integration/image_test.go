@@ -1,8 +1,7 @@
-package function_test
+package integration_test
 
 import (
 	"context"
-	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -14,40 +13,21 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	fnv1 "github.com/crossplane/function-sdk-go/proto/v1"
+
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
-
-// devImage is the local image tag produced by `mise run image-local`.
-const devImage = "crossplane-cuefn:dev"
-
-// requireDevImage skips the test unless Docker is usable and the dev image has
-// been built locally (via `mise run image-local`).
-func requireDevImage(t *testing.T) string {
-	t.Helper()
-	if os.Getenv("CUEFN_INTEGRATION") == "" {
-		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
-	}
-	docker, err := exec.LookPath("docker")
-	if err != nil {
-		t.Skip("docker not on PATH; skipping image smoke test")
-	}
-	if out, err := exec.Command(docker, "image", "inspect", devImage).
-		CombinedOutput(); err != nil {
-		t.Skipf("image %s not present (run `mise run image-local`): %s", devImage, out)
-	}
-	return docker
-}
 
 // TestImageServesFunction proves the apko image runs the function as its default
 // command: launched as `function --insecure`, it starts the gRPC
 // FunctionRunnerService and answers a RunFunction rather than printing help
 // (criterion C4). It self-skips without Docker or the dev image.
 func TestImageServesFunction(t *testing.T) {
-	docker := requireDevImage(t)
+	docker, image := common.RequireDevImage(t)
 
 	const port = "29443"
 	run := exec.Command(docker, "run", "--rm", "-d",
 		"-p", port+":9443",
-		devImage,
+		image,
 		"function", "--insecure", "--address", ":9443",
 	)
 	idOut, err := run.CombinedOutput()
@@ -90,11 +70,11 @@ func TestImageServesFunction(t *testing.T) {
 // printing root help/usage. It self-skips without Docker or the dev image
 // (criterion 6 / the tracked no-args cleanup).
 func TestImageServesFunction_NoArgs(t *testing.T) {
-	docker := requireDevImage(t)
+	docker, image := common.RequireDevImage(t)
 
 	// No command args: rely entirely on apko's `cmd: function`. Capture output so
 	// we can distinguish the function serve path from cobra's help text.
-	run := exec.Command(docker, "run", "--rm", devImage)
+	run := exec.Command(docker, "run", "--rm", image)
 	out, err := run.CombinedOutput()
 
 	// The default command must run `function`, which fails fast on missing mTLS

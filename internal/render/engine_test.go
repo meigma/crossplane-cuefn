@@ -2,7 +2,6 @@ package render_test
 
 import (
 	"context"
-	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +10,7 @@ import (
 	"github.com/crossplane/function-sdk-go/resource"
 
 	"github.com/meigma/crossplane-cuefn/internal/render"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
 // moduleDir is the canonical example CUE module, served offline via LocalLoader.
@@ -23,35 +23,6 @@ func renderExample(t *testing.T, in render.Inputs) render.Result {
 	res, err := e.Render(context.Background(), "ignored-by-local-loader", in)
 	require.NoError(t, err)
 	return res
-}
-
-// object returns the rendered Kubernetes object for the named resource.
-func object(t *testing.T, res render.Result, name string) map[string]any {
-	t.Helper()
-	r, ok := res.Resources[name]
-	require.True(t, ok, "resource %q not found", name)
-	return r.Object
-}
-
-// toInt coerces a decoded JSON/CUE number into an int regardless of its concrete
-// Go type.
-func toInt(t *testing.T, v any) int {
-	t.Helper()
-	switch n := v.(type) {
-	case int:
-		return n
-	case int64:
-		return int(n)
-	case float64:
-		return int(n)
-	case json.Number:
-		i, err := n.Int64()
-		require.NoError(t, err)
-		return int(i)
-	default:
-		t.Fatalf("value %v (%T) is not numeric", v, v)
-		return 0
-	}
 }
 
 func TestRenderKeyedResources(t *testing.T) {
@@ -67,9 +38,9 @@ func TestRenderKeyedResources(t *testing.T) {
 	assert.NotContains(t, res.Resources, "Deployment-demo")
 	assert.NotContains(t, res.Resources, "deployment-demo")
 
-	assert.Equal(t, "Deployment", object(t, res, "deployment")["kind"])
-	assert.Equal(t, "Service", object(t, res, "service")["kind"])
-	assert.Equal(t, "ConfigMap", object(t, res, "config")["kind"])
+	assert.Equal(t, "Deployment", common.Object(t, res, "deployment")["kind"])
+	assert.Equal(t, "Service", common.Object(t, res, "service")["kind"])
+	assert.Equal(t, "ConfigMap", common.Object(t, res, "config")["kind"])
 }
 
 func TestRenderReadiness(t *testing.T) {
@@ -95,7 +66,7 @@ func TestRenderEnvironmentDrivesTier(t *testing.T) {
 		Environment: map[string]any{"tier": "production"},
 	})
 
-	labels, ok := object(t, res, "deployment")["metadata"].(map[string]any)
+	labels, ok := common.Object(t, res, "deployment")["metadata"].(map[string]any)
 	require.True(t, ok)
 	tierLabels, ok := labels["labels"].(map[string]any)
 	require.True(t, ok)
@@ -111,9 +82,9 @@ func TestRenderFloat64Replicas(t *testing.T) {
 		Metadata: render.Metadata{Name: "demo"},
 	})
 
-	spec, ok := object(t, res, "deployment")["spec"].(map[string]any)
+	spec, ok := common.Object(t, res, "deployment")["spec"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, 2, toInt(t, spec["replicas"]))
+	assert.Equal(t, 2, common.ToInt(t, spec["replicas"]))
 }
 
 func TestRenderReservedKeyProjection(t *testing.T) {
@@ -127,7 +98,7 @@ func TestRenderReservedKeyProjection(t *testing.T) {
 		Metadata: render.Metadata{Name: "demo"},
 	})
 
-	spec, ok := object(t, res, "deployment")["spec"].(map[string]any)
+	spec, ok := common.Object(t, res, "deployment")["spec"].(map[string]any)
 	require.True(t, ok)
 	tmpl, ok := spec["template"].(map[string]any)
 	require.True(t, ok)

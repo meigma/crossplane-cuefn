@@ -1,4 +1,4 @@
-package render_test
+package integration_test
 
 import (
 	"context"
@@ -11,11 +11,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/meigma/crossplane-cuefn/internal/render"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
 // Module refs published to the throwaway registry by the integration tests.
 const (
-	exampleRef  = "cuefn.example/app@v0.1.0"
 	consumerRef = "cuefn.test/consumer@v0.1.0"
 	depRef      = "cuefn.test/dep@v0.1.0"
 	mutableRef  = "cuefn.test/mutable@v0.1.0"
@@ -33,8 +33,9 @@ func newOCIEngine(t *testing.T, cfg render.OCIConfig) *render.Engine {
 // dep-free module published to the registry and loaded over OCI renders
 // identically to the same module loaded from disk (criterion C1).
 func TestOCI_EquivalentToLocal(t *testing.T) {
-	reg := startRegistry(t)
-	reg.publishModule(t, exampleRef, "../../example/module")
+	reg := common.StartRegistry(t)
+	modulePath := filepath.Join(common.RepoRoot(t), "example/module")
+	reg.Publish(t, common.ExampleModuleRef, modulePath)
 
 	in := render.Inputs{
 		Spec:        map[string]any{"replicas": float64(3)},
@@ -42,11 +43,11 @@ func TestOCI_EquivalentToLocal(t *testing.T) {
 		Environment: map[string]any{"tier": "production"},
 	}
 
-	oci := newOCIEngine(t, render.OCIConfig{Env: reg.env(cacheDir(t))})
-	ociRes, err := oci.Render(context.Background(), exampleRef, in)
+	oci := newOCIEngine(t, render.OCIConfig{Env: reg.Env(common.CacheDir(t))})
+	ociRes, err := oci.Render(context.Background(), common.ExampleModuleRef, in)
 	require.NoError(t, err)
 
-	local := render.New(render.LocalLoader{Dir: "../../example/module"})
+	local := render.New(render.LocalLoader{Dir: modulePath})
 	localRes, err := local.Render(context.Background(), "ignored", in)
 	require.NoError(t, err)
 
@@ -60,11 +61,12 @@ func TestOCI_EquivalentToLocal(t *testing.T) {
 // from a separately published dep module and renders them into its output
 // (criterion C2).
 func TestOCI_TransitiveDependency(t *testing.T) {
-	reg := startRegistry(t)
-	reg.publishModule(t, depRef, "testdata/oci/dep")
-	reg.publishModule(t, consumerRef, "testdata/oci/consumer")
+	reg := common.StartRegistry(t)
+	ociData := filepath.Join(common.RepoRoot(t), "internal/render/testdata/oci")
+	reg.Publish(t, depRef, filepath.Join(ociData, "dep"))
+	reg.Publish(t, consumerRef, filepath.Join(ociData, "consumer"))
 
-	e := newOCIEngine(t, render.OCIConfig{Env: reg.env(cacheDir(t))})
+	e := newOCIEngine(t, render.OCIConfig{Env: reg.Env(common.CacheDir(t))})
 	res, err := e.Render(context.Background(), consumerRef, render.Inputs{
 		Metadata: render.Metadata{Name: "c1"},
 	})
@@ -79,7 +81,7 @@ func TestOCI_TransitiveDependency(t *testing.T) {
 	require.Len(t, ports, 1)
 	port, ok := ports[0].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, 8421, toInt(t, port["containerPort"]))
+	assert.Equal(t, 8421, common.ToInt(t, port["containerPort"]))
 }
 
 // TestOCI_RepublishedTagRefetched proves the loader keys its cache on the
@@ -87,19 +89,20 @@ func TestOCI_TransitiveDependency(t *testing.T) {
 // same version yields a new digest, a cache miss, and a re-render — something
 // CUE's version-keyed modcache cannot do (criterion C3).
 func TestOCI_RepublishedTagRefetched(t *testing.T) {
-	reg := startRegistry(t)
+	reg := common.StartRegistry(t)
+	mutableData := filepath.Join(common.RepoRoot(t), "internal/render/testdata/oci/mutable")
 
-	reg.publishModule(t, mutableRef, "testdata/oci/mutable/v1")
-	digest1 := reg.manifestDigest(t, mutableRef)
+	reg.Publish(t, mutableRef, filepath.Join(mutableData, "v1"))
+	digest1 := reg.ManifestDigest(t, mutableRef)
 
-	e := newOCIEngine(t, render.OCIConfig{Env: reg.env(cacheDir(t))})
+	e := newOCIEngine(t, render.OCIConfig{Env: reg.Env(common.CacheDir(t))})
 	res, err := e.Render(context.Background(), mutableRef, render.Inputs{})
 	require.NoError(t, err)
 	assert.Equal(t, "A", variant(t, res))
 
 	// Republish DIFFERENT content under the SAME version.
-	reg.publishModule(t, mutableRef, "testdata/oci/mutable/v2")
-	digest2 := reg.manifestDigest(t, mutableRef)
+	reg.Publish(t, mutableRef, filepath.Join(mutableData, "v2"))
+	digest2 := reg.ManifestDigest(t, mutableRef)
 	require.NotEqual(t, digest1, digest2, "republished content must change the manifest digest")
 
 	res, err = e.Render(context.Background(), mutableRef, render.Inputs{})
@@ -111,21 +114,21 @@ func TestOCI_RepublishedTagRefetched(t *testing.T) {
 // across processes: a fresh loader pointed at the same cache dir renders the
 // module after the registry is gone, via the ref->digest pointer (criterion C4).
 func TestOCI_ServesFromCacheWhenRegistryDown(t *testing.T) {
-	reg := startRegistry(t)
-	reg.publishModule(t, exampleRef, "../../example/module")
+	reg := common.StartRegistry(t)
+	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
 
-	cache := cacheDir(t)
+	cache := common.CacheDir(t)
 	in := render.Inputs{Metadata: render.Metadata{Name: "demo"}}
 
-	warm := newOCIEngine(t, render.OCIConfig{Env: reg.env(cache)})
-	want, err := warm.Render(context.Background(), exampleRef, in)
+	warm := newOCIEngine(t, render.OCIConfig{Env: reg.Env(cache)})
+	want, err := warm.Render(context.Background(), common.ExampleModuleRef, in)
 	require.NoError(t, err)
 
 	// Take the registry down, then build a brand-new loader on the warm cache.
-	reg.stop(t)
+	reg.Stop(t)
 
-	cold := newOCIEngine(t, render.OCIConfig{Env: reg.env(cache)})
-	got, err := cold.Render(context.Background(), exampleRef, in)
+	cold := newOCIEngine(t, render.OCIConfig{Env: reg.Env(cache)})
+	got, err := cold.Render(context.Background(), common.ExampleModuleRef, in)
 	require.NoError(t, err, "must serve from cache when the registry is unreachable")
 
 	assert.Equal(t, want, got)
@@ -135,35 +138,35 @@ func TestOCI_ServesFromCacheWhenRegistryDown(t *testing.T) {
 // expected digest is rejected, naming the ref and both digests, while the true
 // digest renders successfully (criterion C5).
 func TestOCI_ExpectedDigestMismatch(t *testing.T) {
-	reg := startRegistry(t)
-	reg.publishModule(t, exampleRef, "../../example/module")
+	reg := common.StartRegistry(t)
+	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
 	in := render.Inputs{Metadata: render.Metadata{Name: "demo"}}
 
 	t.Run("mismatch rejected", func(t *testing.T) {
 		bogus := "sha256:" + strings.Repeat("0", 64)
 		e := newOCIEngine(t, render.OCIConfig{
-			Env:    reg.env(cacheDir(t)),
-			Expect: map[string]string{exampleRef: bogus},
+			Env:    reg.Env(common.CacheDir(t)),
+			Expect: map[string]string{common.ExampleModuleRef: bogus},
 		})
 
 		var err error
 		require.NotPanics(t, func() {
-			_, err = e.Render(context.Background(), exampleRef, in)
+			_, err = e.Render(context.Background(), common.ExampleModuleRef, in)
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), exampleRef)
+		assert.Contains(t, err.Error(), common.ExampleModuleRef)
 		assert.Contains(t, err.Error(), "mismatch")
 		assert.Contains(t, err.Error(), bogus)
 	})
 
 	t.Run("true digest accepted", func(t *testing.T) {
-		actual := reg.manifestDigest(t, exampleRef)
+		actual := reg.ManifestDigest(t, common.ExampleModuleRef)
 		e := newOCIEngine(t, render.OCIConfig{
-			Env:    reg.env(cacheDir(t)),
-			Expect: map[string]string{exampleRef: actual},
+			Env:    reg.Env(common.CacheDir(t)),
+			Expect: map[string]string{common.ExampleModuleRef: actual},
 		})
 
-		_, err := e.Render(context.Background(), exampleRef, in)
+		_, err := e.Render(context.Background(), common.ExampleModuleRef, in)
 		require.NoError(t, err)
 	})
 }
@@ -173,16 +176,16 @@ func TestOCI_ExpectedDigestMismatch(t *testing.T) {
 // a malformed or unpublished ref. This is the author half of the digest
 // lock-step: the value recorded in a published Composition's cuefn input.
 func TestOCI_ResolveDigest(t *testing.T) {
-	reg := startRegistry(t)
-	reg.publishModule(t, exampleRef, "../../example/module")
+	reg := common.StartRegistry(t)
+	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
 
-	loader, err := render.NewOCILoader(render.OCIConfig{Env: reg.env(cacheDir(t))})
+	loader, err := render.NewOCILoader(render.OCIConfig{Env: reg.Env(common.CacheDir(t))})
 	require.NoError(t, err)
 
 	t.Run("matches registry digest", func(t *testing.T) {
-		got, err := loader.ResolveDigest(context.Background(), exampleRef)
+		got, err := loader.ResolveDigest(context.Background(), common.ExampleModuleRef)
 		require.NoError(t, err)
-		assert.Equal(t, reg.manifestDigest(t, exampleRef), got)
+		assert.Equal(t, reg.ManifestDigest(t, common.ExampleModuleRef), got)
 		assert.True(t, strings.HasPrefix(got, "sha256:"), "digest must be a sha256 ref, got %q", got)
 	})
 
@@ -210,10 +213,10 @@ func TestOCI_ResolveDigest(t *testing.T) {
 // missing ref, a malformed ref, and an unreachable registry each produce a
 // wrapped error naming the ref or cause (criterion C6).
 func TestOCI_ErrorPaths(t *testing.T) {
-	reg := startRegistry(t)
+	reg := common.StartRegistry(t)
 
 	t.Run("unpublished ref", func(t *testing.T) {
-		e := newOCIEngine(t, render.OCIConfig{Env: reg.env(cacheDir(t))})
+		e := newOCIEngine(t, render.OCIConfig{Env: reg.Env(common.CacheDir(t))})
 		var err error
 		require.NotPanics(t, func() {
 			_, err = e.Render(context.Background(), "cuefn.test/missing@v0.1.0", render.Inputs{})
@@ -224,7 +227,7 @@ func TestOCI_ErrorPaths(t *testing.T) {
 	})
 
 	t.Run("malformed ref", func(t *testing.T) {
-		e := newOCIEngine(t, render.OCIConfig{Env: reg.env(cacheDir(t))})
+		e := newOCIEngine(t, render.OCIConfig{Env: reg.Env(common.CacheDir(t))})
 		var err error
 		require.NotPanics(t, func() {
 			_, err = e.Render(context.Background(), "cuefn.test/noversion", render.Inputs{})
@@ -237,7 +240,7 @@ func TestOCI_ErrorPaths(t *testing.T) {
 		// A closed port with an empty cache: no online resolve and no cached copy.
 		env := []string{
 			"CUE_REGISTRY=localhost:1+insecure",
-			"CUE_CACHE_DIR=" + cacheDir(t),
+			"CUE_CACHE_DIR=" + common.CacheDir(t),
 		}
 		e := newOCIEngine(t, render.OCIConfig{Env: env})
 		var err error
@@ -254,16 +257,20 @@ func TestOCI_ErrorPaths(t *testing.T) {
 // rendering with an explicit CacheDir populates the digest-keyed cache under it,
 // as a nonroot or read-only-root container requires (criterion C7).
 func TestOCI_NonrootCacheDir(t *testing.T) {
-	reg := startRegistry(t)
-	reg.publishModule(t, exampleRef, "../../example/module")
+	reg := common.StartRegistry(t)
+	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
 
-	cache := cacheDir(t)
+	cache := common.CacheDir(t)
 	e := newOCIEngine(t, render.OCIConfig{
-		Env:      reg.env("/nonexistent-ignored"),
+		Env:      reg.Env("/nonexistent-ignored"),
 		CacheDir: cache, // explicit CacheDir wins over CUE_CACHE_DIR in Env.
 	})
 
-	_, err := e.Render(context.Background(), exampleRef, render.Inputs{Metadata: render.Metadata{Name: "demo"}})
+	_, err := e.Render(
+		context.Background(),
+		common.ExampleModuleRef,
+		render.Inputs{Metadata: render.Metadata{Name: "demo"}},
+	)
 	require.NoError(t, err)
 
 	ociCache := filepath.Join(cache, "cuefn-oci")
@@ -288,7 +295,7 @@ func TestOCI_NonrootCacheDir(t *testing.T) {
 // enclosing spec for the named resource (the first container).
 func containerSpec(t *testing.T, res render.Result, name string) map[string]any {
 	t.Helper()
-	obj := object(t, res, name)
+	obj := common.Object(t, res, name)
 	spec, ok := obj["spec"].(map[string]any)
 	require.True(t, ok)
 	tmpl, ok := spec["template"].(map[string]any)
@@ -307,7 +314,7 @@ func containerSpec(t *testing.T, res render.Result, name string) map[string]any 
 // ConfigMap resource.
 func variant(t *testing.T, res render.Result) string {
 	t.Helper()
-	obj := object(t, res, "config")
+	obj := common.Object(t, res, "config")
 	data, ok := obj["data"].(map[string]any)
 	require.True(t, ok)
 	v, ok := data["variant"].(string)

@@ -4,7 +4,7 @@
 // tag so the default `go test ./...` (and moon's check graph) stays portable and
 // fast on a machine without chainsaw or the envtest binaries. The dedicated moon
 // `schema-test` task builds with `-tags envtest` and provides those tools.
-package schema_test
+package integration_test
 
 import (
 	"context"
@@ -28,11 +28,7 @@ import (
 
 	"github.com/meigma/crossplane-cuefn/internal/render"
 	"github.com/meigma/crossplane-cuefn/internal/schema"
-)
-
-const (
-	deriskedDir       = "testdata/derisked"
-	chainsawAssetsDir = "../../test/chainsaw/schema"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
 // TestSchema_Chainsaw is the functional, server-side proof for criteria 1 and 3.
@@ -51,6 +47,10 @@ func TestSchema_Chainsaw(t *testing.T) {
 	if err != nil {
 		t.Skip("chainsaw binary not found on PATH; skipping server-side schema test")
 	}
+
+	root := common.RepoRoot(t)
+	deriskedDir := filepath.Join(root, "internal/schema/testdata/derisked")
+	chainsawAssetsDir := filepath.Join(root, "test/chainsaw/schema")
 
 	assets := envtestAssets(t)
 	if assets == "" {

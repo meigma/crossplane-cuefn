@@ -18,14 +18,11 @@ import (
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
 const (
-	// registryImage pins the OCI registry image both e2e registries run, matching
-	// the pin the render/function integration tests use so the harness is
-	// reproducible.
-	registryImage = "registry:2.8.3"
-
 	// registryReadyTimeout / registryPollInterval / httpClientTimeout bound the
 	// /v2/ readiness poll after a registry container starts.
 	registryReadyTimeout = 60 * time.Second
@@ -79,7 +76,7 @@ func StartTLSRegistry(ctx context.Context, name, clusterHost string, hostPort in
 		"-v", certDir + ":/certs:ro",
 		"-e", "REGISTRY_HTTP_TLS_CERTIFICATE=/certs/server.crt",
 		"-e", "REGISTRY_HTTP_TLS_KEY=/certs/server.key",
-		registryImage,
+		common.RegistryImage,
 	}
 	if out, err := dockerOutput(ctx, args...); err != nil {
 		return nil, fmt.Errorf("cannot start TLS registry %s: %w\n%s", name, err, out)
@@ -111,7 +108,7 @@ func StartHTTPRegistry(ctx context.Context, name string, hostPort int) (*Registr
 	args := []string{
 		"run", "-d", "--name", name,
 		"-p", fmt.Sprintf("127.0.0.1:%d:5000", hostPort),
-		registryImage,
+		common.RegistryImage,
 	}
 	if out, err := dockerOutput(ctx, args...); err != nil {
 		return nil, fmt.Errorf("cannot start HTTP registry %s: %w\n%s", name, err, out)

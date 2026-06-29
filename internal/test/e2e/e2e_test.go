@@ -9,19 +9,13 @@
 package e2e
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 	"time"
-
-	"cuelang.org/go/mod/modregistry"
-	"cuelang.org/go/mod/module"
-	"cuelang.org/go/mod/modzip"
-
-	"cuelabs.dev/go/oci/ociregistry/ociclient"
 
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/google/go-containerregistry/pkg/v1/daemon"
@@ -31,6 +25,7 @@ import (
 	"github.com/meigma/crossplane-cuefn/internal/pkg"
 	"github.com/meigma/crossplane-cuefn/internal/render"
 	"github.com/meigma/crossplane-cuefn/internal/schema"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
 const (
@@ -53,11 +48,9 @@ const (
 	modRegPort   = 5051
 	moduleRef    = "cuefn.example/app@v0.1.0"
 	moduleDir    = "testdata/module"
-	driftDir     = "../../example/module" // different content under the same version
 	functionName = "cuefn"
 	fnTag        = "v0.1.0"
 	cfgTag       = "v0.1.0"
-	chainsawDir  = "../../test/chainsaw/e2e"
 )
 
 // requireE2E self-skips the harness unless integration mode is on and every tool
@@ -103,7 +96,7 @@ func TestE2E_Kind(t *testing.T) {
 	// --- Author + publish -----------------------------------------------------
 	// Publish the CUE module to the module registry (host port), then resolve the
 	// digest the Configuration must lock against.
-	publishModule(t, modReg.HostRef(), moduleRef, moduleDir)
+	common.PublishModule(t, modReg.HostRef(), moduleRef, moduleDir)
 	expectedDigest := resolveDigest(ctx, t, modReg.HostRef(), moduleRef)
 	t.Logf("module %s resolved to %s", moduleRef, expectedDigest)
 
@@ -154,7 +147,8 @@ func TestE2E_Kind(t *testing.T) {
 
 	// --- Digest-drift guard (criterion 5) -------------------------------------
 	// Republish DIFFERENT content under the SAME version, then force a reconcile.
-	publishModule(t, modReg.HostRef(), moduleRef, driftDir)
+	driftDir := filepath.Join(common.RepoRoot(t), "example/module")
+	common.PublishModule(t, modReg.HostRef(), moduleRef, driftDir)
 	driftDigest := resolveDigest(ctx, t, modReg.HostRef(), moduleRef)
 	require.NotEqual(t, expectedDigest, driftDigest, "drift content must change the digest")
 	out, err = cluster.Kubectl(ctx, "-n", "default", "annotate", "xapp", "demo",
@@ -162,23 +156,6 @@ func TestE2E_Kind(t *testing.T) {
 	require.NoError(t, err, "annotate to force reconcile: %s", out)
 
 	runChainsaw(ctx, t, cluster, "drift.yaml", false /* skipDelete */)
-}
-
-// publishModule packages the CUE module rooted at srcDir and pushes it to the
-// plain-HTTP registry at host ("localhost:port") under ref ("path@version").
-func publishModule(t *testing.T, host, ref, srcDir string) {
-	t.Helper()
-	mv, err := module.ParseVersion(ref)
-	require.NoError(t, err)
-
-	var buf bytes.Buffer
-	require.NoError(t, modzip.CreateFromDir(&buf, mv, srcDir), "zip module %q from %s", ref, srcDir)
-
-	reg, err := ociclient.New(host, &ociclient.Options{Insecure: true})
-	require.NoError(t, err)
-	data := buf.Bytes()
-	require.NoError(t, modregistry.NewClient(reg).PutModule(
-		context.Background(), mv, bytes.NewReader(data), int64(len(data))), "publish module %q", ref)
 }
 
 // resolveDigest resolves ref's current manifest digest from the module registry,
@@ -321,6 +298,7 @@ func waitFor(t *testing.T, cluster *Cluster, timeout, resource, condition string
 // place so a later Test (the drift guard) can observe the same XR.
 func runChainsaw(ctx context.Context, t *testing.T, cluster *Cluster, testFile string, skipDelete bool) {
 	t.Helper()
+	chainsawDir := filepath.Join(common.RepoRoot(t), "test/chainsaw/e2e")
 	args := []string{"test", chainsawDir, "--test-file", testFile}
 	if skipDelete {
 		args = append(args, "--skip-delete")

@@ -1,4 +1,4 @@
-package function_test
+package integration_test
 
 import (
 	"os/exec"
@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/meigma/crossplane-cuefn/internal/pkg"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
 // TestFunctionPackageServesGRPC proves the assembled Function xpkg image — the
@@ -21,14 +22,14 @@ import (
 // gRPC. Self-skips without Docker or the dev image (run after `mise run
 // image-local`).
 func TestFunctionPackageServesGRPC(t *testing.T) {
-	docker := requireDevImage(t)
+	docker, image := common.RequireDevImage(t)
 
 	// Load the apko runtime image from the local daemon and assemble the Function
 	// xpkg over it (the package image IS the runtime image plus the package layer).
-	baseRef, err := name.NewTag(devImage)
+	baseRef, err := name.NewTag(image)
 	require.NoError(t, err)
 	base, err := daemon.Image(baseRef)
-	require.NoError(t, err, "load %s from the docker daemon", devImage)
+	require.NoError(t, err, "load %s from the docker daemon", image)
 
 	meta, err := pkg.GenerateFunctionMeta(pkg.FunctionMeta{Name: "function-cuefn"})
 	require.NoError(t, err)
@@ -46,7 +47,7 @@ func TestFunctionPackageServesGRPC(t *testing.T) {
 
 	// Run the PACKAGE image as a container, overriding cmd to the serve args. The
 	// package layer must not change serving: the entrypoint is still /usr/bin/cuefn.
-	port := strconv.Itoa(freePort(t))
+	port := strconv.Itoa(common.FreePort(t))
 	run := exec.Command(docker, "run", "--rm", "-d",
 		"-p", port+":9443",
 		pkgTag.String(),
@@ -59,5 +60,5 @@ func TestFunctionPackageServesGRPC(t *testing.T) {
 
 	// The packaged image answers RunFunction over gRPC, proving it serves the
 	// FunctionRunnerService rather than printing help.
-	waitForFunction(t, "127.0.0.1:"+port)
+	common.WaitForFunction(t, "127.0.0.1:"+port)
 }
