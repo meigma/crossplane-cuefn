@@ -321,3 +321,40 @@ cache (shared across worktrees) before the gate.
 - **NEXT (needs user):** after #20 merges → user runs `cue login` (interactive device flow) once → then
   `cue mod publish v0.1.0` from contract/ (I can run the publish once auth is cached) → then PR B2 (example
   imports the real path + cue mod tidy + release publish job + docs). The hermetic fixtures stay import-free.
+
+## 2026-06-29 16:30 — User: CI-managed publish via release-please (proper monorepo). Restructured.
+User rejected manual publish; wants CI-managed publishing tied into release-please as a PROPER MONOREPO:
+independent components, separate PRs per component, monorepo-style tags, independent semver. Auth = GitHub
+OIDC (no secret) — user chose this.
+
+Researched (agent + web), KEY findings:
+- **Headless publish IS supported via OIDC**: `cue-labs/registry-login-action@v1` (SHA 66d40052...) exchanges
+  the GH OIDC token for a short-lived registry token, writes ~/.config/cue/logins.json → `cue mod publish`
+  works. Job needs `id-token: write`. ONE-TIME manual setup: trust entry at registry.cue.works/account/oidc
+  for meigma/crossplane-cuefn (web UI, can't be done from CI). Fallback: `cue login --token` + a secret.
+- **CUE ignores git tags**: `cue mod publish vX.Y.Z` uploads committed content (source:git, clean tree,
+  major must match @v0). No tag-format constraint. Subdir module auto-folds the repo-root LICENSE (repo has
+  LICENSE-APACHE/-MIT, no plain LICENSE → may warn; non-blocking).
+- **release-please monorepo**: add `separate-pull-requests: true` + a `contract` package (release-type
+  simple, component contract, tag-separator "/", include-component-in-tag true → tag `contract/v0.1.0`,
+  which does NOT match release.yml's `v*` trigger). Per-component outputs `contract--version` etc.
+
+**CRITICAL release-please constraint discovered:** a single squash commit touching BOTH contract/ AND root
+files (test, moon, release config, workflow) attributes to BOTH components → would bump root too (draft
+product release). So to keep components independent, the contract-RELEASE-triggering commit must touch ONLY
+contract/. → restructured into a sequence:
+- **#21** `ci(release): set up monorepo releases for the contract module` — release-please config (monorepo +
+  contract component) + manifest (contract@0.0.0) + `.github/workflows/release-contract.yml` (OIDC publish on
+  contract/v* tag) + moon cueModules glob. NON-bumping (ci) → merges with NO release. Worktree
+  `.wt/build-contract-release-setup`. Verified: actionlint clean, JSON valid, root:check green (11 tasks).
+- **#20** RESCOPED to `feat(contract)` = contract/*.cue ONLY (amended; removed the test + moon, force-pushed)
+  → release-please turns this into the independent contract release PR.
+- The closedness test (internal/contract, saved to /tmp/contract-test/) lands as a follow-up non-bumping
+  `test(contract)` PR after #20 merges (it needs contract/ + must not bump the product).
+
+**Merge order (matters for attribution):** #21 (wiring) FIRST → then #20 (source) → release-please opens a
+`contract` release PR → merge it → tag contract/v0.1.0 → workflow publishes. OIDC trust setup before that
+contract release PR is merged. Then B2 (example adoption) + the test PR.
+
+release.yml convention mirrored: mise-action `cache: false` (fresh, mise.lock-verified) for the publish job;
+ubuntu-24.04; permissions:{} top + per-job; SHA-pinned actions.
