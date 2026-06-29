@@ -134,17 +134,38 @@ tasks:
   # End-to-end crossplane render loop: publishes the example module to a
   # throwaway OCI registry, serves `cuefn function --insecure`, and runs
   # `crossplane render` over the example assets. Needs a Docker daemon and the
-  # pinned crossplane CLI; self-skips without them. Kept OUT of the default
-  # `check` graph (mirroring the OCI integration-test pattern) so
-  # `moon run root:check` stays green on a machine without Docker/crossplane.
+  # pinned crossplane CLI. The heavy tests env-gate on CUEFN_INTEGRATION (set
+  # here) so plain `go test ./...` / `root:test` skips them; this task is
+  # excluded from the blocking `moon ci` gate (runInCI: false) and runs in the
+  # integration workflow instead, keeping `ci` fast and reliable. Run under
+  # `mise exec` so the pinned crossplane CLI wins over any proto shim on PATH.
   render-test:
-    command: 'go test ./internal/function/... -run TestRenderLoop -count 1'
+    command: 'mise exec -- go test ./internal/function/... -run TestRenderLoop -count 1'
+    env:
+      CUEFN_INTEGRATION: 'true'
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
       - '@group(exampleAssets)'
     options:
       cache: false
+      runInCI: false
+
+  # OCI module loader integration: publishes module fixtures to a throwaway OCI
+  # registry (testcontainers) and exercises the OCILoader — transitive deps, the
+  # digest-keyed cache, digest-drift rejection, and error paths. Needs a Docker
+  # daemon. Env-gated (CUEFN_INTEGRATION) so `go test ./...` skips it; excluded
+  # from the blocking `moon ci` gate; runs in the integration workflow.
+  oci-test:
+    command: 'mise exec -- go test ./internal/render/... -run TestOCI -count 1'
+    env:
+      CUEFN_INTEGRATION: 'true'
+    inputs:
+      - '@group(goSources)'
+      - '@group(cueModules)'
+    options:
+      cache: false
+      runInCI: false
 
   # Configuration packaging + push proof: assembles a Crossplane Configuration
   # xpkg (and a prototype Function xpkg) from a CUE module, pushes it to a
@@ -157,12 +178,15 @@ tasks:
   # CLI wins over any binary on PATH.
   publish-test:
     command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... -run 'TestPublish|TestConfigurationRoundTrip|TestXpkgValidate|TestFunctionXpkg|TestFunctionIndex' -count 1"
+    env:
+      CUEFN_INTEGRATION: 'true'
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
       - '@group(exampleAssets)'
     options:
       cache: false
+      runInCI: false
 
   # Function xpkg packaging proof: assembles the Function package (meta + embedded
   # Input CRD) over the real apko runtime base, round-trips it through a throwaway
@@ -177,11 +201,14 @@ tasks:
   # pinned crossplane/cosign/syft win over any binaries on PATH.
   funcpkg-test:
     command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... ./internal/function/... -run 'TestFunctionXpkg|TestFunctionIndex|TestPublishFunction|TestFunctionPackageServesGRPC' -count 1"
+    env:
+      CUEFN_INTEGRATION: 'true'
     inputs:
       - '@group(goSources)'
       - '@group(exampleAssets)'
     options:
       cache: false
+      runInCI: false
 
   # Guard the lean image binary: the melange/apko build compiles with `-tags
   # noxpkg` to drop the publish commands (and internal/pkg's sigstore/cosign +
@@ -215,6 +242,7 @@ tasks:
       - '@group(chainsawAssets)'
     options:
       cache: false
+      runInCI: false
 
   check:
     deps:

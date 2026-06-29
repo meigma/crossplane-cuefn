@@ -32,6 +32,9 @@ const exampleRef = "cuefn.example/app@v0.1.0"
 // test self-skips on the shim rather than failing.
 func requireCrossplane(t *testing.T) string {
 	t.Helper()
+	if os.Getenv("CUEFN_INTEGRATION") == "" {
+		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
+	}
 	path, err := exec.LookPath("crossplane")
 	if err != nil {
 		t.Skip("crossplane CLI not on PATH; skipping render-loop integration test")
@@ -156,11 +159,16 @@ func TestRenderLoop_CrossplaneRender(t *testing.T) {
 
 	functions := writeFunctions(t, t.TempDir(), addr)
 
+	// crossplane render runs the function-environment-configs step as a Docker
+	// container (only cuefn has the Development annotation), so a cold image pull
+	// on a CI runner can blow crossplane's default 1m timeout
+	// ("error waiting for container ... context deadline exceeded"). Give it room.
 	cmd := exec.Command(crossplane, "render",
 		"../../example/xr.yaml",
 		"../../example/composition.yaml",
 		functions,
 		"--extra-resources", "../../example/environmentconfig.yaml",
+		"--timeout", "10m",
 	)
 	out, err := cmd.CombinedOutput()
 	require.NoError(t, err, "crossplane render: %s", out)

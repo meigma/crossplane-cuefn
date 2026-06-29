@@ -2,6 +2,7 @@ package function_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"strings"
 	"testing"
@@ -22,6 +23,9 @@ const devImage = "crossplane-cuefn:dev"
 // been built locally (via `mise run image-local`).
 func requireDevImage(t *testing.T) string {
 	t.Helper()
+	if os.Getenv("CUEFN_INTEGRATION") == "" {
+		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
+	}
 	docker, err := exec.LookPath("docker")
 	if err != nil {
 		t.Skip("docker not on PATH; skipping image smoke test")

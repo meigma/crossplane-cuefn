@@ -291,6 +291,9 @@ func repoRoot(t *testing.T) string {
 // requireBinary skips the calling test unless bin is on PATH.
 func requireBinary(t *testing.T, bin string) string {
 	t.Helper()
+	if os.Getenv("CUEFN_INTEGRATION") == "" {
+		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
+	}
 	path, err := exec.LookPath(bin)
 	if err != nil {
 		t.Skipf("%s not on PATH; skipping (run via `mise exec`)", bin)
