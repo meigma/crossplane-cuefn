@@ -423,3 +423,42 @@ cluster via **Chainsaw**, green in CI on ubuntu (`e2e` workflow, ~4.5m). `intern
 - e2e loop calls `internal/pkg` library funcs directly (CA-trusting push), not the
   `cuefn publish` CLI binary — same code path, but the CLI binary isn't in the live loop.
 
+## Test layout — integration/E2E under `internal/test` (session 003, PRs #12 + #13)
+
+Org standard, now enforced here: **all infra-dependent tests live OUTSIDE the package they
+exercise, under `internal/test`** (black-box, real exported API). Co-locating integration/E2E
+tests in their home package is no longer allowed. Genuine UNIT tests (no infra) STAY in their
+home package.
+
+- **`internal/test/common`** (`package common`, non-`_test.go`, imports `testing` on purpose):
+  the ONE home for shared test infra. `Registry` (testcontainers OCI registry: `StartRegistry`,
+  `Host`/`CUERegistry`/`Env`/`Publish`/`ManifestDigest`/`Stop`, + free `PublishModule`/
+  `ManifestDigestAt` for the e2e plain-HTTP registry); gates `RequireDocker`/`RequireCrossplane`
+  (uses the `crossplane render --help` shim-probe, NOT bare `LookPath`)/`RequireBinary`/
+  `RequireDevImage`; `RepoRoot`/`FreePort`/`CacheDir`; serve helpers `BuildBinary`/`ServeFunction`/
+  `WaitForFunction`/`WriteFunctions`; runtime bases `FakeRuntimeBase`/`WriteRuntimeBaseTarball`/
+  `RuntimeBaseImage`; kinds parsing `StreamKinds`/`ExtractKinds`/`SplitStream`; typed fixtures
+  `FixtureXRD`/`BuildFixtureConfiguration`/`FixtureFunction`/`StepName`; render accessors
+  `Object`/`ToInt`; consts `ExampleModuleRef`/`DevImage`/`RegistryImage`/`Zeros`. It imports ONLY
+  `internal/pkg` + `internal/render` (no cycle); never `internal/cli`/`function`/`schema`/`test/e2e`.
+- **`internal/test/integration`** (`package integration_test`, external): all `CUEFN_INTEGRATION`-
+  gated integration tests (17). Files: `oci`, `renderloop`, `image`, `funcpkg`, `push`,
+  `publish` (`//go:build !noxpkg`), `publish_function` (`//go:build !noxpkg`), `schema_chainsaw`
+  (`//go:build envtest`).
+- **`internal/test/e2e`** (`package e2e`, `//go:build e2e`): the kind harness — `e2e_test.go` +
+  `cluster.go` + `registry.go` + `doc.go` + `testdata/module`. `TestE2E_Kind`.
+
+Conventions: asset paths use `common.RepoRoot(t)` (NOT `../..` relatives). testdata stays in its
+source package (`internal/render/testdata/oci`, `internal/schema/testdata/derisked`) except the
+e2e fixture which travels in `internal/test/e2e/testdata`. moon gated tasks
+(`oci`/`render`/`publish`/`funcpkg`/`schema`/`e2e-test`) target `internal/test/{integration,e2e}`;
+their `-run` regexes **partition** the suite (no test run twice, no dead alternation). Unit tests
+run in the BLOCKING `check` gate via `root:test`.
+
+Consolidation (#13): merged the round-trip/validate/supply-chain duplicates into table/subtest
+form and dropped library round-trips the CLI E2Es already cover (digest-stability + real-base
+moved into the CLI E2Es). Integration tests 23→17, no assertion lost.
+
+**GOTCHA (caused a 61 MiB binary in #12, fixed in #13):** never `git add -A` after a bare
+`go build ./cmd/cuefn` — it writes `./cuefn` to the repo root. `/cuefn` is now gitignored.
+

@@ -150,3 +150,22 @@ stray cuefn binary), CI watch running. STOP for human merge approval (new PR = n
 
 Remaining after #13 merges: delete the TEMPORARY `.journal/003/PROPOSAL-test-reorg.md` and
 fold the durable test-layout facts into TECH_NOTES (the proposal's own header says so).
+
+## 2026-06-29 06:55 — Phase 2 MERGED; plan COMPLETE
+
+User reviewed PR #13: "LGTM. Proceed." → squash-merged. **master now at 5c9a363**; the
+61 MiB `cuefn` binary is deleted from master (`delete mode 100755 cuefn`); working tree
+clean; `test/consolidate` worktree removed. Final integration test count = 17.
+
+Both PRs merged (#12 relocate, #13 consolidate). The test-reorg plan is fully delivered:
+all integration/E2E tests now live under `internal/test/{integration,e2e}` with shared
+infra in `internal/test/common`; duplicate helpers + tests consolidated; both org
+principles satisfied; the accidental-binary regression fixed.
+
+Housekeeping done this checkpoint: folded the durable test-layout facts into TECH_NOTES
+(new "Test layout" section, incl. the bare-`go build` gotcha) and DELETED the temporary
+`.journal/003/PROPOSAL-test-reorg.md` (its header always marked it disposable).
+
+Session deliverables: 2 merged PRs (#12, #13), TECH_NOTES test-layout section. No open
+threads from this task. (Pre-existing non-blocking follow-ups from prior sessions remain
+in TECH_NOTES — e.g. the two untouched Dependabot PRs #1/#2.)
