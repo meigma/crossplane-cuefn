@@ -78,5 +78,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-uv-docs-
 
-      - name: Run Moon CI
-        run: moon ci --summary minimal
+      # Run the `check` task graph (format, lint, build, unit/functional tests,
+      # generate-check, lean image-binary build, docs) — the fast, reliable gate.
+      # NOT `moon ci`: the heavy Docker/crossplane/envtest suites are deliberately
+      # excluded from `check` and run in the separate (non-blocking) integration
+      # workflow, so they don't gate merges on a flaky container/timeout.
+      - name: Run checks
+        run: moon run root:check

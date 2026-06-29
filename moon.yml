@@ -135,10 +135,11 @@ tasks:
   # throwaway OCI registry, serves `cuefn function --insecure`, and runs
   # `crossplane render` over the example assets. Needs a Docker daemon and the
   # pinned crossplane CLI. The heavy tests env-gate on CUEFN_INTEGRATION (set
-  # here) so plain `go test ./...` / `root:test` skips them; this task is
-  # excluded from the blocking `moon ci` gate (runInCI: false) and runs in the
-  # integration workflow instead, keeping `ci` fast and reliable. Run under
-  # `mise exec` so the pinned crossplane CLI wins over any proto shim on PATH.
+  # here) so plain `go test ./...` / `root:test` skips them; this task is NOT a
+  # dependency of `check` (the blocking `ci` gate runs `moon run root:check`), so
+  # it runs only in the separate, non-blocking integration workflow — keeping `ci`
+  # fast and reliable. Run under `mise exec` so the pinned crossplane CLI wins
+  # over any proto shim on PATH.
   render-test:
     command: 'mise exec -- go test ./internal/function/... -run TestRenderLoop -count 1'
     env:
@@ -149,13 +150,11 @@ tasks:
       - '@group(exampleAssets)'
     options:
       cache: false
-      runInCI: false
-
   # OCI module loader integration: publishes module fixtures to a throwaway OCI
   # registry (testcontainers) and exercises the OCILoader — transitive deps, the
   # digest-keyed cache, digest-drift rejection, and error paths. Needs a Docker
-  # daemon. Env-gated (CUEFN_INTEGRATION) so `go test ./...` skips it; excluded
-  # from the blocking `moon ci` gate; runs in the integration workflow.
+  # daemon. Env-gated (CUEFN_INTEGRATION) so `go test ./...` skips it; not a
+  # dependency of `check`, so it runs only in the integration workflow.
   oci-test:
     command: 'mise exec -- go test ./internal/render/... -run TestOCI -count 1'
     env:
@@ -165,8 +164,6 @@ tasks:
       - '@group(cueModules)'
     options:
       cache: false
-      runInCI: false
-
   # Configuration packaging + push proof: assembles a Crossplane Configuration
   # xpkg (and a prototype Function xpkg) from a CUE module, pushes it to a
   # throwaway OCI registry, round-trips the contents, and validates the package
@@ -186,8 +183,6 @@ tasks:
       - '@group(exampleAssets)'
     options:
       cache: false
-      runInCI: false
-
   # Function xpkg packaging proof: assembles the Function package (meta + embedded
   # Input CRD) over the real apko runtime base, round-trips it through a throwaway
   # registry, validates it with the pinned crossplane CLI (`crossplane xpkg
@@ -208,8 +203,6 @@ tasks:
       - '@group(exampleAssets)'
     options:
       cache: false
-      runInCI: false
-
   # Guard the lean image binary: the melange/apko build compiles with `-tags
   # noxpkg` to drop the publish commands (and internal/pkg's sigstore/cosign +
   # cloud-cred graph) from the runtime image — measured at 12.1 MiB / 23% of the
@@ -242,8 +235,6 @@ tasks:
       - '@group(chainsawAssets)'
     options:
       cache: false
-      runInCI: false
-
   check:
     deps:
       - 'root:format'
