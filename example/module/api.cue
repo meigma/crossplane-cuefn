@@ -1,8 +1,9 @@
 // Package app is the canonical cuefn example module. It declares the platform
 // API (#API), the authoritative XR spec schema (#Spec), and an optional status
 // schema (#Status), then renders a keyed resource map from an App XR's spec and
-// the merged EnvironmentConfig. It deliberately uses no external imports so the
-// module evaluates fully offline.
+// the merged EnvironmentConfig. The transform instantiates its Kubernetes objects
+// from the official cue.dev/x/k8s.io schema (resolved from the default central
+// registry), so an invalid object is caught at render time, not on apply.
 package app
 
 // #API is the concrete platform API description the CLI decodes to build the XRD

@@ -1,5 +1,10 @@
 package app
 
+import (
+	appsv1 "cue.dev/x/k8s.io/api/apps/v1"
+	corev1 "cue.dev/x/k8s.io/api/core/v1"
+)
+
 // input is filled by the engine with the observed XR spec (validated against
 // #Spec), its metadata, and the merged environment. Defaults keep metadata and
 // environment concrete even when the caller omits them.
@@ -23,12 +28,14 @@ _tier: input.environment.tier
 // author-chosen names used verbatim as the Crossplane composed-resource name.
 // The three entries cover all readiness states: an explicit Ready, an explicit
 // NotReady, and an absent hint (unspecified).
+//
+// Each object is instantiated from the official Kubernetes schema
+// (cue.dev/x/k8s.io), so apiVersion/kind are supplied by the definition and any
+// invalid field name, type, or shape fails at render time rather than on apply.
 resources: {
 	deployment: {
 		ready: "Ready"
-		object: {
-			apiVersion: "apps/v1"
-			kind:       "Deployment"
+		object: appsv1.#Deployment & {
 			metadata: {
 				name: _name
 				labels: {app: _name, tier: _tier}
@@ -49,9 +56,7 @@ resources: {
 	}
 	service: {
 		ready: "NotReady"
-		object: {
-			apiVersion: "v1"
-			kind:       "Service"
+		object: corev1.#Service & {
 			metadata: {
 				name: _name
 				labels: {app: _name, tier: _tier}
@@ -63,9 +68,7 @@ resources: {
 		}
 	}
 	config: {
-		object: {
-			apiVersion: "v1"
-			kind:       "ConfigMap"
+		object: corev1.#ConfigMap & {
 			metadata: {
 				name: _name
 				labels: {app: _name, tier: _tier}
