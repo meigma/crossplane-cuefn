@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	xpkg "github.com/crossplane/crossplane-runtime/v2/pkg/xpkg"
@@ -18,13 +20,35 @@ import (
 	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
+// runtimeImagePath returns the path to a runtime base image tarball for the
+// publish-function command: the REAL apko runtime base (via $CUEFN_RUNTIME_IMAGE
+// or <repo>/image.tar) when present, else a freshly written synthetic tarball.
+// Preferring the real base exercises the embed-runtime path over the actual apko
+// image through the CLI command (folding TestFunctionXpkgRoundTrip's real-base
+// coverage) when the funcpkg task has built it, while staying runnable elsewhere.
+func runtimeImagePath(t *testing.T, arch string) string {
+	t.Helper()
+	for _, p := range []string{os.Getenv("CUEFN_RUNTIME_IMAGE"), filepath.Join(common.RepoRoot(t), "image.tar")} {
+		if p == "" {
+			continue
+		}
+		if _, err := os.Stat(p); err == nil {
+			t.Logf("publish-function using real runtime base image %s", p)
+			return p
+		}
+	}
+	return common.WriteRuntimeBaseTarball(t, arch)
+}
+
 // TestPublishFunction_EndToEnd proves `cuefn publish-function` assembles the
-// Function xpkg over a runtime base tarball and pushes it: the pulled package
-// carries the xpkg base annotation and its stream names the Function and Input
-// CRD (criterion 1). Docker-gated.
+// Function xpkg over a runtime base and pushes it: the pulled package carries the
+// xpkg base annotation and its stream names the Function and Input CRD
+// (criterion 1). It prefers the real apko runtime base when present (see
+// runtimeImagePath) and asserts the pulled image's digest is a stable sha256 ref
+// across re-pulls (folds TestFunctionXpkgRoundTrip). Docker-gated.
 func TestPublishFunction_EndToEnd(t *testing.T) {
 	reg := common.StartRegistry(t)
-	basePath := common.WriteRuntimeBaseTarball(t, "amd64")
+	basePath := runtimeImagePath(t, "amd64")
 	pkgRef := reg.Host() + "/function-cuefn:v0.1.0"
 
 	var stdout bytes.Buffer
@@ -45,6 +69,19 @@ func TestPublishFunction_EndToEnd(t *testing.T) {
 	img, err := remote.Image(parsed)
 	require.NoError(t, err)
 
+	// Round-trip digest stability (folds TestFunctionXpkgRoundTrip): the pulled
+	// image resolves to a non-empty sha256 digest that is identical across
+	// re-pulls.
+	digest, err := img.Digest()
+	require.NoError(t, err)
+	assert.Equal(t, "sha256", digest.Algorithm, "pulled image digest must be a sha256 ref")
+	assert.NotEmpty(t, digest.Hex, "pulled image digest must be non-empty")
+	repulled, err := remote.Image(parsed)
+	require.NoError(t, err)
+	reDigest, err := repulled.Digest()
+	require.NoError(t, err)
+	assert.Equal(t, digest.String(), reDigest.String(), "round-tripped digest must be identical across pulls")
+
 	assertBaseLayerAnnotation(t, img)
 
 	rc, err := xpkg.ExtractPackageYAML(img)
@@ -60,7 +97,9 @@ func TestPublishFunction_EndToEnd(t *testing.T) {
 
 // TestPublishFunction_MultiArchIndex proves several --runtime-image bases push a
 // multi-arch index that pulls back with both platform manifests (release path).
-// Docker-gated.
+// It asserts not just that two manifests are present but that BOTH target
+// platforms (linux/amd64 and linux/arm64) appear (ported from
+// TestFunctionIndexRoundTrip). Docker-gated.
 func TestPublishFunction_MultiArchIndex(t *testing.T) {
 	reg := common.StartRegistry(t)
 	amd := common.WriteRuntimeBaseTarball(t, "amd64")
@@ -84,4 +123,13 @@ func TestPublishFunction_MultiArchIndex(t *testing.T) {
 	manifest, err := idx.IndexManifest()
 	require.NoError(t, err)
 	assert.Len(t, manifest.Manifests, 2)
+
+	// Both target platforms must be present (ported from TestFunctionIndexRoundTrip).
+	platforms := map[string]bool{}
+	for _, m := range manifest.Manifests {
+		require.NotNil(t, m.Platform)
+		platforms[m.Platform.OS+"/"+m.Platform.Architecture] = true
+	}
+	assert.True(t, platforms["linux/amd64"], "index must contain a linux/amd64 manifest")
+	assert.True(t, platforms["linux/arm64"], "index must contain a linux/arm64 manifest")
 }

@@ -1,65 +1,14 @@
 package integration_test
 
 import (
-	"context"
 	"os/exec"
-	"strings"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
-
-	fnv1 "github.com/crossplane/function-sdk-go/proto/v1"
 
 	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
-
-// TestImageServesFunction proves the apko image runs the function as its default
-// command: launched as `function --insecure`, it starts the gRPC
-// FunctionRunnerService and answers a RunFunction rather than printing help
-// (criterion C4). It self-skips without Docker or the dev image.
-func TestImageServesFunction(t *testing.T) {
-	docker, image := common.RequireDevImage(t)
-
-	const port = "29443"
-	run := exec.Command(docker, "run", "--rm", "-d",
-		"-p", port+":9443",
-		image,
-		"function", "--insecure", "--address", ":9443",
-	)
-	idOut, err := run.CombinedOutput()
-	require.NoError(t, err, "docker run: %s", idOut)
-	id := strings.TrimSpace(string(idOut))
-	t.Cleanup(func() { _ = exec.Command(docker, "rm", "-f", id).Run() })
-
-	addr := "127.0.0.1:" + port
-	deadline := time.Now().Add(30 * time.Second)
-	for {
-		conn, dialErr := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if dialErr == nil {
-			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-			// An empty request is enough: the server answering at all (even with a
-			// fatal result for the missing input) proves it serves gRPC, not help.
-			_, rpcErr := fnv1.NewFunctionRunnerServiceClient(conn).RunFunction(ctx, &fnv1.RunFunctionRequest{
-				Meta: &fnv1.RequestMeta{Tag: "probe"},
-			})
-			cancel()
-			_ = conn.Close()
-			if rpcErr == nil {
-				return
-			}
-		}
-		if time.Now().After(deadline) {
-			logs, _ := exec.Command(docker, "logs", id).CombinedOutput()
-			assert.Failf(t, "image did not serve the function", "logs:\n%s", logs)
-			return
-		}
-		time.Sleep(250 * time.Millisecond)
-	}
-}
 
 // TestImageServesFunction_NoArgs proves apko's default `cmd: function` dispatches
 // to the function subcommand when the image is run with NO arguments — the path
