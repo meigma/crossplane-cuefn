@@ -12,8 +12,8 @@ import (
 
 // RepoRoot walks up from the test's working directory to the module root (the
 // directory holding go.mod) and returns it. It is depth-independent, so callers
-// build asset paths as filepath.Join(common.RepoRoot(t), "example/module") rather
-// than fragile "../../" relatives that break when a test file moves.
+// build asset paths as filepath.Join(common.RepoRoot(t), "...") rather than
+// fragile "../../" relatives that break when a test file moves.
 func RepoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
@@ -30,6 +30,25 @@ func RepoRoot(t *testing.T) string {
 		}
 		dir = parent
 	}
+}
+
+// HermeticModuleDir returns the path to the shared self-contained test-fixture
+// module (internal/test/common/testdata/module). It is the one module the unit
+// and integration suites load, so the tests never depend on the user-facing
+// example/ module (which may import external schemas). It is published under
+// [ExampleModuleRef] by the integration tests.
+func HermeticModuleDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/module")
+}
+
+// HermeticRenderloopDir returns the path to the self-contained crossplane
+// render-loop assets (composition.yaml, xr.yaml, environmentconfig.yaml) the
+// render-loop integration test drives, so that test does not depend on the
+// example/ assets either.
+func HermeticRenderloopDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/renderloop")
 }
 
 // FreePort reserves an ephemeral TCP port, closes the listener, and returns the

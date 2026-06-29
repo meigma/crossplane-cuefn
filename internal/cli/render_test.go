@@ -11,7 +11,7 @@ import (
 )
 
 // TestRenderCommand_ExampleModule exercises `cuefn render` end to end against the
-// canonical example module served offline via --dir. It proves the command emits
+// hermetic test-fixture module served offline via --dir. It proves the command emits
 // the author-keyed resources and the composite status, and that --env drives the
 // tier to "production" rather than the module's "unset" default — all without
 // Docker or the crossplane CLI (criterion C2).
@@ -22,7 +22,7 @@ func TestRenderCommand_ExampleModule(t *testing.T) {
 	root := NewRootCommand(Options{Out: &stdout})
 	root.SetArgs([]string{
 		"render", "cuefn.example/app@v0.1.0",
-		"--dir", "../../example/module",
+		"--dir", "../test/common/testdata/module",
 		"--xr", "testdata/xr.yaml",
 		"--env", "testdata/env.yaml",
 	})
@@ -69,7 +69,7 @@ func TestRenderCommand_RequiresXR(t *testing.T) {
 	t.Parallel()
 
 	root := NewRootCommand(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}})
-	root.SetArgs([]string{"render", "cuefn.example/app@v0.1.0", "--dir", "../../example/module"})
+	root.SetArgs([]string{"render", "cuefn.example/app@v0.1.0", "--dir", "../test/common/testdata/module"})
 
 	err := root.ExecuteContext(context.Background())
 	require.Error(t, err)

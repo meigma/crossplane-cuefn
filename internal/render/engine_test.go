@@ -13,8 +13,9 @@ import (
 	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
-// moduleDir is the canonical example CUE module, served offline via LocalLoader.
-const moduleDir = "../../example/module"
+// moduleDir is the shared hermetic test-fixture module, served offline via
+// LocalLoader (the tests do not depend on the user-facing example/ module).
+const moduleDir = "../test/common/testdata/module"
 
 // renderExample renders the canonical example module with the given inputs.
 func renderExample(t *testing.T, in render.Inputs) render.Result {
