@@ -294,3 +294,30 @@ Worktree `.wt/feat-module-contract-v2`. Changes (12 files):
 Tooling notes: `cue fmt <dir>` fails ("cannot be imported as a CUE package") — pass file paths or
 `./...`. root:format only checks Go (golangci-lint fmt), not CUE. Recurring: cleared golangci-lint
 cache (shared across worktrees) before the gate.
+
+## 2026-06-29 15:30 — PR A #19 MERGED; PR B1 (#20) open: the contract module
+- **PR A #19 MERGED** to master (c825fe6) after user "PR #19 LGTM, please merge" + full CI green
+  (ci/integration/e2e — the e2e rebuilt the dev image with the v2 engine and passed → v2 works in-cluster).
+- **User decided the contract path: in-repo `github.com/meigma/crossplane-cuefn/contract@v0`.** Researched
+  Central publishing: NO separate registration form — `cue login` (one-off GitHub device flow) + push access
+  to the meigma/crossplane-cuefn repo IS the authorization. Subdir modules supported. Flow (in contract/):
+  `cue mod init --source=git <path>`, `cue login`, `cue mod publish v0.1.0`. CI-token + exact subdir git-tag
+  form = confirm at publish time.
+- **PR B1 #20** (`feat(contract): add the importable cuefn module contract`): worktree
+  `.wt/feat-contract-module`. SPLIT from the original "PR B" because the example can't cleanly import an
+  UNPUBLISHED contract (CI would block on the real import; a local-replace in the shipped example is a smell).
+  So B1 = contract source + validation (mergeable, NO publish needed); B2 = example adoption + publish + docs
+  (after the user's bootstrap publish).
+  - `contract/cue.mod/module.cue` (cue mod init --source=git) + `contract/contract.cue`: closed `#API`,
+    `#Resource` ({object, ready?}), `#Input` (out.input), `#Transform` (closed out wrapper). #Spec/#Status
+    NOT wrapped (codegen guardrail).
+  - `internal/contract/` (doc.go + contract_test.go): loads the contract via `render.LoadModule`(LocalLoader),
+    proves closedness OFFLINE — conforming transform OK; `resorces` typo / bad `ready` / unknown #API key all
+    REJECTED. 4 subtests pass.
+  - moon: `contract/**/*.cue` → cueModules.
+  - Verified: `go test ./internal/contract/...` pass; `cue vet ./contract/...` clean; `moon run root:check`
+    GREEN (11 tasks). (root:format wanted a long line wrapped → `golangci-lint fmt` applied.)
+  - PR #20 opened. Awaiting merge sign-off.
+- **NEXT (needs user):** after #20 merges → user runs `cue login` (interactive device flow) once → then
+  `cue mod publish v0.1.0` from contract/ (I can run the publish once auth is cached) → then PR B2 (example
+  imports the real path + cue mod tidy + release publish job + docs). The hermetic fixtures stay import-free.
