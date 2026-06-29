@@ -123,3 +123,23 @@ Following the repo norm (sessions 002/003): one PR per phase, **human sign-off b
 merge** — I implement + verify + open the PR, then STOP for review; I do not merge.
 
 Starting PR1.
+
+## 2026-06-29 09:55 — PR1 open (#14): render core dependency-aware
+Worktree `.wt/feat-render-dep-aware-load` (branch `feat/render-dep-aware-load`, off
+origin/master). Changes:
+- `internal/render/oci.go`: extracted `buildRegistry(cfg) (*modconfig.Resolver,
+  modconfig.Registry, string, error)` from the inlined construction in `NewOCILoader`;
+  `NewOCILoader` now a thin caller.
+- `internal/render/loader.go`: added unexported `registry` field + `NewLocalLoader(dir,
+  cfg)`; zero-value `LocalLoader{Dir}` unchanged (nil registry, offline). `load.go`
+  untouched (already wires non-nil registry).
+- `internal/render/registry_test.go` (internal `package render` test): `TestBuildRegistry_
+  Routing` — 3 offline subtests via `Resolver.ResolveToLocation` proving decision 3:
+  unset→central; prefix-scoped→private routes local, central stays catch-all; bare→replaces
+  central. ALL PASS offline. **modconfig API confirmed:** `ResolveToLocation(mpath, version)
+  (HostLocation, bool)`; `HostLocation`=`modresolve.Location{Host, Insecure, Repository,
+  Tag}`; `modconfig.DefaultRegistry == "registry.cue.works"`.
+- Verified: `moon run root:check` GREEN (10 tasks). New-worktree gotcha: had to `mise trust`
+  the worktree first. (Benign lint warning references a stale file in another worktree
+  `.wt/test-consolidate`; docs:build "errors" are mkdocs-material's insiders upsell banner.)
+- PR #14 opened, base master. NOT merged (human gate). Awaiting review.
