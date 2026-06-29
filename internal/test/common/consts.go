@@ -7,7 +7,7 @@
 // are reachable from internal/test/integration, internal/test/e2e, and any staying
 // unit _test.go file. It depends only on the exported APIs of internal/pkg and
 // internal/render, and must never import internal/cli, internal/function,
-// internal/schema, or internal/e2e (which would create an import cycle).
+// internal/schema, or internal/test/e2e (which would create an import cycle).
 package common
 
 // ExampleModuleRef is the module ref the example Composition references and the

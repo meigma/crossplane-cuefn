@@ -1,7 +1,7 @@
 # In-cluster install manifest for the cuefn Function (contrast with
 # example/functions.yaml, which is the local `crossplane render` Development
 # form). Apply this after pushing the Function xpkg to a registry Crossplane's
-# package manager accepts (HTTPS). The kind e2e harness (internal/e2e) generates
+# package manager accepts (HTTPS). The kind e2e harness (internal/test/e2e) generates
 # an equivalent manifest with its own registry refs; this committed copy documents
 # the shape for humans and real clusters.
 #
