@@ -31,12 +31,13 @@ fileGroups:
     - 'mise.toml'
     - 'mise.lock'
   cueModules:
-    # CUE fixtures the render tests evaluate: the canonical example module and
-    # the per-case testdata modules (including the OCI fixtures under
-    # internal/render/testdata/oci, published to a throwaway registry by the
-    # integration tests). Listed as test inputs so the test task stays correct
-    # if caching is ever enabled.
-    - 'example/**/*.cue'
+    # CUE fixtures the tests evaluate: the shared hermetic fixture module the unit
+    # and integration suites load (decoupled from the user-facing example/ module,
+    # which may import external schemas) and the per-case testdata modules
+    # (including the OCI fixtures under internal/render/testdata/oci, published to a
+    # throwaway registry by the integration tests). Listed as test inputs so the
+    # test task stays correct if caching is ever enabled.
+    - 'internal/test/common/testdata/**/*.cue'
     - 'internal/render/testdata/**/*.cue'
     # The author-time codegen fixtures (de-risked, no-status, and the negative
     # type-crossing-disjunction module) consumed by the schema unit tests and the
@@ -55,10 +56,6 @@ fileGroups:
   generateSources:
     - 'input/v1beta1/doc.go'
     - 'input/v1beta1/input.go'
-  # Hand-written example assets (XRD/Composition/XR/EnvironmentConfig/functions)
-  # exercised by the crossplane render-loop integration test.
-  exampleAssets:
-    - 'example/**/*.yaml'
   releaseConfig:
     - '.goreleaser.yaml'
     - 'ghd.toml'
@@ -134,9 +131,9 @@ tasks:
     options:
       cache: false
 
-  # End-to-end crossplane render loop: publishes the example module to a
+  # End-to-end crossplane render loop: publishes the hermetic fixture module to a
   # throwaway OCI registry, serves `cuefn function --insecure`, and runs
-  # `crossplane render` over the example assets. Needs a Docker daemon and the
+  # `crossplane render` over the hermetic render-loop assets. Needs a Docker daemon and the
   # pinned crossplane CLI. The heavy tests env-gate on CUEFN_INTEGRATION (set
   # here) so plain `go test ./...` / `root:test` skips them; this task is NOT a
   # dependency of `check` (the blocking `ci` gate runs `moon run root:check`), so
@@ -150,7 +147,7 @@ tasks:
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
-      - '@group(exampleAssets)'
+      - 'internal/test/common/testdata/renderloop/**'
     options:
       cache: false
   # OCI module loader integration: publishes module fixtures to a throwaway OCI
@@ -184,7 +181,6 @@ tasks:
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
-      - '@group(exampleAssets)'
     options:
       cache: false
   # Function image + publish-function proof: runs the apko dev-image smoke test
@@ -204,7 +200,6 @@ tasks:
       CUEFN_INTEGRATION: 'true'
     inputs:
       - '@group(goSources)'
-      - '@group(exampleAssets)'
     options:
       cache: false
   # Guard the lean image binary: the melange/apko build compiles with `-tags
@@ -250,6 +245,7 @@ tasks:
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
+      - 'example/module/**/*.cue'
       - 'example/xrd.yaml'
     options:
       cache: false
@@ -273,7 +269,6 @@ tasks:
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
-      - '@group(exampleAssets)'
       - '@group(chainsawAssets)'
     options:
       cache: false

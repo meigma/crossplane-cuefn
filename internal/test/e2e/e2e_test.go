@@ -147,7 +147,10 @@ func TestE2E_Kind(t *testing.T) {
 
 	// --- Digest-drift guard (criterion 5) -------------------------------------
 	// Republish DIFFERENT content under the SAME version, then force a reconcile.
-	driftDir := filepath.Join(common.RepoRoot(t), "example/module")
+	// The hermetic fixture (three readiness states) differs byte-wise from the
+	// all-Ready primary e2e module, so its manifest digest drifts from the one the
+	// Configuration locked — exactly what the guard must reject.
+	driftDir := common.HermeticModuleDir(t)
 	common.PublishModule(t, modReg.HostRef(), moduleRef, driftDir)
 	driftDigest := resolveDigest(ctx, t, modReg.HostRef(), moduleRef)
 	require.NotEqual(t, expectedDigest, driftDigest, "drift content must change the digest")

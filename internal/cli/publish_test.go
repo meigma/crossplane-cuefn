@@ -21,7 +21,7 @@ func TestPublish_MalformedModuleRef(t *testing.T) {
 	root := NewRootCommand(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}})
 	root.SetArgs([]string{
 		"publish", "cuefn.example/app",
-		"--dir", "../../example/module",
+		"--dir", "../test/common/testdata/module",
 		"--package", "localhost:5000/cfg:v0.1.0",
 		"--insecure",
 	})
@@ -39,7 +39,7 @@ func TestPublish_RequiresPackage(t *testing.T) {
 	t.Parallel()
 
 	root := NewRootCommand(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}})
-	root.SetArgs([]string{"publish", common.ExampleModuleRef, "--dir", "../../example/module"})
+	root.SetArgs([]string{"publish", common.ExampleModuleRef, "--dir", "../test/common/testdata/module"})
 
 	err := root.ExecuteContext(context.Background())
 	require.Error(t, err)

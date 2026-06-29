@@ -19,8 +19,9 @@ import (
 	"github.com/meigma/crossplane-cuefn/internal/render"
 )
 
-// moduleDir is the canonical example module, served offline by the local loader.
-const moduleDir = "../../example/module"
+// moduleDir is the shared hermetic test-fixture module, served offline by the
+// local loader (the tests do not depend on the user-facing example/ module).
+const moduleDir = "../test/common/testdata/module"
 
 // localFactory returns a LoaderFactory serving the example module from disk,
 // ignoring the Input's module ref (the LocalLoader is fixed to one directory).

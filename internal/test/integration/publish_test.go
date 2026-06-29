@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"io"
-	"path/filepath"
 	"testing"
 
 	xpkg "github.com/crossplane/crossplane-runtime/v2/pkg/xpkg"
@@ -32,7 +31,7 @@ import (
 // would accept that digest (and reject a drifted one).
 func TestPublish_EndToEnd(t *testing.T) {
 	reg := common.StartRegistry(t)
-	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
+	reg.Publish(t, common.ExampleModuleRef, common.HermeticModuleDir(t))
 
 	cache := t.TempDir()
 	t.Setenv("CUE_REGISTRY", reg.CUERegistry())

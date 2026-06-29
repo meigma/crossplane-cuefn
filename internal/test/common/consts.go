@@ -10,8 +10,9 @@
 // internal/schema, or internal/test/e2e (which would create an import cycle).
 package common
 
-// ExampleModuleRef is the module ref the example Composition references and the
-// integration tests publish to a throwaway registry.
+// ExampleModuleRef is the module ref the hermetic test-fixture module
+// ([HermeticModuleDir]) is published under to a throwaway registry by the
+// integration tests; the user-facing example Composition references the same ref.
 const ExampleModuleRef = "cuefn.example/app@v0.1.0"
 
 // DevImage is the local image tag produced by `mise run image-local`.

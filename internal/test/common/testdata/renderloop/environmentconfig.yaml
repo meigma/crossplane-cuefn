@@ -1,0 +1,10 @@
+# Supplies the `tier` value the module surfaces as a label and ConfigMap datum.
+# Because the module's input.environment.tier defaults to "unset", a rendered
+# tier of "production" proves the EnvironmentConfig flowed through the pipeline
+# context into the module rather than falling back to the default.
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: app-environment
+data:
+  tier: production

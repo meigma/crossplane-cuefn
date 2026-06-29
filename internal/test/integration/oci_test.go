@@ -34,7 +34,7 @@ func newOCIEngine(t *testing.T, cfg render.OCIConfig) *render.Engine {
 // identically to the same module loaded from disk (criterion C1).
 func TestOCI_EquivalentToLocal(t *testing.T) {
 	reg := common.StartRegistry(t)
-	modulePath := filepath.Join(common.RepoRoot(t), "example/module")
+	modulePath := common.HermeticModuleDir(t)
 	reg.Publish(t, common.ExampleModuleRef, modulePath)
 
 	in := render.Inputs{
@@ -115,7 +115,7 @@ func TestOCI_RepublishedTagRefetched(t *testing.T) {
 // module after the registry is gone, via the ref->digest pointer (criterion C4).
 func TestOCI_ServesFromCacheWhenRegistryDown(t *testing.T) {
 	reg := common.StartRegistry(t)
-	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
+	reg.Publish(t, common.ExampleModuleRef, common.HermeticModuleDir(t))
 
 	cache := common.CacheDir(t)
 	in := render.Inputs{Metadata: render.Metadata{Name: "demo"}}
@@ -139,7 +139,7 @@ func TestOCI_ServesFromCacheWhenRegistryDown(t *testing.T) {
 // digest renders successfully (criterion C5).
 func TestOCI_ExpectedDigestMismatch(t *testing.T) {
 	reg := common.StartRegistry(t)
-	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
+	reg.Publish(t, common.ExampleModuleRef, common.HermeticModuleDir(t))
 	in := render.Inputs{Metadata: render.Metadata{Name: "demo"}}
 
 	t.Run("mismatch rejected", func(t *testing.T) {
@@ -177,7 +177,7 @@ func TestOCI_ExpectedDigestMismatch(t *testing.T) {
 // lock-step: the value recorded in a published Composition's cuefn input.
 func TestOCI_ResolveDigest(t *testing.T) {
 	reg := common.StartRegistry(t)
-	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
+	reg.Publish(t, common.ExampleModuleRef, common.HermeticModuleDir(t))
 
 	loader, err := render.NewOCILoader(render.OCIConfig{Env: reg.Env(common.CacheDir(t))})
 	require.NoError(t, err)
@@ -258,7 +258,7 @@ func TestOCI_ErrorPaths(t *testing.T) {
 // as a nonroot or read-only-root container requires (criterion C7).
 func TestOCI_NonrootCacheDir(t *testing.T) {
 	reg := common.StartRegistry(t)
-	reg.Publish(t, common.ExampleModuleRef, filepath.Join(common.RepoRoot(t), "example/module"))
+	reg.Publish(t, common.ExampleModuleRef, common.HermeticModuleDir(t))
 
 	cache := common.CacheDir(t)
 	e := newOCIEngine(t, render.OCIConfig{
