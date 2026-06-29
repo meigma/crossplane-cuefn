@@ -169,3 +169,16 @@ Housekeeping done this checkpoint: folded the durable test-layout facts into TEC
 Session deliverables: 2 merged PRs (#12, #13), TECH_NOTES test-layout section. No open
 threads from this task. (Pre-existing non-blocking follow-ups from prior sessions remain
 in TECH_NOTES — e.g. the two untouched Dependabot PRs #1/#2.)
+
+## 2026-06-29 07:01 — Close
+
+Session 003 closed. Both PRs merged and squashed:
+- #12 refactor(test): relocate integration and e2e tests to internal/test/{integration,e2e,common}
+- #13 refactor(test): consolidate duplicate integration tests; untrack stray cuefn binary
+
+`master` fast-forwarded to `5c9a363` (= origin/master, 0/0); the stray `cuefn` binary is
+gone; no implementation worktrees remain (only `master` + `journal/jmgilman`). SUMMARY.md
+written; INDEX.md row 003 → complete; TECH_NOTES "Test layout" section is the durable
+record. Handoff: the test suite is fully reorganized (17 integration tests under
+`internal/test/integration`, kind e2e under `internal/test/e2e`, shared infra in
+`internal/test/common`); nothing left in flight for this task.
