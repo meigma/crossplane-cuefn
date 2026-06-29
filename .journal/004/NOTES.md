@@ -230,3 +230,43 @@ NOTE: the local `master` checkout is still at 5c9a363 (5 behind origin) — all 
 origin/master; fast-forward the main checkout when convenient (not required).
 
 User asked to PAUSE. Stopping here; not starting new work. Plan fully delivered.
+
+## 2026-06-29 13:30 — New phase: module-contract v2 + importable contract module (plan approved)
+Design discussion → user confirmed the two remaining contract pieces. Ran 3 Explore agents +
+designed; new plan APPROVED (overwrote the old plan file). Two coupled PRs.
+
+Design decisions (locked by the user):
+- **Root field = `out`**: nest the transform (`input`/`resources`/`status`) under one root field
+  `out: {...}`; keep `#API`/`#Spec`/`#Status` as TOP-LEVEL definitions.
+- **Registry = CUE Central via `github.com/meigma` path** (resolves with zero CUE_REGISTRY config;
+  needs `cue login` to publish).
+- **Enforcement = author-time only**: the engine just reads `out.*`; it does NOT embed/unify the
+  contract. The published contract module is the single source of truth (authors `cue vet`).
+
+Key exploration facts:
+- **v2 is 4 path literals** in `internal/render/engine.go` (`FillPath("input")`→`"out.input"` :132,
+  `LookupPath("input")`→`"out.input"` :134, `"resources"`→`"out.resources"` :152, `"status"`→
+  `"out.status"` :175). `cue.ParsePath` handles dotted paths.
+- **Codegen UNCHANGED**: `internal/schema/openapi.go:75-94` `definitionsOnly` keeps only top-level
+  `#`-defs and drops regular fields → a single `out` field is dropped like input/resources/status
+  today → XRD byte-identical. validate.go + function.go touch no transform paths. Blast radius =
+  internal/render + per-module text.
+- **Engine is schema-agnostic** (never references #Spec/#Status; author's `out.input.spec: #Spec`
+  binding applies the schema).
+- **GOTCHA: two Explore agents explored the STALE main checkout (5c9a363, pre-#14–#18)** — the main
+  `master` worktree was never fast-forwarded. Confirmed current origin/master (e734c79) via git show:
+  the hermetic fixture `internal/test/common/testdata/module` EXISTS and example/module imports k8s.
+  Fixed: fast-forwarding the main checkout. Implementation worktrees branch off origin/master.
+- **Central publishing** (Agent C + web): publish under `github.com/meigma/...` (cue login, GitHub
+  auth) → resolves with no consumer config (Central is CUE's default). S1 spike: in-repo subdir
+  module (`github.com/meigma/crossplane-cuefn/contract@v0`) vs dedicated repo.
+
+8 engine-loaded modules need the `out` restructure (example, hermetic fixture, e2e fixture,
+render/testdata {nostatus,badstatus,nonconcrete}, oci {consumer,mutable/v1,v2}). 4 codegen-only/
+library fixtures untouched (schema/testdata {derisked,disjunction,nostatus}, oci/dep).
+
+PRs: **PR A** = v2 `out` restructure (engine 4 literals + 8 modules + docs; breaking, offline-testable).
+**PR B** = contract module (`contract/` dir + #API/#Resource/#Input/#Transform, closed) + publish to
+Central + example imports it; hermetic fixtures stay import-free. Same per-PR human-sign-off norm.
+
+Starting PR A.
