@@ -20,6 +20,7 @@ import (
 // publishFlags holds the flags for the publish subcommand.
 type publishFlags struct {
 	dir             string
+	cacheDir        string
 	pkgRef          string
 	functionRef     string
 	functionName    string
@@ -67,6 +68,8 @@ func newPublishCommand(options Options) *cobra.Command {
 
 	cmd.Flags().StringVar(&f.dir, "dir", "",
 		"build the XRD/Composition from this local module directory instead of fetching it over OCI")
+	cmd.Flags().StringVar(&f.cacheDir, "cache-dir", "",
+		"directory for the CUE module cache and dependency downloads (overrides CUE_CACHE_DIR)")
 	cmd.Flags().StringVar(&f.pkgRef, "package", "",
 		"destination OCI reference for the Configuration package (required)")
 	cmd.Flags().StringVar(&f.functionRef, "function-ref", defaultFunctionRef,
@@ -97,7 +100,7 @@ func runPublish(ctx context.Context, options Options, f publishFlags, ref string
 
 	// Load the module (local or OCI) and generate the typed XRD; the typed XRD
 	// (not the YAML wrapper) supplies the Composition's compositeTypeRef.
-	loader, err := moduleLoader(f.dir)
+	loader, err := moduleLoader(f.dir, f.cacheDir)
 	if err != nil {
 		return err
 	}
@@ -115,7 +118,7 @@ func runPublish(ctx context.Context, options Options, f publishFlags, ref string
 	// Resolve the live manifest digest from the registry. This is always an OCI
 	// operation: even with --dir, publish records the real published digest so the
 	// runtime lock-step is meaningful.
-	digest, err := resolveModuleDigest(ctx, ref)
+	digest, err := resolveModuleDigest(ctx, ref, f.cacheDir)
 	if err != nil {
 		return err
 	}
@@ -155,9 +158,10 @@ func runPublish(ctx context.Context, options Options, f publishFlags, ref string
 
 // resolveModuleDigest builds an OCI loader honoring CUE_REGISTRY and resolves
 // ref's current manifest digest. It is the publish-time half of the digest
-// lock-step and reuses the same loader configuration the function serves with.
-func resolveModuleDigest(ctx context.Context, ref string) (string, error) {
-	loader, err := render.NewOCILoader(render.OCIConfig{})
+// lock-step and reuses the same loader configuration the function serves with;
+// cacheDir overrides CUE_CACHE_DIR to match the module-load path.
+func resolveModuleDigest(ctx context.Context, ref, cacheDir string) (string, error) {
+	loader, err := render.NewOCILoader(render.OCIConfig{CacheDir: cacheDir})
 	if err != nil {
 		return "", fmt.Errorf("cannot build OCI loader: %w", err)
 	}

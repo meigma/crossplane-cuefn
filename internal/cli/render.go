@@ -13,9 +13,10 @@ import (
 
 // renderFlags holds the flags for the render subcommand.
 type renderFlags struct {
-	dir string
-	xr  string
-	env string
+	dir      string
+	cacheDir string
+	xr       string
+	env      string
 }
 
 // newRenderCommand builds the `cuefn render` subcommand: a cluster-free,
@@ -42,7 +43,9 @@ func newRenderCommand(options Options) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&f.dir, "dir", "",
-		"serve the module from this local directory (offline) instead of fetching it over OCI")
+		"serve the module from this local directory instead of fetching it over OCI")
+	cmd.Flags().StringVar(&f.cacheDir, "cache-dir", "",
+		"directory for the CUE module cache and dependency downloads (overrides CUE_CACHE_DIR)")
 	cmd.Flags().StringVar(&f.xr, "xr", "", "path to the observed XR YAML (required)")
 	cmd.Flags().StringVar(&f.env, "env", "", "path to a merged environment YAML (optional)")
 	_ = cmd.MarkFlagRequired("xr")
@@ -70,10 +73,10 @@ func runRender(ctx context.Context, options Options, f renderFlags, ref string) 
 	return printRenderResult(options, result)
 }
 
-// renderLoader returns a LocalLoader when --dir is set and an OCILoader
-// (honoring CUE_REGISTRY in the process environment) otherwise.
+// renderLoader returns a dependency-aware LocalLoader when --dir is set and an
+// OCILoader (honoring CUE_REGISTRY in the process environment) otherwise.
 func renderLoader(f renderFlags) (render.ModuleLoader, error) {
-	return moduleLoader(f.dir)
+	return moduleLoader(f.dir, f.cacheDir)
 }
 
 // readRenderInputs reads the XR (required) and environment (optional) YAML files

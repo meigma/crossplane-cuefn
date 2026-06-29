@@ -12,8 +12,9 @@ import (
 
 // validateFlags holds the flags for the validate subcommand.
 type validateFlags struct {
-	module string
-	dir    string
+	module   string
+	dir      string
+	cacheDir string
 }
 
 // newValidateCommand builds the `cuefn validate` subcommand: it checks a
@@ -43,7 +44,9 @@ func newValidateCommand(options Options) *cobra.Command {
 	cmd.Flags().StringVar(&f.module, "module", "",
 		"module reference (path@version) to validate against when fetching over OCI")
 	cmd.Flags().StringVar(&f.dir, "dir", "",
-		"serve the module from this local directory (offline) instead of fetching it over OCI")
+		"serve the module from this local directory instead of fetching it over OCI")
+	cmd.Flags().StringVar(&f.cacheDir, "cache-dir", "",
+		"directory for the CUE module cache and dependency downloads (overrides CUE_CACHE_DIR)")
 
 	return cmd
 }
@@ -59,7 +62,7 @@ func runValidate(ctx context.Context, options Options, f validateFlags, xrPath s
 	}
 	spec, _ := xr["spec"].(map[string]any)
 
-	loader, err := moduleLoader(f.dir)
+	loader, err := moduleLoader(f.dir, f.cacheDir)
 	if err != nil {
 		return err
 	}
