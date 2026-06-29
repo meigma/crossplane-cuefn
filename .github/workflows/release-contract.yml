@@ -1,0 +1,79 @@
+# Publishes the cuefn module contract (github.com/meigma/crossplane-cuefn/contract)
+# to the CUE Central Registry when Release Please tags a contract release
+# (contract/v*). Authentication is keyless via GitHub OIDC — there is no stored
+# registry secret.
+#
+# ONE-TIME SETUP (cannot be done from CI): authorize this repository to publish
+# by adding a trust entry for meigma/crossplane-cuefn at
+# https://registry.cue.works/account/oidc before the first contract release.
+
+name: Release Contract
+
+on:
+  push:
+    tags:
+      - contract/v*
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Contract tag to publish (contract/vX.Y.Z)
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Publish Contract Module
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write # exchanged for a short-lived CUE registry token via OIDC
+      contents: read
+    steps:
+      - name: Resolve tag
+        id: tag
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tag="$DISPATCH_TAG"
+          else
+            tag="$GITHUB_REF_NAME"
+          fi
+
+          if [[ ! "$tag" =~ ^contract/v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo "Contract tag must match contract/vX.Y.Z: $tag" >&2
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#contract/}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          # Cache disabled in the publishing pipeline (matches release.yml): the
+          # cue toolchain that publishes a real module is fetched fresh and
+          # verified against mise.lock, never from a poisonable Actions cache.
+          cache: false
+
+      - name: Login to the CUE Central Registry (OIDC)
+        uses: cue-labs/registry-login-action@66d40052b0206031343e17173425fa10508968d0 # v1
+
+      # cue mod publish uploads the committed contract/ content (source: git) to
+      # registry.cue.works (CUE's default registry) under the given version. The
+      # major must match the module path (...contract@v0).
+      - name: Publish the contract module
+        working-directory: contract
+        env:
+          CONTRACT_VERSION: ${{ steps.tag.outputs.version }}
+        run: cue mod publish "$CONTRACT_VERSION"

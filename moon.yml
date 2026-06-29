@@ -43,6 +43,8 @@ fileGroups:
     # type-crossing-disjunction module) consumed by the schema unit tests and the
     # chainsaw CRD.
     - 'internal/schema/testdata/**/*.cue'
+    # The shipped contract module, loaded by internal/contract's closedness test.
+    - 'contract/**/*.cue'
     # The kind e2e module fixture (an all-Ready variant of the example module),
     # published to the throwaway module registry by the e2e harness.
     - 'internal/test/e2e/testdata/**/*.cue'
