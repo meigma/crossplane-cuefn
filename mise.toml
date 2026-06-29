@@ -73,6 +73,9 @@ locked = true
 # macOS too (Docker Desktop runs the Linux build container).
 [tasks.image-local]
 description = "Build the apko image for the host arch and load it into Docker as crossplane-cuefn:dev"
+# Run under bash: mise executes inline task scripts with `sh` (dash on Linux),
+# which rejects `set -o pipefail`. bash is portable across macOS and CI runners.
+shell = "bash -c"
 run = '''
 set -euo pipefail
 arch="$(go env GOARCH)"
@@ -98,6 +101,8 @@ echo "loaded crossplane-cuefn:dev (host arch $arch)"
 #   mise run package-function -- --package localhost:5005/function-cuefn:dev --insecure
 [tasks.package-function]
 description = "Assemble + push the Function xpkg over crossplane-cuefn:dev (image.tar)"
+# Run under bash (see image-local): `set -o pipefail` is not valid in dash.
+shell = "bash -c"
 run = '''
 set -euo pipefail
 if [ ! -f image.tar ]; then
