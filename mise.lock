@@ -144,6 +144,26 @@ checksum = "sha256:f6f06d94b6241521c53d15450c5209b028270bf966f842afb11c030c79f5b
 url = "https://github.com/golangci/golangci-lint/releases/download/v2.12.2/golangci-lint-2.12.2-darwin-amd64.tar.gz"
 provenance = "github-attestations"
 
+[[tools."aqua:helm/helm"]]
+version = "3.18.6"
+backend = "aqua:helm/helm"
+
+[tools."aqua:helm/helm"."platforms.linux-arm64"]
+checksum = "sha256:5b8e00b6709caab466cbbb0bc29ee09059b8dc9417991dd04b497530e49b1737"
+url = "https://get.helm.sh/helm-v3.18.6-linux-arm64.tar.gz"
+
+[tools."aqua:helm/helm"."platforms.linux-x64"]
+checksum = "sha256:3f43c0aa57243852dd542493a0f54f1396c0bc8ec7296bbb2c01e802010819ce"
+url = "https://get.helm.sh/helm-v3.18.6-linux-amd64.tar.gz"
+
+[tools."aqua:helm/helm"."platforms.macos-arm64"]
+checksum = "sha256:48e30d236a1f334c6acb78501be5a851eaa2a267fefeb1131b6484eb2f9f30d7"
+url = "https://get.helm.sh/helm-v3.18.6-darwin-arm64.tar.gz"
+
+[tools."aqua:helm/helm"."platforms.macos-x64"]
+checksum = "sha256:80cad0470e38cf25731cdead7c32dfbeb887bc177bd6fa01e31b065722f8f06b"
+url = "https://get.helm.sh/helm-v3.18.6-darwin-amd64.tar.gz"
+
 [[tools."aqua:kubernetes-sigs/controller-runtime/setup-envtest"]]
 version = "0.20.4"
 backend = "aqua:kubernetes-sigs/controller-runtime/setup-envtest"
@@ -159,6 +179,46 @@ url = "https://github.com/kubernetes-sigs/controller-runtime/releases/download/v
 
 [tools."aqua:kubernetes-sigs/controller-runtime/setup-envtest"."platforms.macos-x64"]
 url = "https://github.com/kubernetes-sigs/controller-runtime/releases/download/v0.20.4/setup-envtest-darwin-amd64"
+
+[[tools."aqua:kubernetes-sigs/kind"]]
+version = "0.31.0"
+backend = "aqua:kubernetes-sigs/kind"
+
+[tools."aqua:kubernetes-sigs/kind"."platforms.linux-arm64"]
+checksum = "sha256:8e1014e87c34901cc422a1445866835d1e666f2a61301c27e722bdeab5a1f7e4"
+url = "https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-arm64"
+
+[tools."aqua:kubernetes-sigs/kind"."platforms.linux-x64"]
+checksum = "sha256:eb244cbafcc157dff60cf68693c14c9a75c4e6e6fedaf9cd71c58117cb93e3fa"
+url = "https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-linux-amd64"
+
+[tools."aqua:kubernetes-sigs/kind"."platforms.macos-arm64"]
+checksum = "sha256:88bf554fe9da6311c9f8c2d082613c002911a476f6b5090e9420b35d84e70c5c"
+url = "https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-darwin-arm64"
+
+[tools."aqua:kubernetes-sigs/kind"."platforms.macos-x64"]
+checksum = "sha256:a8b3cf77b2ad77aec5bf710d1a2589d9117576132af812885cad41e9dede4d4e"
+url = "https://github.com/kubernetes-sigs/kind/releases/download/v0.31.0/kind-darwin-amd64"
+
+[[tools."aqua:kubernetes/kubernetes/kubectl"]]
+version = "1.35.3"
+backend = "aqua:kubernetes/kubernetes/kubectl"
+
+[tools."aqua:kubernetes/kubernetes/kubectl"."platforms.linux-arm64"]
+checksum = "sha256:6f0cd088a82dde5d5807122056069e2fac4ed447cc518efc055547ae46525f14"
+url = "https://dl.k8s.io/v1.35.3/bin/linux/arm64/kubectl"
+
+[tools."aqua:kubernetes/kubernetes/kubectl"."platforms.linux-x64"]
+checksum = "sha256:fd31c7d7129260e608f6faf92d5984c3267ad0b5ead3bced2fe125686e286ad6"
+url = "https://dl.k8s.io/v1.35.3/bin/linux/amd64/kubectl"
+
+[tools."aqua:kubernetes/kubernetes/kubectl"."platforms.macos-arm64"]
+checksum = "sha256:280651239d84bab214ba83403666bf6976a5fa0dbdb41404f26eb6f276d34963"
+url = "https://dl.k8s.io/v1.35.3/bin/darwin/arm64/kubectl"
+
+[tools."aqua:kubernetes/kubernetes/kubectl"."platforms.macos-x64"]
+checksum = "sha256:2f339b1eae2e1792ec08da281b37afbeee94f70bed6b7398e7efd81ba08f8d37"
+url = "https://dl.k8s.io/v1.35.3/bin/darwin/amd64/kubectl"
 
 [[tools."aqua:kyverno/chainsaw"]]
 version = "0.2.15"

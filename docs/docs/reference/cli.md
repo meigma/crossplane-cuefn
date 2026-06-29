@@ -67,17 +67,20 @@ command.
 |------|---------|-------------|
 | `--network <string>` | `tcp` | Network to listen on for gRPC connections. |
 | `--address <string>` | `:9443` | Address to listen on for gRPC connections. |
-| `--tls-certs-dir <string>` | _(empty)_ | Directory holding the server certs (`tls.key`, `tls.crt`) and the client CA (`ca.crt`). |
+| `--tls-certs-dir <string>` | `$TLS_SERVER_CERTS_DIR` | Directory holding the server certs (`tls.key`, `tls.crt`) and the client CA (`ca.crt`). Defaults to the `TLS_SERVER_CERTS_DIR` environment variable, which Crossplane sets on the in-cluster runtime container, so the packaged Function serves mTLS with no extra flags. |
 | `--insecure` | `false` | Serve without mTLS credentials (development only; ignores `--tls-certs-dir`). |
 | `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
+| `--metrics-address <string>` | `:8080` | Address for the Prometheus metrics endpoint; pass an empty string (`--metrics-address ""`) to disable it. |
 | `-d`, `--debug` | `false` | Emit debug logs in addition to info logs. |
 
 **Output.** Long-running server; logs to stderr. Returns a non-zero exit only on
 a startup failure (logger creation or serve error).
 
-**Metrics.** `function-sdk-go` also serves Prometheus metrics on `:8080`, in
-addition to the gRPC `--address`. This port is currently fixed (not exposed as a
-flag), so be aware it can collide with other local services on `:8080`.
+**Metrics.** `function-sdk-go` serves Prometheus metrics on `--metrics-address`
+(default `:8080`), in addition to the gRPC `--address`. Pass
+`--metrics-address ""` to disable the endpoint entirely — useful when `:8080`
+would collide with another local service, or in-cluster where the metrics
+listener is unwanted.
 
 The `--cache-dir` requirement matters for the nonroot, read-only-root runtime
 image — see [Configuration & environment](configuration.md).
@@ -186,6 +189,7 @@ pushes it. Recording the resolved digest is the author half of the
 | `--function-version <string>` | `>=v0.0.0` | Semver constraint for the cuefn Function dependency. |
 | `--name <string>` | `<xrd-plural>-configuration` | Configuration package `metadata.name`. |
 | `--crossplane-constraint <string>` | _(empty)_ | Optional semver constraint on the supported Crossplane version. |
+| `--environment-config <string>` | _(none)_ | Name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable). Each is referenced by name so its values reach the module under `input.environment`. |
 | `--insecure` | `false` | Push over plain HTTP (development only; for a non-loopback throwaway registry). |
 
 **Output.** Prints `pushed <ref>` to stdout on success. Exits non-zero if the

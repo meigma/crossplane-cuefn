@@ -1,0 +1,62 @@
+# In-cluster install manifest for the cuefn Function (contrast with
+# example/functions.yaml, which is the local `crossplane render` Development
+# form). Apply this after pushing the Function xpkg to a registry Crossplane's
+# package manager accepts (HTTPS). The kind e2e harness (internal/e2e) generates
+# an equivalent manifest with its own registry refs; this committed copy documents
+# the shape for humans and real clusters.
+#
+# Replace REGISTRY with the registry hosting the Function xpkg and CUE_REGISTRY
+# with the registry hosting the CUE modules the function fetches at render time.
+---
+# Inject the module registry into the function runtime so the pod fetches CUE
+# modules from the right place, plus a writable cache directory on an emptyDir for
+# the nonroot, read-only-root runtime image. Crossplane names the runtime
+# container `package-runtime`.
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: cuefn-runtime
+spec:
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              env:
+                # CUE modules are pulled from this registry; +insecure permits a
+                # plain-HTTP local/in-cluster registry (Crossplane never uses it).
+                - name: CUE_REGISTRY
+                  value: "cuefn-modules:5000+insecure"
+                # The module cache must live on a writable, nonroot-owned path; the
+                # runtime user is uid 65532 with a read-only root filesystem.
+                - name: CUE_CACHE_DIR
+                  value: "/cuefn-cache"
+              volumeMounts:
+                - name: cue-cache
+                  mountPath: /cuefn-cache
+          volumes:
+            - name: cue-cache
+              emptyDir: {}
+---
+# The cuefn composition Function. Crossplane pulls this package over HTTPS, so the
+# registry must present a certificate Crossplane trusts (the e2e harness wires a
+# self-signed CA into the package manager via registryCaBundleConfig).
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: cuefn
+spec:
+  package: REGISTRY/function-cuefn:v0.1.0
+  runtimeConfigRef:
+    name: cuefn-runtime
+---
+# function-environment-configs merges the referenced EnvironmentConfig into the
+# pipeline context so cuefn can surface it under input.environment.
+apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: function-environment-configs
+spec:
+  package: xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.2

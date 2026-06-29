@@ -42,6 +42,9 @@ fileGroups:
     # type-crossing-disjunction module) consumed by the schema unit tests and the
     # chainsaw CRD.
     - 'internal/schema/testdata/**/*.cue'
+    # The kind e2e module fixture (an all-Ready variant of the example module),
+    # published to the throwaway module registry by the e2e harness.
+    - 'internal/e2e/testdata/**/*.cue'
   # Declarative chainsaw assets the build-tagged schema-test harness stages and
   # applies against an envtest apiserver.
   chainsawAssets:
@@ -188,14 +191,17 @@ tasks:
   # registry, validates it with the pinned crossplane CLI (`crossplane xpkg
   # extract`), signs + verifies it with cosign, generates + parses an SBOM with
   # syft, and runs the PACKAGED image to confirm it still serves the gRPC
-  # FunctionRunnerService. The cases self-skip when their tool (Docker / crossplane
+  # FunctionRunnerService. It also drives the apko dev-image smoke tests
+  # (TestImageServesFunction / _NoArgs) that prove the image's default `cmd:
+  # function` reaches the gRPC serve path rather than printing root help. The
+  # cases self-skip when their tool (Docker / crossplane
   # / cosign / syft / the `crossplane-cuefn:dev` image) is absent, so the task is
   # kept OUT of the default `check` graph (mirroring render-test/publish-test).
   # Build the dev image first with `mise run image-local` so the embed-runtime and
   # container-smoke cases run over the real image. Run under `mise exec` so the
   # pinned crossplane/cosign/syft win over any binaries on PATH.
   funcpkg-test:
-    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... ./internal/function/... -run 'TestFunctionXpkg|TestFunctionIndex|TestPublishFunction|TestFunctionPackageServesGRPC' -count 1"
+    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... ./internal/function/... -run 'TestFunctionXpkg|TestFunctionIndex|TestPublishFunction|TestFunctionPackageServesGRPC|TestImageServesFunction' -count 1"
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
@@ -235,6 +241,45 @@ tasks:
       - '@group(chainsawAssets)'
     options:
       cache: false
+  # Guard the committed, generated example/xrd.yaml against drift: regenerate the
+  # XRD from the example module with `cuefn generate` and diff it against the
+  # checked-in file. Like generate-check this is pure CUE codegen (no Docker), so
+  # it lives in the default check graph. Regenerate the committed file with:
+  #   go run ./cmd/cuefn generate cuefn.example/app@v0 --dir example/module \
+  #     --output example/xrd.yaml
+  xrd-check:
+    command: 'bash -c "mkdir -p bin && go run ./cmd/cuefn generate cuefn.example/app@v0 --dir example/module --output bin/xrd.gen.yaml && diff -u example/xrd.yaml bin/xrd.gen.yaml"'
+    inputs:
+      - '@group(goSources)'
+      - '@group(cueModules)'
+      - 'example/xrd.yaml'
+    options:
+      cache: false
+
+  # Kind end-to-end proof: boots a throwaway kind cluster, stands up a CA-trusted
+  # HTTPS registry (Crossplane xpkgs) and a plain-HTTP registry (CUE modules),
+  # installs Crossplane via helm, publishes + installs the Function (P6) and the
+  # generated Configuration (P5), instantiates an XR + EnvironmentConfig, and
+  # asserts the live reconcile (Ready, composed resources, status, defaulting,
+  # env-merge) and the digest-drift guard via chainsaw. Needs Docker plus the
+  # mise-pinned kind/kubectl/helm/chainsaw and the `crossplane-cuefn:dev` image
+  # (build it first with `mise run image-local`). Gated behind the `e2e` build tag
+  # and CUEFN_INTEGRATION (set here); self-skips when its tools are absent. Kept
+  # OUT of the default `check` graph (mirroring schema-test/render-test) so
+  # `moon run root:check` stays green without a cluster. Run under `mise exec` so
+  # the pinned kind/kubectl/helm/chainsaw/crossplane win over any binaries on PATH.
+  e2e-test:
+    command: 'mise exec -- go test -tags e2e ./internal/e2e/... -run TestE2E_Kind -count 1 -timeout 30m'
+    env:
+      CUEFN_INTEGRATION: 'true'
+    inputs:
+      - '@group(goSources)'
+      - '@group(cueModules)'
+      - '@group(exampleAssets)'
+      - '@group(chainsawAssets)'
+    options:
+      cache: false
+
   check:
     deps:
       - 'root:format'
@@ -243,6 +288,7 @@ tasks:
       - 'root:build-image-binary'
       - 'root:test'
       - 'root:generate-check'
+      - 'root:xrd-check'
       - 'docs:build'
     inputs:
       - '@group(goSources)'

@@ -1,0 +1,93 @@
+# Live-cluster reconcile assertions for the kind e2e (criteria 1-4). The Go
+# harness (internal/e2e) has already installed Crossplane, the cuefn Function, and
+# the generated Configuration from the CA-trusted registry; this chainsaw Test
+# instantiates the XRs and asserts the distinctive in-cluster behaviors. It is run
+# with --skip-delete so the `demo` XR survives for the drift Test that follows.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: e2e-reconcile
+spec:
+  timeouts:
+    apply: 2m
+    assert: 3m
+  steps:
+    - name: environment-and-xr
+      description: Apply the EnvironmentConfig and the primary XR.
+      try:
+        - apply:
+            file: environmentconfig.yaml
+        - apply:
+            file: xr.yaml
+    - name: xr-ready-and-status
+      description: |-
+        The XR reconciles to Ready=True (criterion 1) and its status is populated
+        from the module's #Status (criterion 2): ready=true plus the rendered url.
+      try:
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XApp
+              metadata:
+                name: demo
+                namespace: default
+              status:
+                ready: true
+                url: http://demo.svc
+                (conditions[?type == 'Ready'] | [0].status): "True"
+    - name: composed-resources
+      description: |-
+        The composed Deployment, Service, and ConfigMap exist (criterion 1), carry
+        the spec-driven replicas, and surface tier: production from the
+        EnvironmentConfig (criterion 4) rather than the module's "unset" default.
+      try:
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: demo
+                namespace: default
+                labels:
+                  app: demo
+                  tier: production
+              spec:
+                replicas: 2
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: Service
+              metadata:
+                name: demo
+                namespace: default
+                labels:
+                  app: demo
+                  tier: production
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: demo
+                namespace: default
+                labels:
+                  app: demo
+                  tier: production
+              data:
+                tier: production
+    - name: apiserver-defaulting
+      description: |-
+        An XR that omits replicas gets spec.replicas=1 filled by the API server
+        from the XRD default (criterion 3 — no-drift defaulting).
+      try:
+        - apply:
+            file: xr-default.yaml
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XApp
+              metadata:
+                name: demo-default
+                namespace: default
+              spec:
+                replicas: 1

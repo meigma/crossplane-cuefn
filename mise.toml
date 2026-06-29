@@ -63,6 +63,16 @@ python = "3.14.3"
 "aqua:kyverno/chainsaw"                                  = "0.2.15"
 "aqua:kubernetes-sigs/controller-runtime/setup-envtest" = "0.20.4"
 
+# Kind end-to-end proof (moon `e2e-test`): kind boots a throwaway Kubernetes
+# cluster in Docker, helm installs Crossplane into it, and kubectl + chainsaw
+# drive the live author->publish->install->instantiate->reconcile loop. All three
+# are consumed only by the build-tagged `internal/e2e` harness, which self-skips
+# when they (or Docker) are absent, so the default check graph never needs them.
+# helm is pinned to the v3 line that the Crossplane chart install path targets.
+"aqua:kubernetes-sigs/kind"        = "0.31.0"
+"aqua:kubernetes/kubernetes/kubectl" = "1.35.3"
+"aqua:helm/helm"                   = "3.18.6"
+
 [env]
 # Pin the Go toolchain: never auto-download a toolchain other than the one above.
 # The version here is authoritative and matches go.mod's `go 1.26.4`.
