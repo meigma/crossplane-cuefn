@@ -13,8 +13,9 @@ import (
 
 // generateFlags holds the flags for the generate subcommand.
 type generateFlags struct {
-	dir    string
-	output string
+	dir      string
+	cacheDir string
+	output   string
 }
 
 // newGenerateCommand builds the `cuefn generate` subcommand: it loads a CUE
@@ -41,7 +42,9 @@ func newGenerateCommand(options Options) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&f.dir, "dir", "",
-		"serve the module from this local directory (offline) instead of fetching it over OCI")
+		"serve the module from this local directory instead of fetching it over OCI")
+	cmd.Flags().StringVar(&f.cacheDir, "cache-dir", "",
+		"directory for the CUE module cache and dependency downloads (overrides CUE_CACHE_DIR)")
 	cmd.Flags().StringVarP(&f.output, "output", "o", "",
 		"write the generated XRD to this file instead of stdout")
 
@@ -51,7 +54,7 @@ func newGenerateCommand(options Options) *cobra.Command {
 // runGenerate selects a loader, builds the module value, generates the XRD YAML,
 // and writes it to stdout or the --output file.
 func runGenerate(ctx context.Context, options Options, f generateFlags, ref string) error {
-	loader, err := moduleLoader(f.dir)
+	loader, err := moduleLoader(f.dir, f.cacheDir)
 	if err != nil {
 		return err
 	}
@@ -80,13 +83,21 @@ func runGenerate(ctx context.Context, options Options, f generateFlags, ref stri
 	return nil
 }
 
-// moduleLoader returns a LocalLoader when dir is set and an OCILoader (honoring
-// CUE_REGISTRY) otherwise. It mirrors the render command's loader selection.
-func moduleLoader(dir string) (render.ModuleLoader, error) {
+// moduleLoader returns a dependency-aware LocalLoader when dir is set and an
+// OCILoader otherwise. Both resolve the module's transitive dependencies (e.g. an
+// imported cue.dev/x/k8s.io schema) from the registry — central by default,
+// CUE_REGISTRY for private or override registries; cacheDir overrides
+// CUE_CACHE_DIR. It mirrors the render command's loader selection.
+func moduleLoader(dir, cacheDir string) (render.ModuleLoader, error) {
+	cfg := render.OCIConfig{CacheDir: cacheDir}
 	if dir != "" {
-		return render.LocalLoader{Dir: dir}, nil
+		loader, err := render.NewLocalLoader(dir, cfg)
+		if err != nil {
+			return nil, fmt.Errorf("cannot build local loader: %w", err)
+		}
+		return loader, nil
 	}
-	loader, err := render.NewOCILoader(render.OCIConfig{})
+	loader, err := render.NewOCILoader(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("cannot build OCI loader: %w", err)
 	}
