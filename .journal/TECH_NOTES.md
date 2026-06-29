@@ -374,3 +374,52 @@ flag/disable — feasibility depends on whether `sdk.Serve` exposes a metrics op
 - `example/xrd.yaml` drift check (committed generated artifact, currently unguarded).
 - The `--metrics-address` flag (above), if feasible.
 
+## Phase 8 — kind e2e + finale (merged 2026-06-28, PR #11) — PLAN COMPLETE
+
+The full author→publish→install→instantiate→reconcile loop, proven on a real kind
+cluster via **Chainsaw**, green in CI on ubuntu (`e2e` workflow, ~4.5m). `internal/e2e/`
+(build tag `e2e`, gated) + `test/chainsaw/e2e/` + `.github/workflows/e2e.yml`
+(non-blocking but always-running).
+- **Registry crux solved (dual registry):** (A) an **HTTPS, CA-trusted** `registry:2`
+  on the kind network for the Crossplane xpkgs — a self-signed CA minted in-process,
+  wired into Crossplane via helm `registryCaBundleConfig` AND into each node's
+  containerd (`/etc/containerd/certs.d/.../hosts.toml`); pushes go to localhost over a
+  CA-trusting transport. (B) a plain-HTTP `+insecure` registry for the CUE modules the
+  function fetches at render (`CUE_REGISTRY=...+insecure`).
+- **Two non-obvious gotchas:** Crossplane's CEL package-ref validation **rejects a
+  dotless registry host** (use e.g. `cuefn-e2e-registry.test`); avoid host-publishing
+  `:5000` (macOS Control Center).
+- Chainsaw asserts on the live cluster: XR `Ready=True` + composed Deployment/Service/
+  ConfigMap; status from `#Status`; API-server defaulting of an omitted field;
+  EnvironmentConfig `tier: production` on composed resources; and the **digest-drift
+  guard** → `Synced=False` after republishing different content under the same version.
+
+### Real bugs the e2e surfaced + fixed (carry forward as facts)
+
+- **`pkg.GenerateComposition` emitted the `function-environment-configs` step with NO
+  input** → generated Configurations merged no EnvironmentConfig (`tier` stayed
+  `unset`). Fixed: optional `CompositionInput.EnvironmentConfigRefs` + a `cuefn publish
+  --environment-config` flag. (Configs published before this fix would not merge env.)
+- **`cuefn function` ignored Crossplane's injected mTLS certs dir** → wired the standard
+  `TLS_SERVER_CERTS_DIR` default so the packaged Function serves mTLS in-cluster.
+
+### Cleanups done
+
+- `--metrics-address` flag (default `:8080`, empty disables) wired to real
+  `sdk.WithMetricsServer` (function-sdk-go v0.7.1 exposes it); enable/disable tests.
+- No-args apko image test (`TestImageServesFunction_NoArgs` — default `cmd: function`).
+- `root:xrd-check` drift guard (in the `check` gate): `cuefn generate` vs committed
+  `example/xrd.yaml`.
+- Pinned `kind 0.31.0`, `kubectl 1.35.3`, `helm 3.18.6` in mise.
+
+### Remaining minor follow-ups (optional, non-blocking)
+
+- `example/xrd.yaml` lost its "generated" header (collateral of the exact-match
+  xrd-check; cuefn generate emits none). Could have `cuefn generate` emit a header or
+  make xrd-check comment-tolerant.
+- The e2e job has no explicit fail-if-skipped guard (it demonstrably runs — 4.5m in CI).
+- `ci` mise-setup installs ALL pinned tools, so a transient download 403 of any tool
+  (hit crossplane.io once) fails the fast gate; could scope per-job tool installs.
+- e2e loop calls `internal/pkg` library funcs directly (CA-trusting push), not the
+  `cuefn publish` CLI binary — same code path, but the CLI binary isn't in the live loop.
+

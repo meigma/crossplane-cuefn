@@ -249,3 +249,26 @@ guard** end to end. Plus the tracked cleanups folded in: no-args image test,
 example/xrd.yaml drift check, and the --metrics-address flag if feasible. This is
 the hardest phase (kind + Crossplane + registry + Chainsaw) — expect fix rounds; I
 will watch the e2e CI carefully (standing rule).
+
+## 2026-06-28 20:28 — Phase 8 signed off + merged — PLAN P1→P8 COMPLETE
+Phase 8 (PR #11) all 8 criteria met, 0 blockers, 1 fix round. The kind e2e is
+**green in CI on ubuntu** (`e2e` workflow, 4m28s) — the definitive proof (it was
+flaky only on this macOS host / Docker Desktop). The registry crux was solved
+properly (dual registry, CA-trusted HTTPS for xpkgs + plain-HTTP for modules).
+It surfaced + fixed two real bugs: generated Configs merged NO EnvironmentConfig
+(env-configs step had no input → added --environment-config) and `cuefn function`
+ignored the injected mTLS certs dir (→ TLS_SERVER_CERTS_DIR). Metrics flag + the
+two other cleanups done. Independently confirmed: build (both tags), root:check,
+and the full PR #11 CI (ci + integration + e2e + dry-runs) all green. A transient
+crossplane.io 403 failed `ci` once at mise-setup; URL was back (200), re-ran → green.
+Squash-merged → master `e81d018`. phase-8 worktree/branch cleaned; no leftover kind
+cluster. Details + remaining minor follow-ups → TECH_NOTES "Phase 8".
+
+**PROJECT STATUS: the full PLAN is implemented and merged.** P1 render engine →
+P2 OCI loading → P3 function + render loop → P4 schema CLI → P5 Configuration
+publish → P6 signed Function xpkg + release → P7 docs → P8 kind e2e. Eight PRs
+(#4–#11), each human-signed-off before merge, each independently verified, CI green.
+
+Closing the session now (session-close). Remaining loose ends are the minor
+non-blocking follow-ups in TECH_NOTES and the session-001 note to promote hardened
+DESIGN/PLAN bits into TECH_NOTES and delete those temporary working docs.
