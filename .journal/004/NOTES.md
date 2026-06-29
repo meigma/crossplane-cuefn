@@ -270,3 +270,27 @@ PRs: **PR A** = v2 `out` restructure (engine 4 literals + 8 modules + docs; brea
 Central + example imports it; hermetic fixtures stay import-free. Same per-PR human-sign-off norm.
 
 Starting PR A.
+
+## 2026-06-29 14:30 — PR A open (#19): module-contract v2 (`out` nesting)
+Worktree `.wt/feat-module-contract-v2`. Changes (12 files):
+- `internal/render/engine.go`: 4 literals → `out.input`/`out.resources`/`out.status` + a clear
+  pre-v2 error when `out` is absent (used `cue/errors.New`, NOT stdlib). Schema-agnostic engine
+  unchanged otherwise.
+- 8 engine-loaded modules wrapped under `out: {...}` (locals `_name`/`_tier` moved inside out —
+  hidden fields are allowed inside a closed struct, so this also works for PR B's `out:
+  contract.#Transform & {...}`): example/module, internal/test/common/testdata/module (hermetic),
+  internal/test/e2e/testdata/module, render/testdata/{nostatus,badstatus,nonconcrete},
+  oci/{consumer,mutable/v1,v2}. CUE is whitespace-insensitive → wrapped via heredoc + `cue fmt`.
+- Docs: module-contract.md + quickstart.md → `out` shape (no contract-module ref yet; that's PR B).
+- 4 codegen-only/library fixtures untouched (schema/testdata/{derisked,disjunction,nostatus}, oci/dep).
+- **Verified myself:** `cue mod`-level — example renders v2 (`cuefn render --dir example/module`);
+  XRD byte-identical (codegen drops the regular `out` field like it dropped input/resources/status);
+  `moon run root:check` GREEN (11 tasks incl example-check); gated oci-test + render-test + publish-test
+  GREEN. e2e/funcpkg need an image rebuild → CI.
+- PR #19 opened (BREAKING, pre-1.0, no shim). Awaiting merge sign-off. PR B (contract module +
+  Central publish) needs #19 on master + the publishing decision (S1: in-repo subdir vs dedicated repo,
+  cue login flow).
+
+Tooling notes: `cue fmt <dir>` fails ("cannot be imported as a CUE package") — pass file paths or
+`./...`. root:format only checks Go (golangci-lint fmt), not CUE. Recurring: cleared golangci-lint
+cache (shared across worktrees) before the gate.
