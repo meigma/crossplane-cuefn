@@ -471,3 +471,20 @@ linters:
           - gosec
           - noctx
           - wrapcheck
+      # internal/test/common is buildable test-support code: it imports testing on
+      # purpose and consolidates helpers lifted verbatim from _test.go files, so it
+      # must get the same lint relaxation those test files get (plus the few extra
+      # linters that only apply once the helpers live in a non-_test.go file).
+      - path: 'internal/test/common/'
+        linters:
+          - bodyclose
+          - dupl
+          - errcheck
+          - funlen
+          - goconst
+          - godoclint
+          - gosec
+          - mnd
+          - noctx
+          - nonamedreturns
+          - wrapcheck

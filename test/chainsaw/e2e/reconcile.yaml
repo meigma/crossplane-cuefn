@@ -1,5 +1,5 @@
 # Live-cluster reconcile assertions for the kind e2e (criteria 1-4). The Go
-# harness (internal/e2e) has already installed Crossplane, the cuefn Function, and
+# harness (internal/test/e2e) has already installed Crossplane, the cuefn Function, and
 # the generated Configuration from the CA-trusted registry; this chainsaw Test
 # instantiates the XRs and asserts the distinctive in-cluster behaviors. It is run
 # with --skip-delete so the `demo` XR survives for the drift Test that follows.

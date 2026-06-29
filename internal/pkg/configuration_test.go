@@ -9,37 +9,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/meigma/crossplane-cuefn/internal/pkg"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
-
-// buildFixtureConfiguration assembles a Configuration from the fixture XRD plus a
-// generated Composition and metadata. It is the shared input for the image tests.
-func buildFixtureConfiguration(t *testing.T) pkg.Configuration {
-	t.Helper()
-
-	xrd := fixtureXRD(t)
-	comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
-		Module:         "cuefn.example/app@v0.1.0",
-		ExpectedDigest: "sha256:" + zeros(64),
-	})
-	require.NoError(t, err)
-
-	meta, err := pkg.GenerateConfigurationMeta(pkg.ConfigurationMeta{
-		Name:            "xapps-configuration",
-		FunctionPackage: "xpkg.meigma.io/cuefn",
-		FunctionVersion: ">=v0.1.0",
-	})
-	require.NoError(t, err)
-
-	return pkg.Configuration{Meta: meta, XRD: xrd, Composition: comp}
-}
 
 // TestPackageYAML_DocOrder proves the package.yaml stream carries the three
 // expected documents in crossplane's order: meta, XRD, Composition.
 func TestPackageYAML_DocOrder(t *testing.T) {
-	stream, err := buildFixtureConfiguration(t).PackageYAML()
+	stream, err := common.BuildFixtureConfiguration(t).PackageYAML()
 	require.NoError(t, err)
 
-	docs := splitStream(t, stream)
+	docs := common.SplitStream(t, stream)
 	require.Len(t, docs, 3)
 
 	assert.Equal(t, "meta.pkg.crossplane.io/v1", docs[0].APIVersion)
@@ -55,7 +34,7 @@ func TestPackageYAML_DocOrder(t *testing.T) {
 // kinds/apiVersions with the right Composition step order and the function
 // dependency — checking the bytes, not the in-memory objects (criterion 1a).
 func TestBuildConfigurationImage_EmbeddedDocs(t *testing.T) {
-	cfg := buildFixtureConfiguration(t)
+	cfg := common.BuildFixtureConfiguration(t)
 	img, err := pkg.BuildConfigurationImage(cfg)
 	require.NoError(t, err)
 
@@ -68,7 +47,7 @@ func TestBuildConfigurationImage_EmbeddedDocs(t *testing.T) {
 	stream, err := io.ReadAll(rc)
 	require.NoError(t, err)
 
-	docs := splitStream(t, stream)
+	docs := common.SplitStream(t, stream)
 	require.Len(t, docs, 3)
 
 	// Meta: Configuration depending on the cuefn function.
@@ -92,8 +71,8 @@ func TestBuildConfigurationImage_EmbeddedDocs(t *testing.T) {
 	pipeline, ok := docs[2].Spec["pipeline"].([]any)
 	require.True(t, ok)
 	require.Len(t, pipeline, 2)
-	assert.Equal(t, "function-environment-configs", stepName(t, pipeline[0]))
-	assert.Equal(t, "cuefn", stepName(t, pipeline[1]))
+	assert.Equal(t, "function-environment-configs", common.StepName(t, pipeline[0]))
+	assert.Equal(t, "cuefn", common.StepName(t, pipeline[1]))
 }
 
 // TestBuildConfigurationImage_Errors proves an incomplete Configuration errors
@@ -101,14 +80,4 @@ func TestBuildConfigurationImage_EmbeddedDocs(t *testing.T) {
 func TestBuildConfigurationImage_Errors(t *testing.T) {
 	_, err := pkg.BuildConfigurationImage(pkg.Configuration{})
 	require.Error(t, err)
-}
-
-// stepName extracts the "step" field of a pipeline step map.
-func stepName(t *testing.T, step any) string {
-	t.Helper()
-	m, ok := step.(map[string]any)
-	require.True(t, ok)
-	name, ok := m["step"].(string)
-	require.True(t, ok)
-	return name
 }

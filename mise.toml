@@ -66,7 +66,7 @@ python = "3.14.3"
 # Kind end-to-end proof (moon `e2e-test`): kind boots a throwaway Kubernetes
 # cluster in Docker, helm installs Crossplane into it, and kubectl + chainsaw
 # drive the live author->publish->install->instantiate->reconcile loop. All three
-# are consumed only by the build-tagged `internal/e2e` harness, which self-skips
+# are consumed only by the build-tagged `internal/test/e2e` harness, which self-skips
 # when they (or Docker) are absent, so the default check graph never needs them.
 # helm is pinned to the v3 line that the Crossplane chart install path targets.
 "aqua:kubernetes-sigs/kind"        = "0.31.0"

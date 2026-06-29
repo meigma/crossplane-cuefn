@@ -9,17 +9,18 @@ import (
 
 	inputv1beta1 "github.com/meigma/crossplane-cuefn/input/v1beta1"
 	"github.com/meigma/crossplane-cuefn/internal/pkg"
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
 // TestGenerateComposition_StepOrder proves the Composition is pipeline-mode with
 // the env-config step first and the cuefn step second, and that its
 // compositeTypeRef is derived from the XRD's group/version/kind.
 func TestGenerateComposition_StepOrder(t *testing.T) {
-	xrd := fixtureXRD(t)
+	xrd := common.FixtureXRD(t)
 
 	comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
 		Module:         "cuefn.example/app@v0.1.0",
-		ExpectedDigest: "sha256:" + zeros(64),
+		ExpectedDigest: "sha256:" + common.Zeros(64),
 	})
 	require.NoError(t, err)
 
@@ -39,9 +40,9 @@ func TestGenerateComposition_StepOrder(t *testing.T) {
 // input/v1beta1.Input carrying the exact module ref and expected digest — the
 // author half of the runtime digest lock-step the function later verifies.
 func TestGenerateComposition_LockStep(t *testing.T) {
-	xrd := fixtureXRD(t)
+	xrd := common.FixtureXRD(t)
 	const ref = "cuefn.example/app@v0.3.0"
-	digest := "sha256:" + zeros(64)
+	digest := "sha256:" + common.Zeros(64)
 
 	comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
 		Module:         ref,
@@ -64,7 +65,7 @@ func TestGenerateComposition_LockStep(t *testing.T) {
 // TestGenerateComposition_FunctionName proves the functionRef.name follows the
 // supplied FunctionName, defaulting to the cuefn step name when unset.
 func TestGenerateComposition_FunctionName(t *testing.T) {
-	xrd := fixtureXRD(t)
+	xrd := common.FixtureXRD(t)
 
 	withName, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
 		Module:       "cuefn.example/app@v0.1.0",
@@ -85,7 +86,7 @@ func TestGenerateComposition_FunctionName(t *testing.T) {
 // values reach the module under input.environment, and that the step carries no
 // Input when none are requested (the default, backward-compatible shape).
 func TestGenerateComposition_EnvironmentConfigs(t *testing.T) {
-	xrd := fixtureXRD(t)
+	xrd := common.FixtureXRD(t)
 
 	t.Run("none", func(t *testing.T) {
 		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{Module: "cuefn.example/app@v0.1.0"})
@@ -134,16 +135,7 @@ func TestGenerateComposition_Errors(t *testing.T) {
 	})
 
 	t.Run("empty module", func(t *testing.T) {
-		_, err := pkg.GenerateComposition(fixtureXRD(t), pkg.CompositionInput{})
+		_, err := pkg.GenerateComposition(common.FixtureXRD(t), pkg.CompositionInput{})
 		require.Error(t, err)
 	})
-}
-
-// zeros returns a string of n '0' runes, used to build placeholder digests.
-func zeros(n int) string {
-	b := make([]byte, n)
-	for i := range b {
-		b[i] = '0'
-	}
-	return string(b)
 }

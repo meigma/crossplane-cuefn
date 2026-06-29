@@ -11,19 +11,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-)
 
-// freePort reserves an ephemeral TCP port, closes the listener, and returns the
-// freed port so a server can bind it. There is an inherent race between the close
-// and the rebind, but it is small enough for a single-process test.
-func freePort(t *testing.T) int {
-	t.Helper()
-	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	port := l.Addr().(*net.TCPAddr).Port
-	require.NoError(t, l.Close())
-	return port
-}
+	"github.com/meigma/crossplane-cuefn/internal/test/common"
+)
 
 // portListening reports whether something accepts a TCP connection on the
 // loopback port within the timeout.
@@ -43,7 +33,7 @@ func portListening(port int, timeout time.Duration) bool {
 func serveInBackground(t *testing.T, metricsAddress string) {
 	t.Helper()
 
-	grpcPort := freePort(t)
+	grpcPort := common.FreePort(t)
 	f := functionFlags{
 		network:        "tcp",
 		address:        "127.0.0.1:" + strconv.Itoa(grpcPort),
@@ -69,7 +59,7 @@ func serveInBackground(t *testing.T, metricsAddress string) {
 // Prometheus endpoint on the chosen (non-default) port, so the flag is honored
 // and the endpoint is not hardcoded to :8080.
 func TestServeFunction_MetricsEnabled(t *testing.T) {
-	metricsPort := freePort(t)
+	metricsPort := common.FreePort(t)
 	serveInBackground(t, "127.0.0.1:"+strconv.Itoa(metricsPort))
 
 	url := "http://127.0.0.1:" + strconv.Itoa(metricsPort) + "/metrics"
