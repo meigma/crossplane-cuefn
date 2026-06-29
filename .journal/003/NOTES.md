@@ -74,3 +74,44 @@ delete-redundant-round-trips), per-file migration map, build/CI changes, 12 risk
 Next: developer reviews the proposal + answers the 8 open decisions; then execute
 (Phase 1 migrate, Phase 2 consolidate) — implementation worktree off `origin/master`,
 one PR per phase. No code changed yet.
+
+## 2026-06-28 22:46 — Phase 1 executed (effort: ultracode; autonomy granted, human merge gate)
+
+Developer set effort=ultracode, AGREED with all 8 recommendations, granted autonomy to
+complete the plan with ONE hard rule: human-gated approval before merging any PR.
+Locked decisions = my recommendations (two phases sequentially; delete redundant
+round-trips in P2 after moving their unique asserts; schema-chainsaw→integration
+envtest-tagged; fixtures→common; testdata stays+RepoRoot, e2e dir moves wholesale; one
+common.FreePort close-then-return; leave white-box unit tests; fix the !noxpkg tag).
+
+Implementation worktree: `refactor/test-layout` at `.wt/refactor-test-layout`, off
+master e81d018. Drove Phase 1 via workflow `wf_592377f7-f99` (8 agents, ~1M tok, ~38m):
+build internal/test/common → full migration to green → 6 parallel adversarial auditors →
+fix pass. Then I verified ground truth myself (the workflow's self-reported "green" had
+a stale-LSP scare but actual `go vet ./...`/`-tags envtest`/`-tags e2e` + noxpkg build
+all exit 0).
+
+Result (commits bcb1160 + 6e3dcf7 + 5ac1596 on refactor/test-layout):
+- NEW `internal/test/common` (9 files, package common): Registry, gates (RequireDocker/
+  Crossplane[shim-probe]/Binary/DevImage), RepoRoot/FreePort[close-then-return]/CacheDir,
+  serve helpers, runtime bases, kinds parsing, promoted fixtures, Object/ToInt, consts.
+  RequireCrossplane uses the render --help shim-probe (not the weak LookPath).
+- `internal/test/integration` (package integration_test): 23 tests (oci/renderloop/image/
+  funcpkg/push/publish/publish_function + schema_chainsaw[envtest]). `internal/test/e2e`
+  (package e2e, e2e tag): TestE2E_Kind; whole internal/e2e dir moved wholesale (testdata too).
+- Helpers deduped (requireDocker ×4→1, registryImage ×5→1, startRegistry/testRegistry ×4→1,
+  etc.); staying unit files repointed to common; boundary fixed (publishFunctionUse→literal);
+  !noxpkg added to migrated+staying publish files (decision 8); moon.yml 6 gated tasks
+  repointed + cueModules e2e testdata path; .golangci.yml scoped-exclusion for common/*.go.
+- Cleanups I applied: removed empty internal/e2e dir; fixed stale internal/e2e prose refs
+  (mise.toml, reconcile.yaml, functions.yaml, consts.go).
+
+Verification: golangci-lint 0 issues; gofmt clean; parity perfect (all 24 migrated tests
+exactly once under internal/test/, 6 unit tests stayed). **Gated suites run locally as
+ground truth, ALL genuinely ran (0 skip/fail):** oci(8) ✓, schema-chainsaw ✓, publish(10
+incl cosign/syft) ✓, funcpkg(10 incl real dev-image gRPC) ✓, render-loop ✓. e2e-test
+(kind, ~25m) running in background (btndot72j) — PR opens only after it's green.
+
+All auditor findings were minor + handled or non-issues (the 4 staying unit tests now run
+in the BLOCKING check gate via root:test, strictly better than before). Next: confirm
+e2e green → push → open Phase 1 PR → STOP for human merge.
