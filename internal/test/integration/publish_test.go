@@ -58,6 +58,19 @@ func TestPublish_EndToEnd(t *testing.T) {
 	img, err := remote.Image(parsed)
 	require.NoError(t, err)
 
+	// Round-trip digest stability (folds TestConfigurationRoundTrip): the pulled
+	// image resolves to a non-empty sha256 digest that is identical across
+	// re-pulls.
+	digest, err := img.Digest()
+	require.NoError(t, err)
+	assert.Equal(t, "sha256", digest.Algorithm, "pulled image digest must be a sha256 ref")
+	assert.NotEmpty(t, digest.Hex, "pulled image digest must be non-empty")
+	repulled, err := remote.Image(parsed)
+	require.NoError(t, err)
+	reDigest, err := repulled.Digest()
+	require.NoError(t, err)
+	assert.Equal(t, digest.String(), reDigest.String(), "round-tripped digest must be identical across pulls")
+
 	// Criterion 3: the package layer carries the xpkg base annotation.
 	assertBaseLayerAnnotation(t, img)
 

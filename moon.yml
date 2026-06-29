@@ -177,7 +177,7 @@ tasks:
   # neither Docker nor crossplane. Run under `mise exec` so the pinned crossplane
   # CLI wins over any binary on PATH.
   publish-test:
-    command: "mise exec -- go test ./internal/test/integration/... -run 'TestPublish|TestConfigurationRoundTrip|TestXpkgValidate|TestFunctionXpkg|TestFunctionIndex' -count 1"
+    command: "mise exec -- go test ./internal/test/integration/... -run 'TestPublish_EndToEnd|TestXpkgValidate|TestFunctionXpkgSupplyChain' -count 1"
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
@@ -201,7 +201,7 @@ tasks:
   # container-smoke cases run over the real image. Run under `mise exec` so the
   # pinned crossplane/cosign/syft win over any binaries on PATH.
   funcpkg-test:
-    command: "mise exec -- go test ./internal/test/integration/... -run 'TestFunctionXpkg|TestFunctionIndex|TestPublishFunction|TestFunctionPackageServesGRPC|TestImageServesFunction' -count 1"
+    command: "mise exec -- go test ./internal/test/integration/... -run 'TestImageServesFunction|TestFunctionPackageServesGRPC|TestPublishFunction' -count 1"
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
