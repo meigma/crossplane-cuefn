@@ -27,6 +27,14 @@ python = "3.14.3"
 # Docs (MkDocs) toolchain — moved off moon's former unstable_python/unstable_uv.
 "aqua:astral-sh/uv" = "0.11.0"
 
+# CUE CLI for the documented author workflow (`cue mod publish`): the docs
+# quickstart publishes a module to an OCI registry with `cue mod publish`, the one
+# author-side step the cuefn CLI does not itself perform. Pinned to the same
+# cuelang.org/go the engine evaluates with (go.mod v0.16.1); the `aqua:` ref forces
+# the verifying backend (checksum + attestation recorded in mise.lock). The runtime
+# does not need it — only the publish-a-module step in the docs does.
+"aqua:cue-lang/cue" = "0.16.1"
+
 # Build / CI / release / supply-chain CLIs. moon itself is now mise-managed (CI
 # installs it via mise instead of moonrepo/setup-toolchain). melange/apko/cosign
 # are consumed by the container build + image signing in the release workflow.

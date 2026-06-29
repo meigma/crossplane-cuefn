@@ -13,7 +13,9 @@ theme:
   language: en
   features:
     - content.action.edit
+    - content.code.copy
     - navigation.instant
+    - navigation.sections
     - navigation.tracking
     - search.highlight
     - search.suggest
@@ -35,6 +37,26 @@ theme:
 
 nav:
   - Home: index.md
+  - Quickstart: quickstart.md
+  - How-to:
+      - Render a module locally: how-to/render-locally.md
+      - Generate an XRD: how-to/generate-xrd.md
+      - Validate an XR: how-to/validate-xr.md
+      - Publish a Configuration: how-to/publish-configuration.md
+      - Publish the Function: how-to/publish-function.md
+      - Serve the function: how-to/serve-function.md
+      - Local toolchain (mise): how-to/local-toolchain.md
+      - Build the runtime image: how-to/build-image.md
+  - Reference:
+      - Module contract: reference/module-contract.md
+      - CLI: reference/cli.md
+      - Configuration & environment: reference/configuration.md
+      - Input CRD: reference/input.md
+  - Explanation:
+      - One module, two outputs: explanation/one-module-two-outputs.md
+      - Schema-runtime digest lock-step: explanation/digest-lockstep.md
+      - Reserved-key projection: explanation/reserved-key-projection.md
+      - Lean runtime image (noxpkg): explanation/noxpkg-split.md
 
 plugins:
   - search
