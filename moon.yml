@@ -167,15 +167,16 @@ tasks:
       - '@group(cueModules)'
     options:
       cache: false
-  # Configuration packaging + push proof: assembles a Crossplane Configuration
-  # xpkg (and a prototype Function xpkg) from a CUE module, pushes it to a
-  # throwaway OCI registry, round-trips the contents, and validates the package
-  # with the pinned crossplane CLI (`crossplane xpkg extract`). The push/round-trip
-  # cases need a Docker daemon; the xpkg-validate cases need the crossplane CLI.
-  # Both self-skip when their tool is absent, but the task is kept OUT of the
-  # default `check` graph (mirroring render-test) so `moon run root:check` needs
-  # neither Docker nor crossplane. Run under `mise exec` so the pinned crossplane
-  # CLI wins over any binary on PATH.
+  # Configuration publish + xpkg validation + supply-chain proof: runs the
+  # `cuefn publish` end-to-end flow (build + push a Configuration xpkg, then
+  # verify the recorded module digest and that the runtime loader accepts it and
+  # rejects drift), the `crossplane xpkg extract` acceptance check for both the
+  # Configuration and Function packages (TestXpkgValidate), and the Function xpkg
+  # supply-chain test (cosign sign/verify + syft SBOM, each gated subtest).
+  # Needs a Docker daemon (throwaway registry) plus the pinned crossplane, cosign,
+  # and syft CLIs; per-tool cases self-skip when their tool is absent. Kept OUT of
+  # the default `check` graph so `moon run root:check` needs none of them. Run
+  # under `mise exec` so the pinned crossplane/cosign/syft win over any binary on PATH.
   publish-test:
     command: "mise exec -- go test ./internal/test/integration/... -run 'TestPublish_EndToEnd|TestXpkgValidate|TestFunctionXpkgSupplyChain' -count 1"
     env:
@@ -186,20 +187,17 @@ tasks:
       - '@group(exampleAssets)'
     options:
       cache: false
-  # Function xpkg packaging proof: assembles the Function package (meta + embedded
-  # Input CRD) over the real apko runtime base, round-trips it through a throwaway
-  # registry, validates it with the pinned crossplane CLI (`crossplane xpkg
-  # extract`), signs + verifies it with cosign, generates + parses an SBOM with
-  # syft, and runs the PACKAGED image to confirm it still serves the gRPC
-  # FunctionRunnerService. It also drives the apko dev-image smoke tests
-  # (TestImageServesFunction / _NoArgs) that prove the image's default `cmd:
-  # function` reaches the gRPC serve path rather than printing root help. The
-  # cases self-skip when their tool (Docker / crossplane
-  # / cosign / syft / the `crossplane-cuefn:dev` image) is absent, so the task is
+  # Function image + publish-function proof: runs the apko dev-image smoke test
+  # (TestImageServesFunction_NoArgs — the image's default `cmd: function` reaches
+  # the gRPC serve path rather than printing root help), assembles the Function
+  # package over the real apko runtime base and confirms the PACKAGED image still
+  # serves the gRPC FunctionRunnerService (TestFunctionPackageServesGRPC), and
+  # drives the `cuefn publish-function` command end-to-end including the multi-arch
+  # index (TestPublishFunction_*). Needs a Docker daemon and the locally built
+  # `crossplane-cuefn:dev` image; the cases self-skip when absent, so the task is
   # kept OUT of the default `check` graph (mirroring render-test/publish-test).
-  # Build the dev image first with `mise run image-local` so the embed-runtime and
-  # container-smoke cases run over the real image. Run under `mise exec` so the
-  # pinned crossplane/cosign/syft win over any binaries on PATH.
+  # Build the dev image first with `mise run image-local`. Run under `mise exec` so
+  # the pinned crossplane CLI wins over any binary on PATH.
   funcpkg-test:
     command: "mise exec -- go test ./internal/test/integration/... -run 'TestImageServesFunction|TestFunctionPackageServesGRPC|TestPublishFunction' -count 1"
     env:

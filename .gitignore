@@ -32,6 +32,8 @@ image.tar
 
 # Go
 bin/
+# the compiled cuefn binary built into the repo root by a bare `go build ./cmd/cuefn`
+/cuefn
 cover.out
 coverage.out
 coverage.html

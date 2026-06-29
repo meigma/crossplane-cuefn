@@ -10,7 +10,6 @@ import (
 	"strings"
 	"testing"
 
-	xpkg "github.com/crossplane/crossplane-runtime/v2/pkg/xpkg"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/tarball"
@@ -68,16 +67,6 @@ func ExtractKinds(t *testing.T, bin string, img v1.Image, base string) map[strin
 	require.NoError(t, err)
 
 	return StreamKinds(stream)
-}
-
-// PackageYAMLBytes reads the image's package.yaml layer back into bytes.
-func PackageYAMLBytes(img v1.Image) ([]byte, error) {
-	rc, err := xpkg.ExtractPackageYAML(img)
-	if err != nil {
-		return nil, err
-	}
-	defer rc.Close()
-	return io.ReadAll(rc)
 }
 
 // SplitStream splits a multi-document YAML stream into its non-empty documents,
