@@ -3,14 +3,16 @@
 // Result.Status.
 package app
 
-input: {...}
+out: {
+	input: {...}
 
-resources: {
-	only: {
-		object: {
-			apiVersion: "v1"
-			kind:       "ConfigMap"
-			metadata: name: "only"
+	resources: {
+		only: {
+			object: {
+				apiVersion: "v1"
+				kind:       "ConfigMap"
+				metadata: name: "only"
+			}
 		}
 	}
 }

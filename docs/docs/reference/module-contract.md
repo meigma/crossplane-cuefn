@@ -104,18 +104,30 @@ to be patched onto the composite.
 ```
 
 When a module omits `#Status`, the generated XRD has no status schema and the
-transform's `status` field is simply absent.
+transform's `out.status` field is simply absent.
 
 ## The transform
 
-The transform is a regular (non-definition) CUE field set. The engine fills a
-top-level `input` field and reads a top-level `resources` map and an optional
-`status`.
+The transform is a regular (non-definition) CUE field set nested under a single
+top-level **`out`** field: the engine fills `out.input` and reads `out.resources`
+and an optional `out.status`. The schema definitions (`#API`/`#Spec`/`#Status`)
+stay top-level.
+
+```cue
+out: {
+	input: {/* filled by the engine */}
+	resources: {/* the composed Kubernetes objects */}
+	status?: {/* optional; patched onto the composite */}
+}
+```
+
+Nesting the transform under one `out` field keeps the well-known field set in a
+single place that one closed definition can validate.
 
 ### Inputs the engine fills
 
 ```cue
-input: {
+out: input: {
 	spec: #Spec
 	metadata: {
 		name:       string | *"app"
@@ -131,16 +143,16 @@ input: {
 
 | Fill point | Source |
 |------------|--------|
-| `input.spec` | The observed XR's `spec`, projected (reserved keys stripped) and unified against `#Spec`. |
-| `input.metadata` | The XR's identifying metadata: `name` (and optional `namespace`). |
-| `input.environment` | The merged `EnvironmentConfig` data from the pipeline context. |
+| `out.input.spec` | The observed XR's `spec`, projected (reserved keys stripped) and unified against `#Spec`. |
+| `out.input.metadata` | The XR's identifying metadata: `name` (and optional `namespace`). |
+| `out.input.environment` | The merged `EnvironmentConfig` data from the pipeline context. |
 
-Binding `input.spec: #Spec` is what ties render-time defaults/validation to the
-same schema the XRD is generated from. The engine fills `input` by JSON
+Binding `out.input.spec: #Spec` is what ties render-time defaults/validation to
+the same schema the XRD is generated from. The engine fills `out.input` by JSON
 marshalling, so an integral spec value (e.g. a `float64` replica count from
 YAML) unifies cleanly against a bounded integer field.
 
-`input.environment` is populated in-cluster by an upstream
+`out.input.environment` is populated in-cluster by an upstream
 `function-environment-configs` step that merges the referenced
 `EnvironmentConfig` into the pipeline context (context key
 `apiextensions.crossplane.io/environment`). With `cuefn render`, the `--env` file
@@ -160,27 +172,29 @@ import (
 	corev1 "cue.dev/x/k8s.io/api/core/v1"
 )
 
-resources: {
-	deployment: {
-		ready: "Ready"
-		object: appsv1.#Deployment & { metadata: {/* ... */}, spec: {/* ... */} }
+out: {
+	resources: {
+		deployment: {
+			ready: "Ready"
+			object: appsv1.#Deployment & { metadata: {/* ... */}, spec: {/* ... */} }
+		}
+		service: {
+			ready: "NotReady"
+			object: corev1.#Service & { metadata: {/* ... */}, spec: {/* ... */} }
+		}
+		config: {
+			object: corev1.#ConfigMap & { metadata: {/* ... */}, data: {/* ... */} }
+		}
 	}
-	service: {
-		ready: "NotReady"
-		object: corev1.#Service & { metadata: {/* ... */}, spec: {/* ... */} }
-	}
-	config: {
-		object: corev1.#ConfigMap & { metadata: {/* ... */}, data: {/* ... */} }
-	}
-}
 
-status: #Status & {
-	ready: true
-	url:   "http://\(input.metadata.name).svc"
+	status: #Status & {
+		ready: true
+		url:   "http://\(input.metadata.name).svc"
+	}
 }
 ```
 
-**`resources`** is an author-keyed map. Each key is a stable, author-chosen name
+**`out.resources`** is an author-keyed map. Each key is a stable, author-chosen name
 used **verbatim** as the Crossplane composed-resource name. Each entry has:
 
 | Field | Required | Description |
@@ -189,9 +203,9 @@ used **verbatim** as the Crossplane composed-resource name. Each entry has:
 | `ready` | no | `"Ready"` or `"NotReady"`. An absent hint is treated as unspecified. |
 
 The engine validates that every entry is concrete (`cue.Concrete(true)`); a
-non-concrete `resources` (or `status`) is an error.
+non-concrete `out.resources` (or `out.status`) is an error.
 
-**`status`** is optional. When present it must be concrete and is patched onto
+**`out.status`** is optional. When present it must be concrete and is patched onto
 the composite.
 
 ### Readiness mapping

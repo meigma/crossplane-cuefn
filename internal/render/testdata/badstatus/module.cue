@@ -3,18 +3,20 @@
 // rejects a non-concrete status and names the offending field.
 package app
 
-input: {...}
+out: {
+	input: {...}
 
-resources: {
-	only: {
-		object: {
-			apiVersion: "v1"
-			kind:       "ConfigMap"
-			metadata: name: "only"
+	resources: {
+		only: {
+			object: {
+				apiVersion: "v1"
+				kind:       "ConfigMap"
+				metadata: name: "only"
+			}
 		}
 	}
-}
 
-status: {
-	url: string
+	status: {
+		url: string
+	}
 }

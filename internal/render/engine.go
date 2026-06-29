@@ -83,16 +83,28 @@ func New(loader ModuleLoader) *Engine {
 	return &Engine{loader: loader}
 }
 
-// Render loads the module at ref, fills its input field with in (projecting
+// Render loads the module at ref, fills its out.input field with in (projecting
 // Crossplane-reserved keys out of the spec), and returns the composed resources,
 // readiness, and status it produces. It errors if the module is missing, fails
 // to evaluate, violates its #Spec, or leaves resources or status non-concrete.
+//
+// A module nests its transform under a single top-level `out` field
+// (out.input/out.resources/out.status) — the module contract. The schema
+// definitions (#API/#Spec/#Status) stay top-level and are not read here.
 func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, error) {
 	v, cleanup, err := LoadModule(ctx, e.loader, ref)
 	if err != nil {
 		return Result{}, err
 	}
 	defer cleanup()
+
+	// Catch a module that is missing the `out` wrapper with a clear message
+	// rather than a downstream "no usable resources" error.
+	if !v.LookupPath(cue.ParsePath("out")).Exists() {
+		return Result{}, errors.New(
+			"module has no `out` field: nest the transform (input, resources, status) " +
+				"under a top-level `out` field")
+	}
 
 	v, err = fillInput(v.Context(), v, in)
 	if err != nil {
@@ -112,9 +124,9 @@ func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, err
 	return Result{Resources: resources, Status: status}, nil
 }
 
-// fillInput projects the observed spec, fills the module's input field via JSON
-// marshalling, and validates that the filled input is concrete. Filling via JSON
-// (rather than Go encoding) renders an integral spec value such as a float64
+// fillInput projects the observed spec, fills the module's out.input field via
+// JSON marshalling, and validates that the filled input is concrete. Filling via
+// JSON (rather than Go encoding) renders an integral spec value such as a float64
 // replicas count as an integer, so it unifies against a bounded int #Spec field;
 // validating the result surfaces #Spec bound violations as errors here.
 func fillInput(cctx *cue.Context, v cue.Value, in Inputs) (cue.Value, error) {
@@ -130,9 +142,9 @@ func fillInput(cctx *cue.Context, v cue.Value, in Inputs) (cue.Value, error) {
 		return cue.Value{}, wrapCUE(err, "cannot compile inputs")
 	}
 
-	v = v.FillPath(cue.ParsePath("input"), inVal)
+	v = v.FillPath(cue.ParsePath("out.input"), inVal)
 
-	input := v.LookupPath(cue.ParsePath("input"))
+	input := v.LookupPath(cue.ParsePath("out.input"))
 	if err = input.Validate(cue.Concrete(true)); err != nil {
 		return cue.Value{}, wrapCUE(err, "inputs do not satisfy module #Spec")
 	}
@@ -146,13 +158,13 @@ type rawResource struct {
 	Ready  string         `json:"ready"`
 }
 
-// readResources reads the author-keyed resources map, validates that every entry
-// is concrete, and decodes it into the keyed Result resources with readiness
-// mapped to the SDK enum.
+// readResources reads the author-keyed out.resources map, validates that every
+// entry is concrete, and decodes it into the keyed Result resources with
+// readiness mapped to the SDK enum.
 func readResources(v cue.Value) (map[string]Resource, error) {
-	res := v.LookupPath(cue.ParsePath("resources"))
+	res := v.LookupPath(cue.ParsePath("out.resources"))
 	if err := res.Err(); err != nil {
-		return nil, wrapCUE(err, "module has no usable `resources` field")
+		return nil, wrapCUE(err, "module has no usable `out.resources` field")
 	}
 	if err := res.Validate(cue.Concrete(true)); err != nil {
 		return nil, wrapCUE(err, "`resources` did not fully evaluate")
@@ -170,10 +182,10 @@ func readResources(v cue.Value) (map[string]Resource, error) {
 	return out, nil
 }
 
-// readStatus reads the optional top-level status field. It returns nil when the
+// readStatus reads the optional out.status field. It returns nil when the
 // module returns no status, and an error when status is present but non-concrete.
 func readStatus(v cue.Value) (map[string]any, error) {
-	status := v.LookupPath(cue.ParsePath("status"))
+	status := v.LookupPath(cue.ParsePath("out.status"))
 	if !status.Exists() {
 		return nil, nil //nolint:nilnil // absent status is a valid, empty result.
 	}
