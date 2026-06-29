@@ -69,11 +69,19 @@ type OCILoader struct {
 	expect    map[string]digest.Digest
 }
 
-// NewOCILoader builds an OCILoader from cfg. It resolves a writable cache dir,
-// forces CUE_CACHE_DIR to it, and derives both a digest-aware registry client
-// (for the root fetch) and a CUE registry (for transitive deps and the shared
-// modcache) from the same configuration.
-func NewOCILoader(cfg OCIConfig) (*OCILoader, error) {
+// buildRegistry resolves the writable cache dir, forces CUE_CACHE_DIR onto a
+// copy of cfg's environment, and constructs the digest-aware resolver and the
+// dependency-resolving registry from one modconfig.Config. It is the shared
+// registry-construction path for both NewOCILoader (which also wraps the resolver
+// in a digest-aware client) and NewLocalLoader (which keeps only the registry).
+//
+// Routing follows CUE's standard rules: with CUE_REGISTRY unset or prefix-scoped
+// (e.g. "your.org=registry.internal"), the central registry
+// (modconfig.DefaultRegistry) is the catch-all default; only a bare CUE_REGISTRY
+// value replaces it. So a self-contained module resolves nothing, while a module
+// importing a public dependency (e.g. cue.dev/x/k8s.io) resolves it from central
+// with no extra configuration.
+func buildRegistry(cfg OCIConfig) (*modconfig.Resolver, modconfig.Registry, string, error) {
 	env := cfg.Env
 	if env == nil {
 		env = os.Environ()
@@ -81,20 +89,33 @@ func NewOCILoader(cfg OCIConfig) (*OCILoader, error) {
 
 	cacheDir, err := resolveCacheDir(cfg.CacheDir, env)
 	if err != nil {
-		return nil, err
+		return nil, nil, "", err
 	}
-	// Force CUE_CACHE_DIR so the dep modcache and the loader's extraction cache
-	// share one writable root, regardless of what the caller's environment said.
+	// Force CUE_CACHE_DIR so the dep modcache and any loader-owned extraction
+	// cache share one writable root, regardless of what the caller's environment
+	// said.
 	env = setEnv(env, "CUE_CACHE_DIR", cacheDir)
 
 	mcfg := &modconfig.Config{Env: env}
 	resolver, err := modconfig.NewResolver(mcfg)
 	if err != nil {
-		return nil, fmt.Errorf("cannot build CUE registry resolver from environment: %w", err)
+		return nil, nil, "", fmt.Errorf("cannot build CUE registry resolver from environment: %w", err)
 	}
 	registry, err := modconfig.NewRegistry(mcfg)
 	if err != nil {
-		return nil, fmt.Errorf("cannot build CUE registry from environment: %w", err)
+		return nil, nil, "", fmt.Errorf("cannot build CUE registry from environment: %w", err)
+	}
+	return resolver, registry, cacheDir, nil
+}
+
+// NewOCILoader builds an OCILoader from cfg. It resolves a writable cache dir,
+// forces CUE_CACHE_DIR to it, and derives both a digest-aware registry client
+// (for the root fetch) and a CUE registry (for transitive deps and the shared
+// modcache) from the same configuration.
+func NewOCILoader(cfg OCIConfig) (*OCILoader, error) {
+	resolver, registry, cacheDir, err := buildRegistry(cfg)
+	if err != nil {
+		return nil, err
 	}
 
 	expect := make(map[string]digest.Digest, len(cfg.Expect))
