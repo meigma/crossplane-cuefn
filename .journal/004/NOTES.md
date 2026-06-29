@@ -219,3 +219,14 @@ cwd in the target module dir (mise's `--cd` points tool resolution at the worktr
 --cache-dir) → #16 decouple tests (hermetic fixture) → #17 example→cue.dev/x/k8s.io → #18 CI cache + smoke
 + docs. Net: the local load path resolves OCI deps; the example instantiates k8s objects from the official
 schema; central is the always-on default registry; tests are fully decoupled from the example.
+
+## 2026-06-29 12:25 — PR5 #18 MERGED — ALL 5 PRs DONE, paused
+**PR5 #18 MERGED** (master e734c79) after user "LGTM. Merge once its green. Then pause." + full CI green
+(ci 1m22s, integration 2m46s, e2e 2m59s). All worktrees cleaned (only master + journal remain). No
+leftover open PRs from this session (only the two pre-existing Dependabot #1/#2 from session 001).
+
+Final master order: e734c79 (#18) ← 6fe9932 (#17) ← 8a5a48f (#16) ← 3a70f63 (#15) ← 75a3c4d (#14) ← 5c9a363.
+NOTE: the local `master` checkout is still at 5c9a363 (5 behind origin) — all work happened in worktrees off
+origin/master; fast-forward the main checkout when convenient (not required).
+
+User asked to PAUSE. Stopping here; not starting new work. Plan fully delivered.
