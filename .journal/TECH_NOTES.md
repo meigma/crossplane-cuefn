@@ -339,6 +339,38 @@ local `moon run root:check`.** The fix (folded into P6):
   `127.0.0.1`) so crossplane's function container reaches it via the Linux Docker
   bridge gateway (172.17.0.1).
 - **Result:** `ci` green (~1m) + `integration` green (~4m, all five heavy suites
-  genuinely run + pass in CI). The "no-args apko image default-cmd" + `example/xrd.yaml`
-  drift checks from earlier follow-ups are still open (minor; P7/P8).
+  genuinely run + pass in CI).
+
+## Phase 7 — documentation (merged 2026-06-28, PR #10)
+
+Diátaxis docs set under `docs/docs/` + mkdocs nav: quickstart (tutorial), how-to
+×8, reference ×4 (module-contract, cli, configuration, input), explanation ×4
+(one-module-two-outputs, digest-lockstep, reserved-key-projection, noxpkg-split).
+`cue` CLI pinned in mise (0.16.1) for the documented `cue mod publish` step. Hard
+gate `docs:build --strict` (in `root:check`). CLI reference = exactly the six
+shipped commands (function/render/generate/validate/publish/publish-function;
+`noxpkg` drops the last two). Folded in two fixes at the gate: documented the
+`:8080` metrics endpoint, and fixed a `--from-daemon` quickstart bug (pull before
+extract).
+
+### `cuefn function` metrics on :8080 (finding from a leaked process)
+
+`cuefn function` calls `sdk.Serve` (function-sdk-go), which **also serves
+Prometheus metrics on a fixed `:8080`** alongside the gRPC `--address` — there is
+no flag. A leaked test/verifier `cuefn function` collided with the user's app on
+:8080. Documented in `reference/cli.md`. **Open:** a `--metrics-address`
+flag/disable — feasibility depends on whether `sdk.Serve` exposes a metrics option
+(investigate in P8; if function-sdk-go hardcodes it, document the limitation).
+
+### Open follow-ups → Phase 8 (the finale ties these up)
+
+- Kind e2e + CI e2e (the P8 core): install Configuration + Function, instantiate
+  XR, assert reconcile/Ready/status/defaulting/env-merge/**digest-drift guard** via
+  **Chainsaw** (the recorded decision). Crossplane pkg manager is **HTTPS-only** —
+  the e2e needs the Function/Configuration packages reachable over a registry the
+  in-cluster pkg manager accepts.
+- No-args apko image test (assert the default `cmd: function` serves, not just the
+  arg-override path).
+- `example/xrd.yaml` drift check (committed generated artifact, currently unguarded).
+- The `--metrics-address` flag (above), if feasible.
 

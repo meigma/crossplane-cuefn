@@ -225,3 +225,27 @@ publish/render/function), quickstart (author → cue mod publish → cuefn publi
 install → instantiate). Pin the `cue` CLI in mise for the documented author flow.
 Hard gate: `docs:build --strict` (already in root:check). CLI reference must match
 shipped subcommands exactly.
+
+## 2026-06-28 18:37 — Phase 7 signed off + merged; Phase 8 (finale) launched
+Phase 7 (PR #10) shipped the Diátaxis docs set (quickstart + 8 how-to + 4 reference
++ 4 explanation), pinned `cue` in mise; all 4 criteria met. PR #10 ci + integration
+green (confirmed per the standing rule). Folded in two gate fixes: documented the
+`:8080` metrics endpoint + fixed the `--from-daemon` quickstart bug. Squash-merged
+→ master `ab402db`.
+
+Side event: cleaned up a leaked `cuefn function` process (PID 29988) the user
+found squatting :8080 (function-sdk-go serves Prometheus metrics there by default;
+collided with the user's phoenix-web). Force-killed it; documented the behavior.
+A `--metrics-address` flag is an open follow-up (feasibility TBD — depends on
+sdk.Serve's API).
+
+Phase 8 in flight (the FINALE): worktree `phase-8-e2e` off `ab402db`. Scope = the
+kind cluster e2e via **Chainsaw**: stand up kind + Crossplane + a registry the
+in-cluster pkg manager accepts (HTTPS-only!), install the Function (P6) + a
+Configuration published by `cuefn publish` (P5), instantiate an XR, and assert the
+cluster observables — Ready=True + composed Deployment/Service, #Status populated,
+API-server defaulting (no-drift), EnvironmentConfig merge, and the **digest-drift
+guard** end to end. Plus the tracked cleanups folded in: no-args image test,
+example/xrd.yaml drift check, and the --metrics-address flag if feasible. This is
+the hardest phase (kind + Crossplane + registry + Chainsaw) — expect fix rounds; I
+will watch the e2e CI carefully (standing rule).
