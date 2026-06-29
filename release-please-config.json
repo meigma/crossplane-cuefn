@@ -7,11 +7,20 @@
   "draft": true,
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
+  "separate-pull-requests": true,
   "packages": {
     ".": {
       "package-name": "crossplane-cuefn",
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["melange.yaml", "apko.yaml"]
+    },
+    "contract": {
+      "release-type": "simple",
+      "component": "contract",
+      "package-name": "contract",
+      "changelog-path": "CHANGELOG.md",
+      "include-component-in-tag": true,
+      "tag-separator": "/"
     }
   },
   "changelog-sections": [
