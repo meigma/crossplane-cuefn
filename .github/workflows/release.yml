@@ -21,6 +21,10 @@ permissions: {}
 
 env:
   IMAGE_NAME: ghcr.io/meigma/crossplane-cuefn
+  # The Function xpkg is published to its OWN repo (Crossplane's function-*
+  # convention) so its tags never collide with the runtime image's. The package
+  # image IS the runtime image plus the package layer.
+  FUNCTION_IMAGE_NAME: ghcr.io/meigma/function-cuefn
 
 jobs:
   resolve-release:
@@ -406,6 +410,137 @@ jobs:
       subject-digest: ${{ needs.container-image-release.outputs.image-digest }}
       push-to-registry: true
 
+  # Assemble the Function xpkg OVER the just-published runtime image: source the
+  # per-arch runtime bases by digest from the published multi-arch index, build a
+  # multi-arch Function package index (the package image is the runtime, so it
+  # must run on every node arch), push it to the function repo, sign it keyless
+  # with cosign, and attest its SBOM.
+  function-package-release:
+    name: Function Package Release
+    runs-on: ubuntu-24.04
+    needs:
+      - resolve-release
+      - container-image-release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+      artifact-metadata: write
+    outputs:
+      package-name: ${{ steps.publish.outputs.name }}
+      package-digest: ${{ steps.publish.outputs.digest }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Check out requested tag
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
+        run: git checkout --detach "$RELEASE_TAG"
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: false
+
+      - name: Install Syft
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and push Function xpkg over the runtime image
+        id: publish
+        env:
+          RUNTIME_REF: ${{ needs.container-image-release.outputs.image-name }}@${{ needs.container-image-release.outputs.image-digest }}
+          FUNCTION_TAG: ${{ env.FUNCTION_IMAGE_NAME }}:${{ needs.resolve-release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          # Resolve the per-arch runtime base manifests by digest from the
+          # published multi-arch index, so the Function package embeds the exact
+          # runtime images that were signed and attested.
+          inspect="$(docker buildx imagetools inspect "$RUNTIME_REF" --format '{{json .}}')"
+          amd64_digest="$(jq -r '.manifest.manifests[] | select(.platform.os=="linux" and .platform.architecture=="amd64") | .digest' <<< "$inspect")"
+          arm64_digest="$(jq -r '.manifest.manifests[] | select(.platform.os=="linux" and .platform.architecture=="arm64") | .digest' <<< "$inspect")"
+
+          name="${{ needs.container-image-release.outputs.image-name }}"
+          for d in "$amd64_digest" "$arm64_digest"; do
+            if [[ ! "$d" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+              echo "failed to resolve a per-arch runtime base digest from the index" >&2
+              exit 1
+            fi
+          done
+
+          # Build the multi-arch Function package index and push it. The full CLI
+          # build (default tags) carries publish-function; `go run` uses it here.
+          out="$(go run ./cmd/cuefn publish-function \
+            --runtime-image "${name}@${amd64_digest}" \
+            --runtime-image "${name}@${arm64_digest}" \
+            --package "$FUNCTION_TAG" \
+            --crossplane-constraint '>=v2.0.0-0')"
+          printf '%s\n' "$out"
+
+          digest="$(grep -oE 'sha256:[0-9a-f]{64}' <<< "$out" | tail -n1)"
+          if [[ ! "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]; then
+            echo "failed to parse pushed Function package digest" >&2
+            exit 1
+          fi
+
+          echo "name=${FUNCTION_IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+          echo "ref=${FUNCTION_IMAGE_NAME}@${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Sign Function package (keyless, Sigstore/Fulcio via OIDC)
+        env:
+          PACKAGE_REF: ${{ steps.publish.outputs.ref }}
+        run: cosign sign --yes "$PACKAGE_REF"
+
+      - name: Generate Function package SBOM
+        env:
+          PACKAGE_REF: ${{ steps.publish.outputs.ref }}
+        run: syft "$PACKAGE_REF" -o spdx-json=function.spdx.json
+
+      - name: Attest Function package SBOM
+        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
+        with:
+          subject-name: ${{ steps.publish.outputs.name }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          sbom-path: function.spdx.json
+          push-to-registry: true
+
+  # Generate Function package provenance in the ISOLATED reusable workflow
+  # (SLSA L3), reusing attest.yml exactly as the container image does.
+  attest-function-package:
+    needs:
+      - function-package-release
+    permissions:
+      id-token: write
+      attestations: write
+      packages: write
+      contents: read
+    uses: ./.github/workflows/attest.yml
+    with:
+      subject-name: ${{ needs.function-package-release.outputs.package-name }}
+      subject-digest: ${{ needs.function-package-release.outputs.package-digest }}
+      push-to-registry: true
+
   release-inspection-summary:
     name: Release Inspection Summary
     runs-on: ubuntu-24.04
@@ -413,8 +548,10 @@ jobs:
       - resolve-release
       - binary-release-assets
       - container-image-release
+      - function-package-release
       - attest-binaries
       - attest-image
+      - attest-function-package
     permissions: {}
     steps:
       - name: Write inspection summary
@@ -423,6 +560,8 @@ jobs:
           RELEASE_VERSION: ${{ needs.resolve-release.outputs.version }}
           IMAGE_NAME: ${{ needs.container-image-release.outputs.image-name }}
           IMAGE_DIGEST: ${{ needs.container-image-release.outputs.image-digest }}
+          FUNCTION_NAME: ${{ needs.function-package-release.outputs.package-name }}
+          FUNCTION_DIGEST: ${{ needs.function-package-release.outputs.package-digest }}
         run: |
           {
             echo "## Draft release ready for inspection"
@@ -448,5 +587,13 @@ jobs:
             echo "cosign verify \"${IMAGE_NAME}@${IMAGE_DIGEST}\" --certificate-identity-regexp \"^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@.*\" --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             echo '```'
             echo
-            echo "Publish or reject the draft release manually after inspection. The container image is already available at ${IMAGE_NAME}:${RELEASE_TAG} because GHCR does not have a draft release state."
+            echo "Function package verification commands:"
+            echo
+            echo '```sh'
+            echo "crossplane xpkg extract \"${FUNCTION_NAME}@${FUNCTION_DIGEST}\" -o function.gz"
+            echo "gh attestation verify \"oci://${FUNCTION_NAME}@${FUNCTION_DIGEST}\" --repo \"$GITHUB_REPOSITORY\" --signer-workflow \"$GITHUB_REPOSITORY/.github/workflows/attest.yml\" --source-ref \"refs/tags/$RELEASE_TAG\" --deny-self-hosted-runners"
+            echo "cosign verify \"${FUNCTION_NAME}@${FUNCTION_DIGEST}\" --certificate-identity-regexp \"^https://github.com/${GITHUB_REPOSITORY}/.github/workflows/release.yml@.*\" --certificate-oidc-issuer https://token.actions.githubusercontent.com"
+            echo '```'
+            echo
+            echo "Publish or reject the draft release manually after inspection. The container image is already available at ${IMAGE_NAME}:${RELEASE_TAG} and the Function package at ${FUNCTION_NAME}:${RELEASE_TAG} because GHCR does not have a draft release state."
           } >> "$GITHUB_STEP_SUMMARY"

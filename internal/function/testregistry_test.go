@@ -3,6 +3,7 @@ package function_test
 import (
 	"bytes"
 	"context"
+	"os"
 	"testing"
 
 	"cuelang.org/go/mod/modregistry"
@@ -26,6 +27,9 @@ const registryImage = "registry:2.8.3"
 // so `go test ./...` stays green on a developer machine without Docker.
 func requireDocker(t *testing.T) {
 	t.Helper()
+	if os.Getenv("CUEFN_INTEGRATION") == "" {
+		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
+	}
 	testcontainers.SkipIfProviderIsNotHealthy(t)
 }
 

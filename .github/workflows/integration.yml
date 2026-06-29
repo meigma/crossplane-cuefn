@@ -1,0 +1,91 @@
+name: Integration
+
+# Heavy Docker/crossplane/envtest integration suites. These are deliberately
+# kept OUT of the blocking `ci` workflow (which runs `moon ci`, where these moon
+# tasks are `runInCI: false`) so `ci` stays fast and reliable. This workflow runs
+# them visibly on every PR and on master, but is NOT a required check — a slow
+# runner or a flaky container must not block merges. The tests themselves
+# env-gate on CUEFN_INTEGRATION (set by the moon tasks), so plain `go test ./...`
+# never runs them.
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Never auto-download a Go toolchain other than the mise-pinned one.
+      GOTOOLCHAIN: local
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: true
+          # Installs every tool from mise.toml honoring mise.lock (locked → fail
+          # closed): go, moon, crossplane, cosign, syft, chainsaw, setup-envtest,
+          # melange, apko — everything the integration suites need.
+
+      - name: Cache Go modules
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-mod-
+
+      - name: Cache Go build artifacts
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-go-build-integration-${{ hashFiles('mise.lock', 'go.sum') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-integration-${{ hashFiles('mise.lock', 'go.sum') }}-
+            ${{ runner.os }}-go-build-integration-
+
+      # Builds the apko runtime image for the host arch, writes image.tar, and
+      # `docker load`s crossplane-cuefn:dev — the real runtime base the funcpkg
+      # suite assembles the Function xpkg over and the image smoke test runs.
+      - name: Build runtime image
+        run: mise run image-local
+
+      # The heavy suites, each excluded from `moon ci` (runInCI: false) and run
+      # here. The moon tasks set CUEFN_INTEGRATION=1 and run under `mise exec` so
+      # the pinned crossplane/cosign/syft/chainsaw win over any shims on PATH.
+      - name: OCI loader integration
+        run: moon run root:oci-test
+
+      - name: Schema server-side proof (envtest + chainsaw)
+        run: moon run root:schema-test
+
+      - name: Configuration publish integration
+        run: moon run root:publish-test
+
+      - name: Function xpkg packaging integration
+        run: moon run root:funcpkg-test
+
+      - name: Crossplane render loop
+        run: moon run root:render-test

@@ -8,9 +8,10 @@ a versioned Crossplane Configuration.
 > **Status: early development.** The toolchain, CI, and release scaffolding are
 > in place and exercised. The composition-function runtime (`cuefn function`) and
 > the local author command (`cuefn render`) work end to end against a CUE module
-> over OCI; XRD codegen (`cuefn generate`) and Configuration packaging + push
-> (`cuefn publish`) are implemented and validated against the `crossplane` CLI.
-> Expect the surfaces described below to change.
+> over OCI; XRD codegen (`cuefn generate`), Configuration packaging
+> (`cuefn publish`), and Function packaging (`cuefn publish-function`) are
+> implemented and validated against the `crossplane` CLI. Expect the surfaces
+> described below to change.
 
 ## Commands
 
@@ -40,6 +41,15 @@ a versioned Crossplane Configuration.
   [go-containerregistry](https://github.com/google/go-containerregistry) and the
   public `crossplane-runtime/v2/pkg/xpkg` primitives — no `crossplane` CLI is
   needed to build it.
+- `cuefn publish-function --runtime-image <base> --package <oci-ref> [flags]`
+  assembles and pushes the cuefn **Function** package (`xpkg`) over the apko-built
+  runtime image. The package image *is* the runtime image plus a `package.yaml`
+  layer holding the Function metadata and the embedded `Input` CRD, so it both
+  installs as a Crossplane Function and serves `cuefn function`. Pass
+  `--runtime-image` once for a single-arch image or repeatedly for a multi-arch
+  index (a Function package image must run on every node arch). `--output` writes
+  a local `.xpkg` instead of pushing (for `crossplane xpkg extract --from-xpkg`);
+  `--crossplane-constraint` / `--capabilities` set the package metadata.
 
 The `example/` directory contains a runnable render loop: an XRD, a pipeline
 Composition (`function-environment-configs` → `cuefn`), an XR, an
@@ -182,16 +192,34 @@ timezones, low CVE surface); the exact resolved versions are recorded in the
 per-build SBOM and provenance attestation rather than pinned. `version`, `commit`,
 and `date` are stamped into the binary via melange `--vars-file`.
 
-> Note: a Crossplane composition function ships as an `xpkg` (an OCI image
-> wrapping an embedded runtime image). The current release pipeline produces a
-> standard runtime image; xpkg packaging is a planned follow-up.
+A Crossplane composition function ships as an `xpkg` whose OCI image embeds the
+runtime image. `cuefn publish-function` assembles that package over the apko
+image — the runtime layers and the `cuefn function` entrypoint are preserved, and
+a `package.yaml` layer carrying the Function metadata plus the generated `Input`
+CRD is appended on top. The release pipeline builds a multi-arch Function package
+index over the just-published, signed runtime image, signs it keyless with cosign
+(Sigstore/Fulcio via GitHub OIDC), and carries SBOM and SLSA Level 3 provenance
+attestations alongside the runtime image and the binaries. Build and inspect one
+locally over the dev image:
+
+```sh
+mise run image-local                                   # build crossplane-cuefn:dev + image.tar
+cuefn publish-function --runtime-image image.tar --output function.xpkg
+crossplane xpkg extract --from-xpkg function.xpkg -o out.gz   # accepts it; embeds the Input CRD
+```
+
+To keep the runtime image lean, the binary it embeds is built with `-tags noxpkg`,
+which drops the `publish`/`publish-function` commands and their
+`crossplane-runtime/v2/pkg/xpkg` → sigstore/cosign + cloud-credential dependency
+graph — the runtime never packages or signs. Measured impact: 12.1 MiB / 23% of
+the stripped binary (53.5 → 41.3 MiB). The full `cuefn` CLI keeps both commands.
 
 ## CI and security
 
 The default CI workflow keeps permissions minimal, pins external actions, disables checkout credential persistence, and delegates checks to Moon.
 It uses GitHub-hosted dependency caches for Go, golangci-lint, and uv download artifacts.
 The docs workflow builds the MkDocs site on pull requests and deploys `docs/build` to GitHub Pages from the default branch.
-The scheduled security scan workflow builds the local container image weekly, scans it for high/critical fixed vulnerabilities, and uploads SARIF results to GitHub code scanning.
+The scheduled security scan workflow builds the local container image weekly, scans it (and the Function xpkg assembled over it) for high/critical fixed vulnerabilities, and uploads SARIF results to GitHub code scanning.
 Dependabot covers GitHub Actions, the root Go module, and the docs uv project.
 
 Repository settings live in `.github/repository-settings.toml`: immutable

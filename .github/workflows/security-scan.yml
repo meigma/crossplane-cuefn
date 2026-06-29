@@ -33,6 +33,12 @@ jobs:
             echo "date=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
       - name: Setup mise
         uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
@@ -55,6 +61,17 @@ jobs:
           docker load < scan.tar
           docker tag crossplane-cuefn:security-scan-amd64 crossplane-cuefn:security-scan
 
+      # The Function xpkg IS the runtime image plus the package layer, so its
+      # vulnerability surface must hold the same fixed-vuln posture. Assemble it
+      # locally over the scan image (no push) for a second trivy scan.
+      - name: Assemble Function xpkg over the scan image
+        run: |
+          set -euo pipefail
+          go run ./cmd/cuefn publish-function \
+            --runtime-image scan.tar \
+            --output function.xpkg \
+            --crossplane-constraint '>=v2.0.0-0'
+
       - name: Scan local image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -70,9 +87,31 @@ jobs:
           hide-progress: true
           limit-severities-for-sarif: true
 
+      - name: Scan Function xpkg
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          input: function.xpkg
+          scanners: vuln
+          vuln-type: os,library
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          format: sarif
+          output: trivy-function.sarif
+          exit-code: "1"
+          hide-progress: true
+          limit-severities-for-sarif: true
+
       - name: Upload scan results
         if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           sarif_file: trivy-results.sarif
           category: container-vulnerability-scan
+
+      - name: Upload Function xpkg scan results
+        if: ${{ always() && hashFiles('trivy-function.sarif') != '' }}
+        uses: github/codeql-action/upload-sarif@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
+        with:
+          sarif_file: trivy-function.sarif
+          category: function-xpkg-vulnerability-scan

@@ -2,6 +2,7 @@ package pkg_test
 
 import (
 	"context"
+	"os"
 	"os/exec"
 	"testing"
 
@@ -20,6 +21,9 @@ const registryImage = "registry:2.8.3"
 // so `go test ./...` stays green on a developer machine without Docker.
 func requireDocker(t *testing.T) {
 	t.Helper()
+	if os.Getenv("CUEFN_INTEGRATION") == "" {
+		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
+	}
 	testcontainers.SkipIfProviderIsNotHealthy(t)
 }
 
@@ -28,6 +32,9 @@ func requireDocker(t *testing.T) {
 // `go test ./...` self-skips when it is absent. CI asserts the binary is present.
 func requireCrossplane(t *testing.T) string {
 	t.Helper()
+	if os.Getenv("CUEFN_INTEGRATION") == "" {
+		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
+	}
 	bin, err := exec.LookPath("crossplane")
 	if err != nil {
 		t.Skip("crossplane CLI not on PATH; skipping xpkg validation test (run via `mise exec`)")

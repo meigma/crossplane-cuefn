@@ -46,8 +46,9 @@ fileGroups:
   # applies against an envtest apiserver.
   chainsawAssets:
     - 'test/chainsaw/**/*.yaml'
-  # The controller-gen deepcopy source: the Input type and its package markers.
-  # Bumping either must invalidate the generate-check task.
+  # The controller-gen sources: the Input type and its package markers. Bumping
+  # either must invalidate the generate / generate-check tasks (which emit both
+  # the deepcopy and the Input CRD embedded in the Function xpkg).
   generateSources:
     - 'input/v1beta1/doc.go'
     - 'input/v1beta1/input.go'
@@ -102,26 +103,29 @@ tasks:
     options:
       cache: false
 
-  # Regenerate the input/v1beta1 deepcopy from its kubebuilder markers. Driven by
-  # the go.mod `tool` directive (controller-gen pinned at v0.20.0), not a mise
-  # tool, so the generator version travels with go.sum.
+  # Regenerate the input/v1beta1 deepcopy AND the Input CRD (embedded in the
+  # Function xpkg) from the kubebuilder markers. Driven by the go.mod `tool`
+  # directive (controller-gen pinned at v0.20.0), not a mise tool, so the
+  # generator version travels with go.sum.
   generate:
-    command: 'go tool controller-gen object paths=./input/...'
+    command: 'bash -c "go tool controller-gen object paths=./input/... && go tool controller-gen crd:crdVersions=v1 paths=./input/... output:crd:dir=internal/pkg/inputcrd"'
     inputs:
       - '@group(generateSources)'
       - 'go.mod'
       - 'go.sum'
     outputs:
       - 'input/v1beta1/zz_generated.deepcopy.go'
+      - 'internal/pkg/inputcrd/cuefn.meigma.io_inputs.yaml'
 
-  # Fail if the committed deepcopy is stale: regenerate and diff just the
-  # generated file, proving controller-gen is wired and the checked-in output is
-  # current. Part of the default check graph (needs no Docker).
+  # Fail if the committed deepcopy or the embedded Input CRD is stale: regenerate
+  # both and diff the generated files, proving controller-gen is wired and the
+  # checked-in outputs are current. Part of the default check graph (no Docker).
   generate-check:
-    command: 'bash -c "go tool controller-gen object paths=./input/... && git diff --exit-code -- input/v1beta1/zz_generated.deepcopy.go"'
+    command: 'bash -c "go tool controller-gen object paths=./input/... && go tool controller-gen crd:crdVersions=v1 paths=./input/... output:crd:dir=internal/pkg/inputcrd && git diff --exit-code -- input/v1beta1/zz_generated.deepcopy.go internal/pkg/inputcrd/cuefn.meigma.io_inputs.yaml"'
     inputs:
       - '@group(generateSources)'
       - 'input/v1beta1/zz_generated.deepcopy.go'
+      - 'internal/pkg/inputcrd/cuefn.meigma.io_inputs.yaml'
       - 'go.mod'
       - 'go.sum'
     options:
@@ -130,18 +134,36 @@ tasks:
   # End-to-end crossplane render loop: publishes the example module to a
   # throwaway OCI registry, serves `cuefn function --insecure`, and runs
   # `crossplane render` over the example assets. Needs a Docker daemon and the
-  # pinned crossplane CLI; self-skips without them. Kept OUT of the default
-  # `check` graph (mirroring the OCI integration-test pattern) so
-  # `moon run root:check` stays green on a machine without Docker/crossplane.
+  # pinned crossplane CLI. The heavy tests env-gate on CUEFN_INTEGRATION (set
+  # here) so plain `go test ./...` / `root:test` skips them; this task is NOT a
+  # dependency of `check` (the blocking `ci` gate runs `moon run root:check`), so
+  # it runs only in the separate, non-blocking integration workflow — keeping `ci`
+  # fast and reliable. Run under `mise exec` so the pinned crossplane CLI wins
+  # over any proto shim on PATH.
   render-test:
-    command: 'go test ./internal/function/... -run TestRenderLoop -count 1'
+    command: 'mise exec -- go test ./internal/function/... -run TestRenderLoop -count 1'
+    env:
+      CUEFN_INTEGRATION: 'true'
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
       - '@group(exampleAssets)'
     options:
       cache: false
-
+  # OCI module loader integration: publishes module fixtures to a throwaway OCI
+  # registry (testcontainers) and exercises the OCILoader — transitive deps, the
+  # digest-keyed cache, digest-drift rejection, and error paths. Needs a Docker
+  # daemon. Env-gated (CUEFN_INTEGRATION) so `go test ./...` skips it; not a
+  # dependency of `check`, so it runs only in the integration workflow.
+  oci-test:
+    command: 'mise exec -- go test ./internal/render/... -run TestOCI -count 1'
+    env:
+      CUEFN_INTEGRATION: 'true'
+    inputs:
+      - '@group(goSources)'
+      - '@group(cueModules)'
+    options:
+      cache: false
   # Configuration packaging + push proof: assembles a Crossplane Configuration
   # xpkg (and a prototype Function xpkg) from a CUE module, pushes it to a
   # throwaway OCI registry, round-trips the contents, and validates the package
@@ -152,13 +174,46 @@ tasks:
   # neither Docker nor crossplane. Run under `mise exec` so the pinned crossplane
   # CLI wins over any binary on PATH.
   publish-test:
-    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... -run 'TestPublish|TestConfigurationRoundTrip|TestXpkgValidate|TestFunctionXpkgValidate' -count 1"
+    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... -run 'TestPublish|TestConfigurationRoundTrip|TestXpkgValidate|TestFunctionXpkg|TestFunctionIndex' -count 1"
+    env:
+      CUEFN_INTEGRATION: 'true'
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
       - '@group(exampleAssets)'
     options:
       cache: false
+  # Function xpkg packaging proof: assembles the Function package (meta + embedded
+  # Input CRD) over the real apko runtime base, round-trips it through a throwaway
+  # registry, validates it with the pinned crossplane CLI (`crossplane xpkg
+  # extract`), signs + verifies it with cosign, generates + parses an SBOM with
+  # syft, and runs the PACKAGED image to confirm it still serves the gRPC
+  # FunctionRunnerService. The cases self-skip when their tool (Docker / crossplane
+  # / cosign / syft / the `crossplane-cuefn:dev` image) is absent, so the task is
+  # kept OUT of the default `check` graph (mirroring render-test/publish-test).
+  # Build the dev image first with `mise run image-local` so the embed-runtime and
+  # container-smoke cases run over the real image. Run under `mise exec` so the
+  # pinned crossplane/cosign/syft win over any binaries on PATH.
+  funcpkg-test:
+    command: "mise exec -- go test ./internal/pkg/... ./internal/cli/... ./internal/function/... -run 'TestFunctionXpkg|TestFunctionIndex|TestPublishFunction|TestFunctionPackageServesGRPC' -count 1"
+    env:
+      CUEFN_INTEGRATION: 'true'
+    inputs:
+      - '@group(goSources)'
+      - '@group(exampleAssets)'
+    options:
+      cache: false
+  # Guard the lean image binary: the melange/apko build compiles with `-tags
+  # noxpkg` to drop the publish commands (and internal/pkg's sigstore/cosign +
+  # cloud-cred graph) from the runtime image — measured at 12.1 MiB / 23% of the
+  # stripped binary. This task proves that build still compiles, so the lean path
+  # cannot silently rot. Part of the default check graph (no Docker needed).
+  build-image-binary:
+    command: 'go build -tags noxpkg -o bin/cuefn-noxpkg ./cmd/cuefn'
+    inputs:
+      - '@group(goSources)'
+    outputs:
+      - 'bin/cuefn-noxpkg'
 
   # Server-side author-time schema proof: boots an envtest apiserver, generates
   # the de-risked module's XRD, wraps it as a real CRD, and drives chainsaw plus a
@@ -180,12 +235,12 @@ tasks:
       - '@group(chainsawAssets)'
     options:
       cache: false
-
   check:
     deps:
       - 'root:format'
       - 'root:lint'
       - 'root:build'
+      - 'root:build-image-binary'
       - 'root:test'
       - 'root:generate-check'
       - 'docs:build'

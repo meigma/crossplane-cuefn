@@ -51,6 +51,9 @@ func cacheDir(t *testing.T) string {
 // (which has a daemon) runs the suite fully.
 func requireDocker(t *testing.T) {
 	t.Helper()
+	if os.Getenv("CUEFN_INTEGRATION") == "" {
+		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
+	}
 	testcontainers.SkipIfProviderIsNotHealthy(t)
 }
 

@@ -9,11 +9,21 @@ import (
 // cuefn.meigma.io/v1beta1, kind Input); the function decodes it with
 // request.GetInput before rendering.
 //
+// The embedded ObjectMeta is the upstream function-Input convention: it makes
+// controller-gen emit a CustomResourceDefinition for the type, which ships
+// inside the Function xpkg (Crossplane reads the Input CRD from the package to
+// validate pipeline step inputs). The runtime ignores any metadata an author
+// happens to set; request.GetInput decodes only the typed fields below.
+//
 // +kubebuilder:object:root=true
 // +kubebuilder:storageversion
 // +kubebuilder:resource:categories=crossplane
 type Input struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// ObjectMeta is present so controller-gen emits a CRD for the Input type;
+	// it is never populated by an author and is ignored by the function.
+	metav1.ObjectMeta `json:"metadata,omitempty"`
 
 	// Module is the CUE module to fetch and evaluate, in "path@version" semver
 	// form (e.g. "cuefn.example/app@v0.1.0"). It is resolved against the

@@ -38,4 +38,10 @@ pipeline:
       modroot: .
       strip: "-s -w"
       ldflags: "-buildid= -X main.version=${{vars.version}} -X main.commit=${{vars.commit}} -X main.date=${{vars.date}}"
-      extra-args: "-mod=readonly -buildvcs=false"
+      # -tags=noxpkg drops the publish/publish-function commands (and with them
+      # internal/pkg -> crossplane-runtime xpkg -> sigstore/cosign + cloud-cred
+      # SDKs) from the IMAGE binary the Function package embeds. The runtime never
+      # packages or signs, so those deps are dead weight: measured at 12.1 MiB /
+      # 23% of the stripped binary (53.5 -> 41.3 MiB). The full GoReleaser CLI
+      # build keeps both commands.
+      extra-args: "-mod=readonly -buildvcs=false -tags=noxpkg"
