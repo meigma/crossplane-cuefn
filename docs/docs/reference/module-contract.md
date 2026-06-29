@@ -19,10 +19,24 @@ language: {
 source: {
 	kind: "self"
 }
+deps: {
+	"cue.dev/x/k8s.io@v0": {
+		v:       "v0.7.0"
+		default: true
+	}
+}
 ```
 
 The module path and major version (`cuefn.example/app@v0`) form the
 `path@version` reference used everywhere a `<module-ref>` is required.
+
+The `deps` block records the module's dependencies. The example transform
+instantiates its Kubernetes objects from the official Kubernetes schema
+(`cue.dev/x/k8s.io`), so the module carries that as a dependency. Run
+`cue mod tidy` in the module directory to populate `deps` after adding an import;
+modern CUE records the resolved versions inline in `module.cue` (there is no
+separate `cue.sum`). The dependency resolves from the default central registry
+(`registry.cue.works`) — see [configuration](configuration.md#cue_registry).
 
 ## The API envelope: `#API`
 
@@ -134,18 +148,29 @@ supplies it directly.
 
 ### Outputs the engine reads
 
+The example instantiates each `object` from the official Kubernetes schema
+(`cue.dev/x/k8s.io`) rather than hand-writing the maps, so `apiVersion`/`kind` are
+supplied by the definition and any invalid field name, type, or shape fails at
+render time instead of on apply. Writing the objects as plain maps is still valid;
+importing the schema is the recommended practice.
+
 ```cue
+import (
+	appsv1 "cue.dev/x/k8s.io/api/apps/v1"
+	corev1 "cue.dev/x/k8s.io/api/core/v1"
+)
+
 resources: {
 	deployment: {
 		ready: "Ready"
-		object: { apiVersion: "apps/v1", kind: "Deployment", /* ... */ }
+		object: appsv1.#Deployment & { metadata: {/* ... */}, spec: {/* ... */} }
 	}
 	service: {
 		ready: "NotReady"
-		object: { apiVersion: "v1", kind: "Service", /* ... */ }
+		object: corev1.#Service & { metadata: {/* ... */}, spec: {/* ... */} }
 	}
 	config: {
-		object: { apiVersion: "v1", kind: "ConfigMap", /* ... */ }
+		object: corev1.#ConfigMap & { metadata: {/* ... */}, data: {/* ... */} }
 	}
 }
 

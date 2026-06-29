@@ -14,6 +14,11 @@ The XRD is written to stdout. The envelope (`group`, `kind`, `plural`, `scope`,
 `version`) comes from `#API`; the spec and status schemas (with defaults and
 bounds) come from `#Spec` and `#Status`.
 
+`--dir` serves the module from disk. Loading it resolves any imports it declares —
+the example imports `cue.dev/x/k8s.io`, which resolves from the central registry
+by default (codegen itself only reads the definitions, so the import does not
+affect the generated XRD). Use `--cache-dir` to control where that cache lives.
+
 ## Write to a file
 
 ```sh
@@ -24,7 +29,8 @@ cuefn generate cuefn.example/app@v0 \
 
 ## Generate from the registry
 
-Omit `--dir` to fetch the module over OCI (set `CUE_REGISTRY` first):
+Omit `--dir` to fetch the module over OCI. Set `CUE_REGISTRY` only for a private or
+local module registry (public dependencies still resolve from central by default):
 
 ```sh
 export CUE_REGISTRY=localhost:5000+insecure

@@ -104,9 +104,10 @@ the bytes come from the directory.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--dir <string>` | _(empty)_ | Serve the module from this local directory (offline) instead of fetching it over OCI. |
+| `--dir <string>` | _(empty)_ | Serve the module from this local directory instead of fetching it over OCI. Transitive dependencies are resolved from the configured/default registry. |
 | `--xr <string>` | _(required)_ | Path to the observed XR YAML. |
 | `--env <string>` | _(empty)_ | Path to a merged environment YAML. Its top-level keys become `input.environment`. |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
 
 **Output.** YAML to stdout: a `resources` map keyed by the author's resource
 names, each entry carrying `object` (the rendered Kubernetes object) and `ready`
@@ -132,7 +133,8 @@ declares `#Status`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--dir <string>` | _(empty)_ | Serve the module from this local directory (offline) instead of fetching it over OCI. |
+| `--dir <string>` | _(empty)_ | Serve the module from this local directory instead of fetching it over OCI. Transitive dependencies are resolved from the configured/default registry. |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
 | `-o`, `--output <string>` | _(empty)_ | Write the generated XRD to this file instead of stdout. |
 
 **Output.** XRD YAML to stdout, or to `--output`. Exits non-zero on a load
@@ -156,7 +158,8 @@ using the same CUE evaluation the runtime engine uses, applying `#Spec` defaults
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--module <string>` | _(empty)_ | Module reference (`path@version`) to validate against when fetching over OCI. |
-| `--dir <string>` | _(empty)_ | Serve the module from this local directory (offline) instead of fetching it over OCI. |
+| `--dir <string>` | _(empty)_ | Serve the module from this local directory instead of fetching it over OCI. Transitive dependencies are resolved from the configured/default registry. |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
 
 **Output.** On a valid (or defaulted-but-omitted) XR, prints `<path>: valid` to
 stderr and exits zero. On the first violation (out-of-bounds, wrong enum,
@@ -184,6 +187,7 @@ pushes it. Recording the resolved digest is the author half of the
 |------|---------|-------------|
 | `--package <string>` | _(required)_ | Destination OCI reference for the Configuration package. |
 | `--dir <string>` | _(empty)_ | Build the XRD/Composition from this local module directory instead of fetching it over OCI. The digest is still resolved from the registry. |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
 | `--function-ref <string>` | `ghcr.io/meigma/function-cuefn` | cuefn Function package OCI ref recorded in the Configuration's `dependsOn`. |
 | `--function-name <string>` | _(last path segment of `--function-ref`)_ | In-cluster Function resource name the Composition references. |
 | `--function-version <string>` | `>=v0.0.0` | Semver constraint for the cuefn Function dependency. |

@@ -62,3 +62,11 @@ artifact, and they have different registry requirements.
 
 Conflating the two is a common setup mistake. The module registry and the package
 registry are independent; only the package registry has to be HTTPS.
+
+A module may also carry its own **public dependencies** — the example imports the
+official Kubernetes schema (`cue.dev/x/k8s.io`) to build its objects. Those
+resolve from the **central registry** (`registry.cue.works`), which is CUE's
+default when `CUE_REGISTRY` is unset, so they need no extra configuration. If you
+point `CUE_REGISTRY` at a private module registry, use the prefix form
+(`your.org=registry.internal`) so central stays the fallback for public
+dependencies — see [configuration](../reference/configuration.md#cue_registry).

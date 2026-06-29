@@ -31,6 +31,9 @@ source: {
 }
 ```
 
+We will instantiate the Kubernetes objects from the official schema, which adds a
+`deps` block. You do not write it by hand — `cue mod tidy` (below) fills it in.
+
 Declare the platform API and the spec schema. `#API` is the XRD envelope; `#Spec`
 is the closed, authoritative spec schema (with defaults and bounds):
 
@@ -57,10 +60,18 @@ package app
 ```
 
 Now the transform. The engine fills `input` (spec, metadata, environment); we
-read it and return an author-keyed `resources` map and a `status`:
+read it and return an author-keyed `resources` map and a `status`. We instantiate
+each object from the official Kubernetes schema (`cue.dev/x/k8s.io`) so
+`apiVersion`/`kind` come from the definition and an invalid object is caught here,
+at render time, not on apply:
 
 ```cue title="transform.cue"
 package app
+
+import (
+	appsv1 "cue.dev/x/k8s.io/api/apps/v1"
+	corev1 "cue.dev/x/k8s.io/api/core/v1"
+)
 
 input: {
 	spec: #Spec
@@ -81,9 +92,7 @@ _tier: input.environment.tier
 resources: {
 	deployment: {
 		ready: "Ready"
-		object: {
-			apiVersion: "apps/v1"
-			kind:       "Deployment"
+		object: appsv1.#Deployment & {
 			metadata: {name: _name, labels: {app: _name, tier: _tier}}
 			spec: {
 				replicas: input.spec.replicas
@@ -100,9 +109,7 @@ resources: {
 		}
 	}
 	config: {
-		object: {
-			apiVersion: "v1"
-			kind:       "ConfigMap"
+		object: corev1.#ConfigMap & {
 			metadata: {name: _name, labels: {app: _name, tier: _tier}}
 			data: tier: _tier
 		}
@@ -117,6 +124,17 @@ status: #Status & {
 
 Binding `input.spec: #Spec` is the key move: the schema the XRD is generated from
 is the same value the transform renders against, so the two never drift.
+
+Resolve the new dependency, which records it in `cue.mod/module.cue`:
+
+```sh
+cue mod tidy
+```
+
+This fetches `cue.dev/x/k8s.io` from the default central registry
+(`registry.cue.works`) — no `CUE_REGISTRY` needed for public dependencies — and
+writes a `deps` block. There is no separate `cue.sum`; modern CUE records the
+resolved versions inline.
 
 ## Step 2 — Render it locally
 
@@ -134,15 +152,17 @@ spec:
   replicas: 2
 ```
 
-Render it offline from the directory:
+Render it from the directory:
 
 ```sh
 cuefn render cuefn.example/app@v0 --dir . --xr xr.yaml
 ```
 
-You will see a `resources` map (a Deployment with `replicas: 2` marked `"True"`,
-a ConfigMap marked `Unspecified`) and a `status`. Add `--env` to see the
-environment flow through:
+`--dir` serves the module from disk; its `cue.dev/x/k8s.io` dependency resolves
+from the central registry on the first run (and is cached after), so this stays
+cluster-free. You will see a `resources` map (a Deployment with `replicas: 2`
+marked `"True"`, a ConfigMap marked `Unspecified`) and a `status`. Add `--env` to
+see the environment flow through:
 
 ```sh
 echo 'tier: production' > env.yaml
