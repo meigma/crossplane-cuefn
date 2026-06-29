@@ -143,3 +143,26 @@ origin/master). Changes:
   the worktree first. (Benign lint warning references a stale file in another worktree
   `.wt/test-consolidate`; docs:build "errors" are mkdocs-material's insiders upsell banner.)
 - PR #14 opened, base master. NOT merged (human gate). Awaiting review.
+
+## 2026-06-29 10:40 — PR1 merged (#14); PR2 (#15) + PR3 (#16) open
+- **PR1 #14 MERGED** to master (75a3c4d) after user "LGTM. Proceed" + CI green (ci/integration/e2e).
+  Cleaned up worktree (background `wt remove --force`; squash-merge left local branch, deleted it).
+- **PR2 #15** (`feat(cli): wire dependency-aware local loading and add --cache-dir`): `moduleLoader(dir,
+  cacheDir)` builds `NewLocalLoader` for the local path; `--cache-dir` on render/generate/validate/publish;
+  `resolveModuleDigest` threads cacheDir. Both build tags + cli tests + `moon run root:check` green.
+  Worktree `.wt/feat-cli-dep-aware-loader`. CI running at report time. Awaiting merge sign-off.
+- **PR3 #16** (`refactor(test): decouple the test suite from the example module`): independent of #14/#15.
+  New hermetic fixture `internal/test/common/testdata/module` (frozen 3-readiness copy of example) +
+  `testdata/renderloop` assets; `common.HermeticModuleDir/HermeticRenderloopDir`; repointed ALL load sites
+  (engine/function/cli/oci/publish/renderloop/e2e-drift). grep confirms ZERO test refs to example/module.
+  moon: cueModules→fixture, render-test→hermetic assets, xrd-check+example input, removed unused exampleAssets.
+  **DESIGN CHANGE vs plan: did NOT rename ExampleModuleRef** — kept fixture module path cuefn.example/app@v0
+  so the e2e drift (republishes under cuefn.example/app@v0.1.0) path-matches; less churn, same decoupling.
+  Verified: build (default/e2e/envtest vet), `moon run root:check` green, gated oci-test + render-test +
+  publish-test green locally. Worktree `.wt/refactor-decouple-tests-from-example`. Awaiting merge.
+
+Gotcha recurring: each new worktree needs `mise trust` before `mise exec -- moon ...`. Also the
+golangci-lint cache is SHARED across worktrees — a half-deleted sibling worktree poisoned PR2's lint
+(stale cross-worktree findings); fix = fully remove the worktree + `golangci-lint cache clean`.
+
+Dep graph remaining: PR4 (example→k8s) needs #14+#15+#16 merged. PR5 (CI cache + smoke + docs) needs PR4.
