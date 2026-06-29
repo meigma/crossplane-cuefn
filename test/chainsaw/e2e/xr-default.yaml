@@ -1,0 +1,10 @@
+# A second XR that OMITS replicas. The XRD generated from the module's #Spec
+# carries `default: 1`, so the API server fills spec.replicas=1 on admission with
+# no drift — the no-drift / API-server-defaulting proof.
+apiVersion: platform.meigma.io/v1alpha1
+kind: XApp
+metadata:
+  name: demo-default
+  namespace: default
+spec:
+  image: ghcr.io/stefanprodan/podinfo:6.7.0

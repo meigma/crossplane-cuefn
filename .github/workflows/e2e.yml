@@ -1,0 +1,80 @@
+name: E2E
+
+# Kind end-to-end suite. It boots a real kind cluster, installs Crossplane, and
+# drives the full author->publish->install->instantiate->reconcile loop, asserting
+# the live behaviors (Ready, composed resources, status, defaulting, env-merge) and
+# the digest-drift guard via chainsaw. Like the integration workflow this is kept
+# OUT of the blocking `ci` gate (e2e weight + cluster flakiness must not block
+# merges) and is NOT a required check — but it MUST actually run, so it has no
+# `if:` skip and triggers on every PR and on master. The test itself env-gates on
+# CUEFN_INTEGRATION (set by the moon task), so plain `go test ./...` never runs it.
+
+on:
+  pull_request:
+    branches:
+      - master
+      - main
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      # Never auto-download a Go toolchain other than the mise-pinned one.
+      GOTOOLCHAIN: local
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup mise
+        uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          version: 2026.6.14
+          cache: true
+          # Installs every tool from mise.toml honoring mise.lock (locked → fail
+          # closed): go, moon, kind, kubectl, helm, chainsaw, crossplane, melange,
+          # apko — everything the kind e2e harness needs.
+
+      - name: Cache Go modules
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-mod-${{ hashFiles('go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-mod-
+
+      - name: Cache Go build artifacts
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
+        with:
+          path: ~/.cache/go-build
+          key: ${{ runner.os }}-go-build-e2e-${{ hashFiles('mise.lock', 'go.sum') }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-go-build-e2e-${{ hashFiles('mise.lock', 'go.sum') }}-
+            ${{ runner.os }}-go-build-e2e-
+
+      # Builds the apko runtime image for the host arch, writes image.tar, and
+      # `docker load`s crossplane-cuefn:dev — the runtime base the Function xpkg is
+      # assembled over and the image the in-cluster function pod runs.
+      - name: Build runtime image
+        run: mise run image-local
+
+      # The kind e2e harness. The moon task sets CUEFN_INTEGRATION=1 and runs under
+      # `mise exec` so the pinned kind/kubectl/helm/chainsaw/crossplane win over any
+      # binaries on PATH.
+      - name: Kind end-to-end
+        run: moon run root:e2e-test

@@ -26,6 +26,7 @@ type publishFlags struct {
 	functionVersion string
 	name            string
 	crossplane      string
+	environmentRefs []string
 	insecure        bool
 }
 
@@ -78,6 +79,9 @@ func newPublishCommand(options Options) *cobra.Command {
 		"Configuration package metadata.name (defaults to <xrd-plural>-configuration)")
 	cmd.Flags().StringVar(&f.crossplane, "crossplane-constraint", "",
 		"optional semver constraint on the Crossplane version the package supports")
+	cmd.Flags().StringArrayVar(&f.environmentRefs, "environment-config", nil,
+		"name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable); "+
+			"each is referenced by name so its values reach the module under input.environment")
 	cmd.Flags().BoolVar(&f.insecure, "insecure", false,
 		"push over plain HTTP (development only; for a non-loopback throwaway registry)")
 	_ = cmd.MarkFlagRequired("package")
@@ -117,9 +121,10 @@ func runPublish(ctx context.Context, options Options, f publishFlags, ref string
 	}
 
 	comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
-		Module:         ref,
-		ExpectedDigest: digest,
-		FunctionName:   functionName(f),
+		Module:                ref,
+		ExpectedDigest:        digest,
+		FunctionName:          functionName(f),
+		EnvironmentConfigRefs: f.environmentRefs,
 	})
 	if err != nil {
 		return fmt.Errorf("cannot build composition for module %q: %w", ref, err)

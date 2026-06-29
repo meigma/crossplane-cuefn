@@ -1,0 +1,27 @@
+# Digest-drift guard on the live cluster (criterion 5). Before this Test runs, the
+# Go harness has republished DIFFERENT module content under the SAME version to the
+# CUE-module registry and forced the `demo` XR to reconcile. The cuefn function
+# resolves the tag to its new manifest digest, finds it does not match the digest
+# the Configuration recorded (input.expectedDigest), and returns a fatal result —
+# so the composite stops syncing. This Test asserts that rejection surfaces as
+# Synced=False on the live XR, proving the runtime refuses drifted modules.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: e2e-drift
+spec:
+  timeouts:
+    assert: 5m
+  steps:
+    - name: synced-false
+      description: The XR surfaces a failed reconcile after the module drifted.
+      try:
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XApp
+              metadata:
+                name: demo
+                namespace: default
+              status:
+                (conditions[?type == 'Synced'] | [0].status): "False"

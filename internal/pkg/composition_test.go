@@ -80,6 +80,51 @@ func TestGenerateComposition_FunctionName(t *testing.T) {
 	assert.Equal(t, "cuefn", defaulted.Spec.Pipeline[1].FunctionRef.Name)
 }
 
+// TestGenerateComposition_EnvironmentConfigs proves the function-environment-configs
+// step carries a Reference Input for each requested EnvironmentConfig, so its
+// values reach the module under input.environment, and that the step carries no
+// Input when none are requested (the default, backward-compatible shape).
+func TestGenerateComposition_EnvironmentConfigs(t *testing.T) {
+	xrd := fixtureXRD(t)
+
+	t.Run("none", func(t *testing.T) {
+		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{Module: "cuefn.example/app@v0.1.0"})
+		require.NoError(t, err)
+		assert.Nil(t, comp.Spec.Pipeline[0].Input, "env-config step must carry no Input when no refs are given")
+	})
+
+	t.Run("references", func(t *testing.T) {
+		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
+			Module:                "cuefn.example/app@v0.1.0",
+			EnvironmentConfigRefs: []string{"app-environment", "shared-env"},
+		})
+		require.NoError(t, err)
+
+		step := comp.Spec.Pipeline[0]
+		require.NotNil(t, step.Input, "env-config step must carry an Input when refs are given")
+
+		var in struct {
+			APIVersion string `json:"apiVersion"`
+			Kind       string `json:"kind"`
+			Spec       struct {
+				EnvironmentConfigs []struct {
+					Type string `json:"type"`
+					Ref  struct {
+						Name string `json:"name"`
+					} `json:"ref"`
+				} `json:"environmentConfigs"`
+			} `json:"spec"`
+		}
+		require.NoError(t, json.Unmarshal(step.Input.Raw, &in))
+		assert.Equal(t, "environmentconfigs.fn.crossplane.io/v1beta1", in.APIVersion)
+		assert.Equal(t, "Input", in.Kind)
+		require.Len(t, in.Spec.EnvironmentConfigs, 2)
+		assert.Equal(t, "Reference", in.Spec.EnvironmentConfigs[0].Type)
+		assert.Equal(t, "app-environment", in.Spec.EnvironmentConfigs[0].Ref.Name)
+		assert.Equal(t, "shared-env", in.Spec.EnvironmentConfigs[1].Ref.Name)
+	})
+}
+
 // TestGenerateComposition_Errors proves malformed inputs surface clear errors
 // instead of panicking.
 func TestGenerateComposition_Errors(t *testing.T) {

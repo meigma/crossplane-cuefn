@@ -35,6 +35,11 @@ const (
 	// object. They must match the type the runtime decodes (input/v1beta1.Input).
 	cuefnInputAPIVersion = "cuefn.meigma.io/v1beta1"
 	cuefnInputKind       = "Input"
+
+	// envConfigInputAPIVersion / envConfigInputKind identify the Input the
+	// function-environment-configs step consumes to select EnvironmentConfigs.
+	envConfigInputAPIVersion = "environmentconfigs.fn.crossplane.io/v1beta1"
+	envConfigInputKind       = "Input"
 )
 
 // CompositionInput is the author half of the schema<->runtime digest lock-step:
@@ -51,6 +56,12 @@ type CompositionInput struct {
 	// references (the functionRef.name). It must match the Function name the
 	// installed Configuration's dependsOn entry produces.
 	FunctionName string
+	// EnvironmentConfigRefs are the names of EnvironmentConfigs the
+	// function-environment-configs step merges into the pipeline context (by
+	// Reference) before cuefn evaluates the module. When empty the step is still
+	// present but selects nothing, so cuefn sees an empty environment. Each name
+	// becomes a `type: Reference` entry in the step's Input.
+	EnvironmentConfigRefs []string
 }
 
 // GenerateComposition builds a pipeline-mode Composition for xrd. Its
@@ -76,6 +87,11 @@ func GenerateComposition(xrd *xv2.CompositeResourceDefinition, in CompositionInp
 		return nil, err
 	}
 
+	envStep, err := envConfigPipelineStep(in.EnvironmentConfigRefs)
+	if err != nil {
+		return nil, err
+	}
+
 	comp := &apiextv1.Composition{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: compositionAPIVersion,
@@ -91,10 +107,7 @@ func GenerateComposition(xrd *xv2.CompositeResourceDefinition, in CompositionInp
 			},
 			Mode: apiextv1.CompositionModePipeline,
 			Pipeline: []apiextv1.PipelineStep{
-				{
-					Step:        envConfigStepName,
-					FunctionRef: apiextv1.FunctionReference{Name: envConfigFunctionName},
-				},
+				envStep,
 				cuefnStep,
 			},
 		},
@@ -137,6 +150,46 @@ func referenceableVersion(xrd *xv2.CompositeResourceDefinition) string {
 		return versions[0].Name
 	}
 	return ""
+}
+
+// envConfigPipelineStep builds the function-environment-configs step. When refs
+// are supplied it carries an Input selecting each EnvironmentConfig by Reference,
+// so the step merges them into the pipeline context for cuefn; with no refs the
+// step is present but selects nothing.
+func envConfigPipelineStep(refs []string) (apiextv1.PipelineStep, error) {
+	step := apiextv1.PipelineStep{
+		Step:        envConfigStepName,
+		FunctionRef: apiextv1.FunctionReference{Name: envConfigFunctionName},
+	}
+	if len(refs) == 0 {
+		return step, nil
+	}
+
+	configs := make([]map[string]any, 0, len(refs))
+	for _, name := range refs {
+		if strings.TrimSpace(name) == "" {
+			continue
+		}
+		configs = append(configs, map[string]any{
+			"type": "Reference",
+			"ref":  map[string]any{"name": name},
+		})
+	}
+	if len(configs) == 0 {
+		return step, nil
+	}
+
+	input := map[string]any{
+		"apiVersion": envConfigInputAPIVersion,
+		"kind":       envConfigInputKind,
+		"spec":       map[string]any{"environmentConfigs": configs},
+	}
+	raw, err := json.Marshal(input)
+	if err != nil {
+		return apiextv1.PipelineStep{}, fmt.Errorf("cannot marshal environment-configs input: %w", err)
+	}
+	step.Input = &runtime.RawExtension{Raw: raw}
+	return step, nil
 }
 
 // cuefnPipelineStep builds the cuefn pipeline step, embedding the module ref and

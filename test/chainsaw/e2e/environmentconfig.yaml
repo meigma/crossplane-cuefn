@@ -1,0 +1,10 @@
+# The EnvironmentConfig the Composition's function-environment-configs step
+# merges into the pipeline context. The module's input.environment.tier defaults
+# to "unset", so a composed resource carrying tier: production proves the
+# EnvironmentConfig flowed end-to-end through the pipeline into the CUE module.
+apiVersion: apiextensions.crossplane.io/v1beta1
+kind: EnvironmentConfig
+metadata:
+  name: app-environment
+data:
+  tier: production
