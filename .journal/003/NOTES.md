@@ -115,3 +115,38 @@ incl cosign/syft) ✓, funcpkg(10 incl real dev-image gRPC) ✓, render-loop ✓
 All auditor findings were minor + handled or non-issues (the 4 staying unit tests now run
 in the BLOCKING check gate via root:test, strictly better than before). Next: confirm
 e2e green → push → open Phase 1 PR → STOP for human merge.
+
+## 2026-06-28 23:26 — Phase 1 MERGED; Phase 2 done + PR #13 open
+
+Phase 1: kind e2e went green on the local run (TestE2E_Kind 68.8s, all 6 gated suites
+green). Opened **PR #12**, CI all green (ci/integration/e2e + dry-runs). User reviewed:
+"LGTM. Proceed." → squash-merged #12. master now at 149aa5f. Removed the Phase 1 worktree.
+
+Phase 2 (consolidation) via workflow `wf_cb71f8e5-ff9` (4 agents, ~263k tok) on branch
+`test/consolidate` (`.wt/test-consolidate`, off master): consolidate → 3 verifiers
+(coverage/regex/build) → fix. All verdicts pass, 0 blocking.
+- C2: deleted TestImageServesFunction (folded into TestFunctionPackageServesGRPC; base
+  preservation in unit TestBuildFunctionImage_EmbedsRuntime). Kept _NoArgs.
+- C3: deleted TestConfigurationRoundTrip + TestFunctionXpkgRoundTrip; added digest-stability
+  to both CLI E2Es; TestPublishFunction_EndToEnd now uses the REAL apko base when present.
+- C4: deleted TestFunctionIndexRoundTrip; TestPublishFunction_MultiArchIndex now asserts
+  both platforms.
+- C5: merged TestXpkgValidate + TestFunctionXpkgValidate → one table test (config+function).
+- C6: merged cosign+sbom → TestFunctionXpkgSupplyChain (gated subtests).
+- moon -run regexes re-derived (publish-test/funcpkg-test); clean partition, no double-run.
+  Integration tests 23→17, no assertion lost (verified by adversarial coverage audit + the
+  merged-subtest run: config/function + cosign/syft all genuinely execute).
+
+**REGRESSION found + fixed:** PR #12 accidentally committed a **61 MiB `cuefn` binary** at
+repo root (a Phase-1 workflow gate ran a bare `go build ./cmd/cuefn` + `git add -A`; absent
+at e81d018, added in 149aa5f, not gitignored). Phase 2 PR untracks it + gitignores `/cuefn`.
+Also removed orphaned common.PackageYAMLBytes + refreshed stale moon comments. **Root-cause
+note for future workflows: never `git add -A` after a bare `go build` of cmd/cuefn.**
+
+Verified Phase 2 ground truth: golangci-lint 0, gofmt clean, go vet (all tag configs) +
+noxpkg build green, `moon run root:check` 10/10, publish-test + funcpkg-test pass locally
+with all merged subtests executing. **PR #13** open (refactor(test): consolidate … ; untrack
+stray cuefn binary), CI watch running. STOP for human merge approval (new PR = new gate).
+
+Remaining after #13 merges: delete the TEMPORARY `.journal/003/PROPOSAL-test-reorg.md` and
+fold the durable test-layout facts into TECH_NOTES (the proposal's own header says so).
