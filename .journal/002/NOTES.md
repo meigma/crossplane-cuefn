@@ -197,3 +197,31 @@ runtime base (first real embed-runtime use); cosign-sign + SBOM + provenance;
 wire release.yml/release-dry-run.yml/security-scan.yml; AND resolve the dep-bloat
 decision (measure + build-tag-split publish out of the image binary if needed).
 The "release dry-run green in CI" criterion confirms on the PR (CI runs it).
+
+## 2026-06-28 17:49 — Phase 6 signed off + merged (incl. CI-hardening); Phase 7 launched
+Phase 6 (PR #9) shipped the signed Function xpkg (embed-runtime over the real apko
+base, embedded Input CRD, cosign/SBOM/provenance release wiring) and resolved the
+dep-bloat decision (noxpkg build-tag split, −12.1 MiB/−23% on the image binary).
+All 5 criteria met (criterion 4's release-dry-run is green in CI).
+
+BIG event: discovered `ci` had been **red on master since Phase 2** — my per-phase
+gate was local `moon run root:check` (excludes the heavy suites) + MERGEABLE, and
+`ci` isn't required, so the redness slipped. User chose option A (fold the CI fix
+into P6). Hardened CI over 4 iterations (all locally verified): env-gate heavy tests
+on CUEFN_INTEGRATION; blocking gate now `moon run root:check` (not `moon ci`); new
+non-blocking integration.yml runs all 5 heavy suites; fixed image-local pipefail-
+under-dash (shell=bash), the moon `runInCI` vs `moon run` conflict, render-loop
+`--timeout 10m` + `0.0.0.0` bind (Linux Docker bridge reachability). **Result: ci
+green + integration green (all 5 heavy suites run + pass in CI).** Assurance debt
+CLOSED (was tracked since P2). Squash-merged → master `5000e29`.
+
+NEW STANDING RULE: verify the real `ci` Action at every gate, not just local
+`moon run root:check`. (Recorded in TECH_NOTES.)
+
+Phase 7 in flight: worktree `phase-7-docs` off `5000e29`. Scope = Diátaxis docs
+set + mkdocs nav: module-contract reference (#API/#Spec/#Status, resources/status
+output, reserved-key projection, digest-verify), CLI reference (generate/validate/
+publish/render/function), quickstart (author → cue mod publish → cuefn publish →
+install → instantiate). Pin the `cue` CLI in mise for the documented author flow.
+Hard gate: `docs:build --strict` (already in root:check). CLI reference must match
+shipped subcommands exactly.

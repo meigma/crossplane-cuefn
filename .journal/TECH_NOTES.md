@@ -296,3 +296,49 @@ already run-or-fail; this debt is the Go testcontainers/build-tagged suites.
 - crossplane-CLI validation here is annotation/parse-level (kinds present via
   `extract`), not schema-level; full structural acceptance is P4 envtest + P8 install.
 
+## Phase 6 — Function xpkg + release wiring + CI-hardening (merged 2026-06-28, PR #9)
+
+Ships the function as a signed Crossplane **Function** xpkg.
+- `internal/pkg/function.go`: `BuildFunctionImage` — first real use of the
+  embed-runtime (non-empty base) path, appending the `package.yaml` layer over the
+  apko `crossplane-cuefn:dev` image while preserving its entrypoint/cmd. `meta.go`
+  `GenerateFunctionMeta` (kind Function) + the embedded Input CRD
+  (`internal/pkg/inputcrd/cuefn.meigma.io_inputs.yaml`, controller-gen from
+  `input/v1beta1`). `push.go` `PushIndex` (multi-arch). `cuefn publish-function`.
+- `release.yml` (`function-package-release`: multi-arch index, keyless cosign,
+  syft SBOM + attest-sbom; `attest-function-package` → SLSA L3), `release-dry-run.yml`,
+  `security-scan.yml` wired for the function xpkg. Proven: `crossplane xpkg extract`
+  accepts it; cosign sign+verify; the packaged image serves gRPC.
+- **DEP-BLOAT resolved:** `publish`/`publish-function` (and `internal/pkg` →
+  sigstore/cosign + cloud-cred SDKs) sit behind a `//go:build !noxpkg` seam
+  (`internal/cli/packaging.go` / `packaging_noxpkg.go`); `melange.yaml` builds the
+  **image binary with `-tags=noxpkg`** → **−12.1 MiB / −23%** (53.5→41.3 MiB
+  stripped). A `build-image-binary` moon task (in `check`) keeps the lean path green.
+
+### CI-EXECUTION-ASSURANCE DEBT — RESOLVED (was tracked P2→P5)
+
+`ci` had been **red on master since Phase 2**: the GitHub `ci` job ran `moon ci`
+(all tasks, incl. the heavy Docker/crossplane suites), which were flaky/failing on
+the runner. It slipped through because the per-phase gate was local
+`moon run root:check` (excludes the heavy suites) + `MERGEABLE`, and `ci` is **not
+a required check**. **LESSON: verify the real `ci` Action at every gate, not just
+local `moon run root:check`.** The fix (folded into P6):
+- Heavy tests **env-gate on `CUEFN_INTEGRATION`** (set only by the dedicated moon
+  tasks) via the four `require*` helpers (`requireDocker`/`requireCrossplane`/
+  `requireBinary`/`requireDevImage`) — so plain `go test ./...` skips them (no
+  build-tag file-splitting needed; fast error-path tests stay in the gate).
+- The blocking `ci` job runs **`moon run root:check`** (NOT `moon ci`); the heavy
+  tasks are not `check` deps, so they're excluded. (`runInCI: false` was rejected:
+  it also makes a task un-runnable via `moon run` when `CI=true`.)
+- New **non-blocking `.github/workflows/integration.yml`** runs all five heavy
+  suites (oci/schema/publish/funcpkg/render-loop) visibly on PRs + master.
+- Three real CI-env bugs fixed along the way: (1) `image-local` mise task used
+  `set -o pipefail` under dash → pin `shell = "bash -c"`; (2) the `moon run`/`CI`
+  conflict above; (3) the render-loop `crossplane render` step — bump `--timeout`
+  to 10m (cold env-configs pull) AND **bind the function server on `0.0.0.0`** (not
+  `127.0.0.1`) so crossplane's function container reaches it via the Linux Docker
+  bridge gateway (172.17.0.1).
+- **Result:** `ci` green (~1m) + `integration` green (~4m, all five heavy suites
+  genuinely run + pass in CI). The "no-args apko image default-cmd" + `example/xrd.yaml`
+  drift checks from earlier follow-ups are still open (minor; P7/P8).
+
