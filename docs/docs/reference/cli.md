@@ -75,6 +75,10 @@ command.
 **Output.** Long-running server; logs to stderr. Returns a non-zero exit only on
 a startup failure (logger creation or serve error).
 
+**Metrics.** `function-sdk-go` also serves Prometheus metrics on `:8080`, in
+addition to the gRPC `--address`. This port is currently fixed (not exposed as a
+flag), so be aware it can collide with other local services on `:8080`.
+
 The `--cache-dir` requirement matters for the nonroot, read-only-root runtime
 image — see [Configuration & environment](configuration.md).
 

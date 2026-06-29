@@ -184,6 +184,8 @@ resolved manifest digest (the runtime [digest lock-step](explanation/digest-lock
 and pushes the package. You can confirm the package parses:
 
 ```sh
+# --from-daemon reads from the local Docker daemon, so pull the pushed package first
+docker pull registry.example.com/xapp-configuration:v0.1.0
 crossplane xpkg extract --from-daemon registry.example.com/xapp-configuration:v0.1.0 -o out.gz
 ```
 
