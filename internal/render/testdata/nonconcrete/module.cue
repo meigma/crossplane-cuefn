@@ -3,14 +3,16 @@
 // engine rejects non-concrete resources and names the offending field/key.
 package app
 
-input: {...}
+out: {
+	input: {...}
 
-resources: {
-	broken: {
-		object: {
-			apiVersion: "v1"
-			kind:       "ConfigMap"
-			metadata: name: string
+	resources: {
+		broken: {
+			object: {
+				apiVersion: "v1"
+				kind:       "ConfigMap"
+				metadata: name: string
+			}
 		}
 	}
 }

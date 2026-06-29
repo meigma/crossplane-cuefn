@@ -59,11 +59,11 @@ package app
 }
 ```
 
-Now the transform. The engine fills `input` (spec, metadata, environment); we
-read it and return an author-keyed `resources` map and a `status`. We instantiate
-each object from the official Kubernetes schema (`cue.dev/x/k8s.io`) so
-`apiVersion`/`kind` come from the definition and an invalid object is caught here,
-at render time, not on apply:
+Now the transform, nested under a single `out` field. The engine fills
+`out.input` (spec, metadata, environment); we read it and return an author-keyed
+`out.resources` map and an `out.status`. We instantiate each object from the
+official Kubernetes schema (`cue.dev/x/k8s.io`) so `apiVersion`/`kind` come from
+the definition and an invalid object is caught here, at render time, not on apply:
 
 ```cue title="transform.cue"
 package app
@@ -73,57 +73,59 @@ import (
 	corev1 "cue.dev/x/k8s.io/api/core/v1"
 )
 
-input: {
-	spec: #Spec
-	metadata: {
-		name:       string | *"app"
-		namespace?: string
-		...
+out: {
+	input: {
+		spec: #Spec
+		metadata: {
+			name:       string | *"app"
+			namespace?: string
+			...
+		}
+		environment: {
+			tier: string | *"unset"
+			...
+		}
 	}
-	environment: {
-		tier: string | *"unset"
-		...
-	}
-}
 
-_name: input.metadata.name
-_tier: input.environment.tier
+	_name: input.metadata.name
+	_tier: input.environment.tier
 
-resources: {
-	deployment: {
-		ready: "Ready"
-		object: appsv1.#Deployment & {
-			metadata: {name: _name, labels: {app: _name, tier: _tier}}
-			spec: {
-				replicas: input.spec.replicas
-				selector: matchLabels: app: _name
-				template: {
-					metadata: labels: {app: _name, tier: _tier}
-					spec: containers: [{
-						name:  "app"
-						image: input.spec.image
-						ports: [{containerPort: 9898}]
-					}]
+	resources: {
+		deployment: {
+			ready: "Ready"
+			object: appsv1.#Deployment & {
+				metadata: {name: _name, labels: {app: _name, tier: _tier}}
+				spec: {
+					replicas: input.spec.replicas
+					selector: matchLabels: app: _name
+					template: {
+						metadata: labels: {app: _name, tier: _tier}
+						spec: containers: [{
+							name:  "app"
+							image: input.spec.image
+							ports: [{containerPort: 9898}]
+						}]
+					}
 				}
 			}
 		}
-	}
-	config: {
-		object: corev1.#ConfigMap & {
-			metadata: {name: _name, labels: {app: _name, tier: _tier}}
-			data: tier: _tier
+		config: {
+			object: corev1.#ConfigMap & {
+				metadata: {name: _name, labels: {app: _name, tier: _tier}}
+				data: tier: _tier
+			}
 		}
 	}
-}
 
-status: #Status & {
-	ready: true
-	url:   "http://\(_name).svc"
+	status: #Status & {
+		ready: true
+		url:   "http://\(_name).svc"
+	}
 }
 ```
 
-Binding `input.spec: #Spec` is the key move: the schema the XRD is generated from
-is the same value the transform renders against, so the two never drift.
+Binding `out.input.spec: #Spec` is the key move: the schema the XRD is generated
+from is the same value the transform renders against, so the two never drift.
 
 Resolve the new dependency, which records it in `cue.mod/module.cue`:
 

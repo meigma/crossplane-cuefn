@@ -6,33 +6,35 @@ package consumer
 
 import dep "cuefn.test/dep@v0"
 
-// input is filled by the engine. The consumer ignores the spec but keeps the
-// field present so the contract is uniform with the example module.
-input: {
-	metadata: {
-		name: string | *"consumer"
+out: {
+	// input is filled by the engine. The consumer ignores the spec but keeps the
+	// field present so the contract is uniform with the example module.
+	input: {
+		metadata: {
+			name: string | *"consumer"
+			...
+		}
 		...
 	}
-	...
-}
 
-_name: input.metadata.name
+	_name: input.metadata.name
 
-resources: {
-	deployment: {
-		ready: "Ready"
-		object: {
-			apiVersion: "apps/v1"
-			kind:       "Deployment"
-			metadata: name: _name
-			spec: {
-				// Both values come from the imported dependency module.
-				replicas: 1
-				template: spec: containers: [{
-					name:  "app"
-					image: dep.Image
-					ports: [{containerPort: dep.Port}]
-				}]
+	resources: {
+		deployment: {
+			ready: "Ready"
+			object: {
+				apiVersion: "apps/v1"
+				kind:       "Deployment"
+				metadata: name: _name
+				spec: {
+					// Both values come from the imported dependency module.
+					replicas: 1
+					template: spec: containers: [{
+						name:  "app"
+						image: dep.Image
+						ports: [{containerPort: dep.Port}]
+					}]
+				}
 			}
 		}
 	}
