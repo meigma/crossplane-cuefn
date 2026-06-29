@@ -166,3 +166,30 @@ golangci-lint cache is SHARED across worktrees — a half-deleted sibling worktr
 (stale cross-worktree findings); fix = fully remove the worktree + `golangci-lint cache clean`.
 
 Dep graph remaining: PR4 (example→k8s) needs #14+#15+#16 merged. PR5 (CI cache + smoke + docs) needs PR4.
+
+## 2026-06-29 11:20 — PR2+PR3 merged; PR4 (#17) open — SUCCESS CRITERION met
+- **PR2 #15 + PR3 #16 MERGED** to master after user "LGTM. Please merge both and proceed." Both CI-green
+  (ci/integration/e2e). master now at 8a5a48f (#16) ← 3a70f63 (#15) ← 75a3c4d (#14).
+- **PR4 #17** (`feat(example): instantiate Kubernetes objects from cue.dev/x/k8s.io`): worktree
+  `.wt/feat-example-k8s-schema` off updated master.
+  - **S2 spike RETIRED (network worked in sandbox):** probed `cue.dev/x/k8s.io@v0` → resolves to v0.7.0.
+    `apps/v1.#Deployment`/`core/v1.#Service`/`core/v1.#ConfigMap` **pin apiVersion/kind** as concrete
+    defaults, require nothing beyond what the example already set, and accept int targetPort/containerPort/
+    port (intstr disjunction unifies). `cue eval -c` clean, NO extra defaulted fields → rendered output
+    structurally identical to the hand-written version.
+  - `transform.cue` rewritten to instantiate from the k8s schema; `cue mod tidy` (in example/module) added
+    the `deps` block (cue.dev/x/k8s.io@v0 v0.7.0 default:true; **no cue.sum** — modern CUE inlines deps);
+    api.cue package doc updated (dropped "no external imports/offline"). #API/#Spec/#Status UNTOUCHED.
+  - **Verified locally:** `cuefn render --dir example/module --xr example/xr.yaml` with NO CUE_REGISTRY →
+    renders 3 resources from k8s schema (proves dep-aware local load + central default end-to-end);
+    `cuefn generate --dir example/module` → XRD byte-identical (xrd-check clean); `moon run root:check`
+    GREEN (root:test offline on the PR3 fixture, xrd-check resolves k8s dep from warm cache).
+  - **CI note:** ci.yml sets NO CUE_REGISTRY → central default; xrd-check fetches k8s dep live (public,
+    reachable on GH runners). CUE-module cache deferred to PR5 (resilience only; first fetch must work
+    regardless). integration/e2e jobs use the hermetic fixture → unaffected by the example change.
+  - PR #17 opened, base master. Watching the `ci` job (first blocking-gate live k8s fetch). Awaiting
+    merge sign-off; PR5 (CI cache + example-check smoke + docs) is next and needs PR4 on master.
+
+Recurring gotcha confirmed again: shared golangci-lint cache poisoned by deleted sibling worktrees →
+`golangci-lint cache clean` fixes it. Probe trick: `mise which cue` to get the pinned binary, run it with
+cwd in the target module dir (mise's `--cd` points tool resolution at the worktree, not the run dir).
