@@ -64,9 +64,10 @@ func buildBinary(t *testing.T) string {
 	return bin
 }
 
-// serveFunction starts `cuefn function --insecure` on addr with the given
-// CUE_REGISTRY, waits until the gRPC server answers, and stops it at cleanup.
-func serveFunction(t *testing.T, bin, addr, cueRegistry, cacheDir string) {
+// serveFunction starts `cuefn function --insecure` listening on bindAddr with the
+// given CUE_REGISTRY, waits (dialing dialAddr) until the gRPC server answers, and
+// stops it at cleanup.
+func serveFunction(t *testing.T, bin, bindAddr, dialAddr, cueRegistry, cacheDir string) {
 	t.Helper()
 
 	cmd := exec.Command(
@@ -74,7 +75,7 @@ func serveFunction(t *testing.T, bin, addr, cueRegistry, cacheDir string) {
 		"function",
 		"--insecure",
 		"--address",
-		addr,
+		bindAddr,
 		"--cache-dir",
 		cacheDir,
 	)
@@ -87,7 +88,7 @@ func serveFunction(t *testing.T, bin, addr, cueRegistry, cacheDir string) {
 		_, _ = cmd.Process.Wait()
 	})
 
-	waitForFunction(t, addr)
+	waitForFunction(t, dialAddr)
 }
 
 // waitForFunction dials addr and issues a RunFunction until the server responds,
@@ -154,10 +155,17 @@ func TestRenderLoop_CrossplaneRender(t *testing.T) {
 	reg.publishModule(t, exampleRef, "../../example/module")
 
 	bin := buildBinary(t)
-	addr := fmt.Sprintf("127.0.0.1:%d", freePort(t))
-	serveFunction(t, bin, addr, reg.cueRegistry, t.TempDir())
+	// Bind the function server on all interfaces (0.0.0.0): crossplane render runs
+	// the cuefn step in a Docker container and reaches the host-served function via
+	// the bridge gateway (e.g. 172.17.0.1 on Linux), which a 127.0.0.1-only bind
+	// refuses. functions.yaml still targets 127.0.0.1 — crossplane translates it to
+	// the host's container-reachable address per platform.
+	port := freePort(t)
+	bindAddr := fmt.Sprintf("0.0.0.0:%d", port)
+	dialAddr := fmt.Sprintf("127.0.0.1:%d", port)
+	serveFunction(t, bin, bindAddr, dialAddr, reg.cueRegistry, t.TempDir())
 
-	functions := writeFunctions(t, t.TempDir(), addr)
+	functions := writeFunctions(t, t.TempDir(), dialAddr)
 
 	// crossplane render runs the function-environment-configs step as a Docker
 	// container (only cuefn has the Development annotation), so a cold image pull
