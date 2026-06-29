@@ -193,3 +193,29 @@ Dep graph remaining: PR4 (example→k8s) needs #14+#15+#16 merged. PR5 (CI cache
 Recurring gotcha confirmed again: shared golangci-lint cache poisoned by deleted sibling worktrees →
 `golangci-lint cache clean` fixes it. Probe trick: `mise which cue` to get the pinned binary, run it with
 cwd in the target module dir (mise's `--cd` points tool resolution at the worktree, not the run dir).
+
+## 2026-06-29 12:10 — PR4 merged; PR5 (#18) open — PLAN COMPLETE (all 5 PRs implemented)
+- **PR4 #17 MERGED** (master 6fe9932) after user "LGTM. Go ahead and continue." + full CI green
+  (ci 44s incl. the FIRST live k8s fetch in the blocking gate — proves no cache needed for correctness).
+- **PR5 #18** (`docs: cover the k8s-schema example, registry defaults, and --cache-dir`): worktree
+  `.wt/feat-example-ci-cache-and-docs`. Three parts:
+  1. **CI cache** (ci.yml): deterministic `CUE_CACHE_DIR: ${{ github.workspace }}/.cue-cache` + a
+     `Cache CUE modules` actions/cache step keyed on `example/module/cue.mod/module.cue` (restore-keys
+     fallback). Resilience/speed only — first fetch works regardless (proven on #17).
+  2. **example-check** (moon.yml): render smoke (`cuefn render --dir example/module` asserting
+     Deployment/Service/ConfigMap), added to `check.deps` → blocking gate now 11 tasks. The light "doesn't
+     break" validation the example gets instead of being in the unit suite.
+  3. **Docs (11 files)** — delegated to a FORK (inherited full context): module-contract + quickstart show
+     the cue.dev/x/k8s.io import + deps block + `cue mod tidy`; "offline --dir" softened across how-to +
+     cli.md; configuration.md documents central-as-always-on-default + the prefix form (only bare
+     CUE_REGISTRY replaces central) + --cache-dir; render/validate/generate Long help + engine.go doc
+     de-"offline"-ed. Fork self-verified docs:build strict + go vet.
+  - **Verified myself** (session-003 lesson — don't trust agent self-report): `moon run root:check` GREEN
+    (11 tasks incl. example-check + docs:build); ci.yml valid YAML; spot-checked the doc snippets match the
+    real transform. PR #18 opened, base master. Watching the `ci` job (the cache change touches it).
+
+### Series summary (all merged except #18 awaiting final sign-off)
+#14 render core (buildRegistry + NewLocalLoader + offline routing test) → #15 CLI wiring (moduleLoader +
+--cache-dir) → #16 decouple tests (hermetic fixture) → #17 example→cue.dev/x/k8s.io → #18 CI cache + smoke
++ docs. Net: the local load path resolves OCI deps; the example instantiates k8s objects from the official
+schema; central is the always-on default registry; tests are fully decoupled from the example.
