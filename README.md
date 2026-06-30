@@ -22,13 +22,17 @@ a versioned Crossplane Configuration.
   resources plus a patched composite status. Crossplane connects over mTLS by
   default; pass `--insecure` for local `crossplane render`. This is the image's
   default command.
-- `cuefn render <module-ref> --xr <file> [--env <file>] [--dir <dir>]` evaluates a
-  module against an XR locally and prints the rendered resources and status as
-  YAML — cluster-free and crossplane-CLI-free. `--dir` serves the module from a
-  local directory (its dependencies resolved from the registry — central by
+- `cuefn render <module-ref> --xr <file> [--env <file>] [--dir <dir>] [--cache-dir <dir>]`
+  evaluates a module against an XR locally and prints the rendered resources and
+  status as YAML — cluster-free and crossplane-CLI-free. `--dir` serves the module
+  from a local directory (its dependencies resolved from the registry — central by
   default); otherwise it is fetched over OCI.
-- `cuefn generate <module-ref> [--dir <dir>] [-o <file>]` emits the structural
-  Crossplane v2 XRD generated from the module's `#API`/`#Spec`/`#Status`.
+- `cuefn generate <module-ref> [--dir <dir>] [--cache-dir <dir>] [-o <file>]` emits
+  the structural Crossplane v2 XRD generated from the module's `#API`/`#Spec`/`#Status`.
+- `cuefn validate <xr> [--module <ref>] [--dir <dir>] [--cache-dir <dir>]` checks an
+  XR's `spec` against the target module's `#Spec` — the same evaluation the engine
+  uses, applying `#Spec` defaults — printing `<path>: valid` and exiting zero when
+  it passes, or naming the first offending field and exiting non-zero.
 - `cuefn publish <module-ref> --package <oci-ref> [flags]` builds and pushes an
   installable Crossplane **Configuration** package (`xpkg`) from one CUE module in
   a single command: it generates the XRD, builds a pipeline Composition wired to
@@ -79,6 +83,13 @@ That single module is the source of truth for two things:
 The result: define a platform API once, in CUE; publish the module and an
 auto-generated Configuration; install and instantiate XRs.
 
+To keep that one module honest, cuefn also ships an importable **module
+contract** — a separately versioned CUE module of closed definitions
+(`github.com/meigma/crossplane-cuefn/contract@v0`, on the CUE Central Registry)
+that authors unify their `#API` and `out` transform against, so a misspelled or
+unknown field is caught by `cue vet` at author time rather than at render.
+Adoption is optional and the plain module renders identically.
+
 ## Loading modules from an OCI registry
 
 The render engine (`internal/render`) is pure; where a module's bytes come from is
@@ -108,7 +119,9 @@ environment:
 - **`CUE_CACHE_DIR`** (or `OCIConfig.CacheDir`, which takes precedence) points the
   module cache at a **writable, non-`$HOME`** path. The function image runs
   nonroot on a read-only root filesystem, so the cache must live somewhere
-  writable — set this to an `emptyDir`/tmp path in that deployment.
+  writable — set this to an `emptyDir`/tmp path in that deployment. The
+  `function`/`render`/`generate`/`validate`/`publish` subcommands also expose a
+  `--cache-dir` flag for the same purpose.
 - **`OCIConfig.Expect`** optionally pins the expected manifest digest for a ref.
   CUE references modules by **semver, not digest**, so the loader verifies the
   fetched module's manifest digest against the expected value *after* fetch and
@@ -239,6 +252,13 @@ SBOMs), and the native-runner melange/apko container build, with keyless cosign
 signing and SLSA Build L3 provenance attestations generated in an isolated
 `attest.yml` reusable workflow. Binaries are installable with `ghd` per the root
 `ghd.toml`.
+
+The CUE **module contract** is released independently: a `contract` Release Please
+component cuts `contract/v*` tags (kept separate from the product's `v*`), and
+`.github/workflows/release-contract.yml` publishes the module to the CUE Central
+Registry (`registry.cue.works`) on that tag — keyless via GitHub OIDC, with no
+stored registry secret. The contract's major is welded to the function's major
+(both `v0`); authors pin `@v0`.
 
 ## Contributing
 

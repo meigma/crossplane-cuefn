@@ -1,8 +1,10 @@
 # How to set up the local toolchain
 
-Every pinned tool comes from [mise](https://mise.jdx.dev) via `mise.toml` +
-`mise.lock`: Go, Moon, Python + uv (for these docs), `golangci-lint`, the
-`crossplane` and `cue` CLIs, and `melange`/`apko`/`cosign` for releases.
+The toolchain comes entirely from [mise](https://mise.jdx.dev) via `mise.toml` +
+`mise.lock` — Go, Moon, Python + uv (for these docs), `golangci-lint`, the
+`crossplane` and `cue` CLIs, and `melange`/`apko`/`cosign` for releases, plus the
+test-suite tools `syft`, `chainsaw`, `setup-envtest`, `kind`, `kubectl`, and
+`helm`. Run `mise install` and every pinned tool is provisioned for your platform.
 
 ## Install everything
 
@@ -38,10 +40,12 @@ moon run root:test
 moon run root:check     # the aggregate gate, incl. docs:build --strict
 ```
 
-The heavy, tool-gated suites (Docker / crossplane / chainsaw / cosign) are not
-part of `root:check`; they run as dedicated tasks (`render-test`, `oci-test`,
-`publish-test`, `funcpkg-test`, `schema-test`) and in the separate `integration`
-workflow.
+The heavy, tool-gated suites are not part of `root:check`. They run as dedicated
+moon tasks — `render-test`, `oci-test`, `publish-test`, `funcpkg-test`, and
+`schema-test` (gated on Docker, the `crossplane`/`chainsaw` CLIs, `cosign`,
+`syft`, and `setup-envtest`) in the separate `integration` workflow, plus
+`e2e-test` (gated on Docker plus `kind`/`kubectl`/`helm`/`chainsaw` and the
+`crossplane-cuefn:dev` image) in its own `e2e` workflow.
 
 ## Bump or add a tool
 

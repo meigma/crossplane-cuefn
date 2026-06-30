@@ -106,7 +106,7 @@ the bytes come from the directory.
 |------|---------|-------------|
 | `--dir <string>` | _(empty)_ | Serve the module from this local directory instead of fetching it over OCI. Transitive dependencies are resolved from the configured/default registry. |
 | `--xr <string>` | _(required)_ | Path to the observed XR YAML. |
-| `--env <string>` | _(empty)_ | Path to a merged environment YAML. Its top-level keys become `input.environment`. |
+| `--env <string>` | _(empty)_ | Path to a merged environment YAML. Its top-level keys become `out.input.environment` in the module. |
 | `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
 
 **Output.** YAML to stdout: a `resources` map keyed by the author's resource
@@ -193,7 +193,7 @@ pushes it. Recording the resolved digest is the author half of the
 | `--function-version <string>` | `>=v0.0.0` | Semver constraint for the cuefn Function dependency. |
 | `--name <string>` | `<xrd-plural>-configuration` | Configuration package `metadata.name`. |
 | `--crossplane-constraint <string>` | _(empty)_ | Optional semver constraint on the supported Crossplane version. |
-| `--environment-config <string>` | _(none)_ | Name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable). Each is referenced by name so its values reach the module under `input.environment`. |
+| `--environment-config <string>` | _(none)_ | Name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable). Each is referenced by name so its values reach the module under `out.input.environment`. |
 | `--insecure` | `false` | Push over plain HTTP (development only; for a non-loopback throwaway registry). |
 
 **Output.** Prints `pushed <ref>` to stdout on success. Exits non-zero if the
