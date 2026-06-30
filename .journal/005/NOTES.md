@@ -204,3 +204,15 @@ re-runnable commands in the doc appendix (scratchpad `rr-proof/` + `harness/`).
 **Paused for human review** per developer request. Open Q's flagged in doc:
 namespace read-scope (UNVERIFIED security note), disjunction-in-closed-struct
 deferred (exactly-one enforced at render time instead).
+
+## 2026-06-30 — Review decisions recorded
+Developer reviewed the two open questions:
+1. Namespace read-scope: it's a supported Crossplane feature, consequences are
+   understood. → Reframed the doc: cross-namespace reads are intentional,
+   RBAC-governed upstream behavior, NOT a cuefn security gap. Dropped the
+   "UNVERIFIED security note" framing + the security-probe; e2e cross-ns read is
+   now optional coverage. Authors scope with `namespace: input.metadata.namespace`.
+2. Exactly-one matchName/matchLabels enforced at render time: approved ("Sure").
+   → Marked DECIDED; contract-disjunction tightening is a deferred nicety.
+Doc status bumped to "review decisions recorded 2026-06-30; awaiting go-ahead to
+implement". Journal re-committed. Still awaiting greenlight on PR1 (contract bump).

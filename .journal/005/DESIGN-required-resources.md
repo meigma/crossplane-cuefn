@@ -1,12 +1,12 @@
 ---
 title: Required resources for cuefn modules
-status: proposal — awaiting human review
+status: proposal — review decisions recorded 2026-06-30; awaiting go-ahead to implement
 date: 2026-06-29
 temporary: true   # working design doc — delete at session close (.journal/<id>/ norm)
 summary: Let a CUE composition module request additional cluster data at render time via a symmetric, author-keyed out.requirements (emit) / out.input.requiredResources (receive) pair, with Crossplane owning the fetch-and-re-invoke fixpoint and the render core staying pure.
 ---
 
-> **TEMPORARY.** This is a session-scoped design proposal living under `.journal/<id>/`. Delete it at session close (DESIGN.md/PLAN.md precedent). Status: **proposal — awaiting human review**.
+> **TEMPORARY.** This is a session-scoped design proposal living under `.journal/<id>/`. Delete it at session close (DESIGN.md/PLAN.md precedent). Status: **proposal — review decisions recorded 2026-06-30** (cross-namespace reads accepted as the supported upstream behavior; exactly-one match enforced at render time); awaiting go-ahead to implement.
 
 ## Summary & goals
 
@@ -486,9 +486,9 @@ rules:
 
 This is an **operator responsibility, not a function responsibility** — `crossplane-cuefn` ships no RBAC for arbitrary requested kinds because it cannot know which kinds an author will request. Without the rule, the fetch silently returns nothing, the delivered bucket stays `[]`, and any guarded resource never renders (a silent under-render).
 
-### Namespace read scope (UNVERIFIED — security note)
+### Namespace read scope
 
-No enforced namespace boundary was found on the read path for namespaced XRs; the engine's namespace enforcement applies to composed/created resources only. **Treat as a security note to confirm against real cluster behavior** — it is not a blocker. Follow-up probe: a namespaced XR in namespace `a` emits a requirement selecting a ConfigMap in namespace `b`; observe whether it is delivered, then narrow docs/RBAC accordingly.
+Read scope is selector-driven and governed by the Crossplane controller's RBAC, exactly as for any composition function that uses this feature: a selector with a `namespace` reads that namespace; an omitted `namespace` reads cluster-scoped objects, or lists a namespaced kind across all namespaces. Cross-namespace reads are an **intentional, supported property of the upstream feature** (gated by the aggregate-to-crossplane RBAC grant) — not a cuefn-specific boundary to add. cuefn keeps its existing namespace enforcement scoped to composed/created resources and adds none on the read path. Authors who want reads confined to the XR's own namespace simply write `namespace: input.metadata.namespace` into the selector (the canonical example does this).
 
 ### Capability gating
 
@@ -581,17 +581,17 @@ The single `TestE2E_Kind` builds one cluster (~25 min); reuse it.
 1. **RBAC (mandatory):** append the aggregate-to-crossplane `ClusterRole` for `configmaps` (above) to `functionInstallManifest` in `internal/test/e2e/e2e_test.go` (the `fmt.Appendf` block ~lines 236–277). The one piece without which the read silently returns nothing.
 2. **Requirement-emitting module:** have the e2e fixture emit one requirement for an operator-supplied ConfigMap. Pick a `matchName` distinct from any composed resource name (the existing module composes a `ConfigMap` named `demo`) so the function does not read its own output. The selector stays a pure function of `input.spec`.
 3. **New chainsaw test** `test/chainsaw/e2e/required-resources.yaml`, run via an added `runChainsaw(…)` step in `TestE2E_Kind`: `apply` a real ConfigMap (`app-cfg` in `default`, `data.image: img:e2e`); `apply` an XR whose `spec.configName` selects it; `assert` the composed Deployment reflects `spec.image: img:e2e` and the XR reaches `Ready=True` — proving the core controller fetched it via the aggregated RBAC and the second pass rendered the data-dependent resource. Existing `reconcile.yaml` assertions stay valid because the `demo` XR's requirement finds no matching ConfigMap (empty bucket, only the guarded field omitted).
-4. **Namespace probe (follow-up, not a blocker):** once (1)–(3) pass, add the cross-namespace read probe from the security note.
+4. **Cross-namespace read (optional coverage, not a blocker):** once (1)–(3) pass, optionally assert that a namespaced XR can read a ConfigMap in another namespace given the RBAC grant — documenting the supported upstream behavior, not guarding against it.
 
 ## Risks & open questions
 
 - **First-pass concreteness (highest).** Without the seed, a data-dependent guard references an absent field → hard CUE error → `Validate(cue.Concrete(true))` fails on `out.resources`. Closed by the engine seed (proven). The author `| *[]` default is only for raw out-of-engine evaluation; the contract pattern field does **not** by itself protect per-key concreteness.
 - **Non-convergence (author discipline).** If an author lets `out.requirements` depend on fetched data, the requirements differ each pass, `proto.Equal` never matches, and Crossplane fails with `requirements didn't stabilize`. `cuefn render` mirrors this with its two-pass stabilization check; document the hazard loudly.
-- **"Exactly one" of matchName/matchLabels** is enforced only at render time in `readRequirements` (the embedded-disjunction contract refinement is unverified against closedness and deferred). Open question: confirm the disjunction-inside-closed-struct form before tightening the contract.
+- **"Exactly one" of matchName/matchLabels** is enforced at render time in `readRequirements` (**decided**). Tightening the contract itself with an embedded disjunction is a deferred nicety, not a blocker: the closed-struct disjunction form is unverified, and render-time enforcement already gives a clear, field-named error.
 - **RBAC.** Missing aggregate-to-crossplane rule → silent empty fetch → guarded resource never renders.
 - **Capability.** Crossplane without `CAPABILITY_REQUIRED_RESOURCES` never iterates; mitigated by the non-fatal Warning.
 - **SDK helper gap.** v0.7.1 has no requirement-resource setter; we build the `ResourceSelector` oneof and `Namespace *string` by hand, covered by both-oneof-arm unit tests.
-- **Security (UNVERIFIED).** No enforced namespace boundary on the read path; confirm before claiming isolation (follow-up probe).
+- **Cross-namespace reads (by design).** Read scope follows the selector plus the controller's RBAC, as with any function using this feature; an omitted selector `namespace` can read cluster-wide. This is the supported upstream behavior — RBAC-gated and documented, not a cuefn boundary. Authors scope reads to the XR's own namespace with `namespace: input.metadata.namespace`.
 - **Error-path requirements.** If `out.resources` errors for a non-guard reason, `Render` returns the error and `Requirements` is dropped — acceptable, since a non-concrete `out.resources` is a Fatal the loop cannot recover from. Noted for review.
 
 ## Phased rollout (ordered PRs — each independently reviewable, human sign-off)
