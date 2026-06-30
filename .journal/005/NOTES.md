@@ -397,3 +397,9 @@ how-to command is runnable against the shipped example; the function-side runtim
 contract-major check (from session 004); maintainer to publish the v0.1.1 +
 contract v0.2.0 draft releases. Old draft releases v0.1.0 / contract v0.1.0 also
 still draft.
+
+**Release pipeline GREEN:** `release.yml` for #35 `completed/success`. v0.1.1 draft
+release has 9 assets (cuefn binaries darwin/linux × amd64/arm64 + per-binary SBOM
++ checksums.txt); signed image + Function xpkg on ghcr with cosign + SLSA
+attestations. Drafts (v0.1.1 + contract v0.2.0) LEFT for maintainer to publish —
+did not publish (outward-facing; not instructed). Session at a clean close point.
