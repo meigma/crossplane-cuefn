@@ -403,3 +403,26 @@ release has 9 assets (cuefn binaries darwin/linux × amd64/arm64 + per-binary SB
 + checksums.txt); signed image + Function xpkg on ghcr with cosign + SLSA
 attestations. Drafts (v0.1.1 + contract v0.2.0) LEFT for maintainer to publish —
 did not publish (outward-facing; not instructed). Session at a clean close point.
+
+## 2026-06-30 11:11 — Close
+Session 005 closed. Two bodies of work, all merged to `master` (`13f8587`, tag
+`v0.1.1`):
+- Docs freshness audit + refresh: **PR #30** (merged).
+- Required-resources feature: **#31** contract, **#33** contract test, **#34**
+  render, **#36** function, **#37** cli, **#38** e2e (kind, CI green), **#39**
+  docs; **#32** contract `v0.2.0` (published to Central), **#35** product
+  `v0.1.1` (Release pipeline green). All squash-merged; all worktrees removed;
+  `master` fast-forwarded; no journal contamination on master.
+
+Handoff:
+- **Maintainer to publish** the draft GitHub releases: `v0.1.1`, `contract:
+  v0.2.0` (and the older `v0.1.0` / `contract v0.1.0`).
+- Deferred (non-blocking): adopt a `cfg` requirement in `example/module` so the
+  how-to command runs against the shipped example; the function-side runtime
+  contract-major check (only matters at a future `v1`); session-001
+  DESIGN/PLAN promote+delete (carried since session 002).
+
+Recorded: `SUMMARY.md` written; `INDEX.md` row → complete; `TECH_NOTES.md` gained
+a "Required resources" section; the temporary `DESIGN-required-resources.md` was
+promoted into TECH_NOTES and deleted. Durable design rationale lives in
+TECH_NOTES + the shipped code/docs.

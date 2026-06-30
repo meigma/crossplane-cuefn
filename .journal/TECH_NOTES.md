@@ -527,3 +527,53 @@ GitHub OIDC** — `.github/workflows/release-contract.yml` uses
   then remove it. CUE ignores git tags — `cue mod publish vX.Y.Z` just uploads the
   committed `contract/` content (major must match `@v0`).
 - Non-bumping commit types (`ci`/`docs`/`test`/`chore`/`build`) cut no release.
+
+## Required resources — a module requests cluster data (session 005, PRs #31–#39, product v0.1.1)
+
+A CUE module can request additional cluster objects at render time — Crossplane's
+"extra resources" (renamed **required resources** in v2). The module **emits**
+selectors under `out.requirements`; Crossplane fetches them and re-invokes; the
+fetched objects arrive under `out.input.requiredResources` keyed by the same
+author-chosen name. The function is a **pure** function of (observed + delivered +
+input) → (desired + requirements); **Crossplane owns the fetch/re-invoke fixpoint**
+(`internal/xfn` `FetchingFunctionRunner`, `MaxRequirementsIterations=5`, stop when
+`proto.Equal` of two consecutive `Requirements`; non-final desired is discarded;
+missing → key-present-empty). Use the CURRENT wire field `Requirements.Resources`
+/ `request.GetRequiredResources`, NOT deprecated `extra_resources`.
+
+- **Contract (`contract@v0.2.0`, published):** added optional `#Transform.requirements?`
+  (`[string]: #Requirement`) and `#Input.requiredResources?` (`[string]: [...#Required]`);
+  `#Requirement{apiVersion, kind, matchName?, matchLabels?, namespace?}`; `#Required`
+  open. Backward-compatible minor bump. "Exactly one of matchName/matchLabels" is NOT
+  enforced by the closed contract (the disjunction-in-closed-struct form is unverified,
+  deferred) — the **engine** enforces it at render time.
+- **Engine SEED is load-bearing (`internal/render/engine.go`):** `Render` reads
+  `out.requirements` (`readRequirements`: nil-when-absent, concrete, exactly-one) →
+  `seedRequiredResources` (one non-nil empty `[]` per declared requirement name, only
+  if absent) → re-fill `out.input` → read `out.resources`. The seed is what keeps a
+  data-dependent guard concrete on the first pass — an absent/empty-key
+  `requiredResources` is a HARD CUE error ("undefined field"), NOT "incomplete", so an
+  optional contract field alone does NOT save it. `cue.Concrete(true)` is never relaxed.
+  Author idiom: guard data-dependent fields with `for i,x in input.requiredResources.<name>`
+  or `if len(...)>0`, and keep `out.requirements` a **pure function of stable inputs**
+  (spec/metadata) — referencing `requiredResources` inside `out.requirements` errors
+  before the seed runs unless the author defaults the field.
+- **Function edge (`internal/function/function.go`):** `requiredToInputs` (request →
+  inputs, empty-but-present preserved) + `setRequirements` (Result → `rsp.Requirements.Resources`,
+  proto built by hand — v0.7.1 has NO setter). Emits on every successful call (fixpoint);
+  `HasCapability(...CAPABILITY_REQUIRED_RESOURCES)` gates only a non-fatal Warning.
+- **CLI:** `cuefn render --required-resources <file|dir>` does a fixed two-pass
+  (render → `matchRequirements` → render) + `reflect.DeepEqual` stabilization error;
+  prints emitted `requirements`. `loadRequiredObjects` uses the k8s multi-doc YAML reader
+  (`k8s.io/apimachinery/.../util/yaml`) so a `---` inside a value is not mis-split.
+- **XRD codegen UNAFFECTED** (runtime-only); the step `input/v1beta1.Input` is UNCHANGED.
+- **RBAC (operational):** required-resource reads go through Crossplane's **core
+  controller ServiceAccount**, not the function pod → operators grant a ClusterRole
+  labeled `rbac.crossplane.io/aggregate-to-crossplane: "true"` for each requested kind.
+  The kind e2e (`test/chainsaw/e2e/required-resources.yaml`) proves the full loop with
+  this grant. Cross-namespace reads are intentional, RBAC-governed upstream behavior
+  (not a cuefn boundary); scope a read to the XR's namespace with
+  `namespace: input.metadata.namespace`.
+- **Enforcement stays author-time-only at the contract layer** (the engine does not
+  embed the contract). Carried follow-up: a function-side runtime check of a module's
+  imported contract major — only matters when the function/contract reach `v1`.
