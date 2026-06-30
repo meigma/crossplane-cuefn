@@ -55,5 +55,5 @@ Configuration; install it and instantiate XRs.
   [reserved-key projection](explanation/reserved-key-projection.md), and the
   [lean runtime image](explanation/noxpkg-split.md).
 
-The [README](https://github.com/meigma/crossplane-cuefn#readme) covers the
-development workflow and the supply-chain layer.
+[CONTRIBUTING.md](https://github.com/meigma/crossplane-cuefn/blob/master/CONTRIBUTING.md)
+covers the development workflow, the toolchain, and the supply-chain layer.
