@@ -40,13 +40,17 @@ cuefn function --tls-certs-dir /tls
 
 ## Cache directory
 
-The function caches fetched modules. In the nonroot, read-only-root runtime image
-the cache cannot go to `$HOME`, so point it at a writable path:
+The function caches fetched modules. By default it writes the cache to a temp dir
+on the container's writable layer, so the nonroot, read-only-root runtime image
+needs no extra configuration. Override the location with a flag or env var:
 
 ```sh
 cuefn function --cache-dir /var/cache/cuefn
 # or: CUE_CACHE_DIR=/var/cache/cuefn cuefn function
 ```
+
+If you harden the Deployment with a read-only root filesystem (no writable
+`/tmp`), mount an `emptyDir` and point `CUE_CACHE_DIR` at it.
 
 See [Configuration & environment](../reference/configuration.md) for the cache
 and registry details, and the [CLI reference](../reference/cli.md#function) for

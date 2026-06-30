@@ -87,7 +87,7 @@ func buildRegistry(cfg OCIConfig) (*modconfig.Resolver, modconfig.Registry, stri
 		env = os.Environ()
 	}
 
-	cacheDir, err := resolveCacheDir(cfg.CacheDir, env)
+	cacheDir, err := resolveCacheDir(cfg.CacheDir, env, os.UserCacheDir)
 	if err != nil {
 		return nil, nil, "", err
 	}
@@ -331,21 +331,38 @@ func (o *OCILoader) readPointer(ref string) (digest.Digest, bool) {
 	return dg, true
 }
 
-// resolveCacheDir picks the writable cache root: an explicit dir wins, then
-// CUE_CACHE_DIR from env, then the OS user cache dir (matching CUE's own
-// fallback in internal/cueconfig.CacheDir).
-func resolveCacheDir(explicit string, env []string) (string, error) {
+// resolveCacheDir picks a writable cache root: an explicit dir wins, then
+// CUE_CACHE_DIR from env, then the OS user cache dir, then a temp-dir fallback.
+// userCache supplies the OS user cache dir (normally [os.UserCacheDir]); it is a
+// parameter so the temp-dir fallback can be exercised in tests.
+//
+// An explicit dir or CUE_CACHE_DIR is honored verbatim and never redirected. The
+// OS-cache default is probed by creating it: a nonroot, read-only-root runtime
+// resolves the user cache to an uncreatable path (HOME="/" -> "/.cache"), so it
+// falls through to <tmp>/cuefn-cache. That lets a freshly installed function pod
+// render with no DeploymentRuntimeConfig; a hardened readOnlyRootFilesystem
+// deployment (where even /tmp is unwritable) still needs CUE_CACHE_DIR set.
+func resolveCacheDir(explicit string, env []string, userCache func() (string, error)) (string, error) {
 	if explicit != "" {
 		return explicit, nil
 	}
 	if dir := getEnv(env, "CUE_CACHE_DIR"); dir != "" {
 		return dir, nil
 	}
-	dir, err := os.UserCacheDir()
-	if err != nil {
-		return "", fmt.Errorf("cannot determine cache directory (set CUE_CACHE_DIR): %w", err)
+	// Prefer the OS user cache dir, but only when we can actually create it.
+	if dir, err := userCache(); err == nil {
+		candidate := filepath.Join(dir, "cue")
+		if mkErr := os.MkdirAll(candidate, 0o750); mkErr == nil {
+			return candidate, nil
+		}
 	}
-	return filepath.Join(dir, "cue"), nil
+	// Fall back to a writable temp dir (the nonroot / read-only-root case).
+	fallback := filepath.Join(os.TempDir(), "cuefn-cache")
+	if err := os.MkdirAll(fallback, 0o750); err != nil {
+		return "", fmt.Errorf("cannot create a writable CUE cache directory "+
+			"(set CUE_CACHE_DIR or --cache-dir): %w", err)
+	}
+	return fallback, nil
 }
 
 // getEnv reads key from an env slice ("KEY=value"), preferring the last match to

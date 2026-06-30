@@ -66,13 +66,17 @@ registry a Configuration or Function package is pushed to, which must be HTTPS
 Points the module cache at a writable directory. `--cache-dir` is available on the
 fetching commands (`render`, `generate`, `validate`, `publish`, `function`) and
 (like `OCIConfig.CacheDir` in code) takes precedence over `CUE_CACHE_DIR`, which
-takes precedence over the OS user-cache default.
+takes precedence over the OS user-cache default. When the OS user-cache directory
+is not writable — as in the nonroot, read-only-root runtime image, where it
+resolves to an uncreatable `/.cache` — the cache falls back to `<tmp>/cuefn-cache`,
+so a freshly installed function pod renders with no extra configuration.
 
-!!! warning "Nonroot runtime requires a writable cache"
-    The function runtime image runs as a nonroot user (uid 65532) on a read-only
-    root filesystem. CUE cannot write its module cache to `$HOME`, so the cache
-    **must** be a writable non-`$HOME` path. In a Deployment, mount an
-    `emptyDir` and point the cache at it with `--cache-dir` or `CUE_CACHE_DIR`.
+!!! note "Hardened (read-only root filesystem) deployments"
+    A freshly installed function needs **no** `DeploymentRuntimeConfig`: it writes
+    its cache to a temp dir on the container's writable layer. If you harden the
+    Deployment with `readOnlyRootFilesystem: true` (so even `/tmp` is unwritable),
+    mount an `emptyDir` and point the cache at it with `CUE_CACHE_DIR` (or
+    `--cache-dir`).
 
 ### Two caches, by design
 

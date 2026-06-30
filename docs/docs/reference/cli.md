@@ -69,7 +69,7 @@ command.
 | `--address <string>` | `:9443` | Address to listen on for gRPC connections. |
 | `--tls-certs-dir <string>` | `$TLS_SERVER_CERTS_DIR` | Directory holding the server certs (`tls.key`, `tls.crt`) and the client CA (`ca.crt`). Defaults to the `TLS_SERVER_CERTS_DIR` environment variable, which Crossplane sets on the in-cluster runtime container, so the packaged Function serves mTLS with no extra flags. |
 | `--insecure` | `false` | Serve without mTLS credentials (development only; ignores `--tls-certs-dir`). |
-| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 | `--metrics-address <string>` | `:8080` | Address for the Prometheus metrics endpoint; pass an empty string (`--metrics-address ""`) to disable it. |
 | `-d`, `--debug` | `false` | Emit debug logs in addition to info logs. |
 
@@ -82,8 +82,9 @@ a startup failure (logger creation or serve error).
 would collide with another local service, or in-cluster where the metrics
 listener is unwanted.
 
-The `--cache-dir` requirement matters for the nonroot, read-only-root runtime
-image — see [Configuration & environment](configuration.md).
+A freshly installed function needs no `--cache-dir`: it falls back to a writable
+temp dir. Only a hardened read-only-root deployment requires one — see
+[Configuration & environment](configuration.md).
 
 ---
 
@@ -107,7 +108,7 @@ the bytes come from the directory.
 | `--dir <string>` | _(empty)_ | Serve the module from this local directory instead of fetching it over OCI. Transitive dependencies are resolved from the configured/default registry. |
 | `--xr <string>` | _(required)_ | Path to the observed XR YAML. |
 | `--env <string>` | _(empty)_ | Path to a merged environment YAML. Its top-level keys become `out.input.environment` in the module. |
-| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 | `--required-resources <string>` | _(empty)_ | Path to a YAML file or directory of cluster objects matched against the module's emitted `out.requirements` selectors (mirrors `crossplane render --required-resources`). Multi-document files are split; objects are matched by selector, not keyed by filename. |
 
 **Output.** YAML to stdout: a `resources` map keyed by the author's resource
@@ -149,7 +150,7 @@ declares `#Status`.
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--dir <string>` | _(empty)_ | Serve the module from this local directory instead of fetching it over OCI. Transitive dependencies are resolved from the configured/default registry. |
-| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 | `-o`, `--output <string>` | _(empty)_ | Write the generated XRD to this file instead of stdout. |
 
 **Output.** XRD YAML to stdout, or to `--output`. Exits non-zero on a load
@@ -174,7 +175,7 @@ using the same CUE evaluation the runtime engine uses, applying `#Spec` defaults
 |------|---------|-------------|
 | `--module <string>` | _(empty)_ | Module reference (`path@version`) to validate against when fetching over OCI. |
 | `--dir <string>` | _(empty)_ | Serve the module from this local directory instead of fetching it over OCI. Transitive dependencies are resolved from the configured/default registry. |
-| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 
 **Output.** On a valid (or defaulted-but-omitted) XR, prints `<path>: valid` to
 stderr and exits zero. On the first violation (out-of-bounds, wrong enum,
@@ -202,7 +203,7 @@ pushes it. Recording the resolved digest is the author half of the
 |------|---------|-------------|
 | `--package <string>` | _(required)_ | Destination OCI reference for the Configuration package. |
 | `--dir <string>` | _(empty)_ | Build the XRD/Composition from this local module directory instead of fetching it over OCI. The digest is still resolved from the registry. |
-| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 | `--function-ref <string>` | `ghcr.io/meigma/function-cuefn` | cuefn Function package OCI ref recorded in the Configuration's `dependsOn`. |
 | `--function-name <string>` | _(last path segment of `--function-ref`)_ | In-cluster Function resource name the Composition references. |
 | `--function-version <string>` | `>=v0.0.0` | Semver constraint for the cuefn Function dependency. |

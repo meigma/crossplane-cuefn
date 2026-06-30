@@ -53,7 +53,7 @@ func newFunctionCommand(_ Options) *cobra.Command {
 	cmd.Flags().BoolVar(&f.insecure, "insecure", false,
 		"serve without mTLS credentials (development only; ignores --tls-certs-dir)")
 	cmd.Flags().StringVar(&f.cacheDir, "cache-dir", "",
-		"writable directory for the CUE module cache (defaults to CUE_CACHE_DIR or the OS cache)")
+		"writable directory for the CUE module cache (defaults to CUE_CACHE_DIR, the OS cache, then a temp dir)")
 	cmd.Flags().StringVar(&f.metricsAddress, "metrics-address", ":8080",
 		"address for the Prometheus metrics endpoint; pass an empty string to disable it")
 	cmd.Flags().BoolVarP(&f.debug, "debug", "d", false, "emit debug logs in addition to info logs")
