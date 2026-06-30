@@ -120,3 +120,54 @@ stray `kind-registry-*` (registry:2) container p1 left behind. Pre-existing
 `oidc-smoke` cluster + `dagger-engine` (2 days old) left untouched. ttl.sh +
 scratch are self-expiring. Per developer's choice this run is **report-only** — no
 repo changes; triage of fixes is a separate decision.
+
+## 2026-06-30 13:56 — Triage into a fix plan; landing PRs (ultracode)
+
+Developer chose: triage the 21 verified findings into PR-sized units and START
+landing them. Ran a grounding workflow (`wf_9f5cbbf3-41f`, 7 read-only
+maintainer-side investigators) to confirm each fix's root cause + exact files +
+size + decisions in the REAL source. All grounded except the **B2 investigator
+returned a degenerate stub** (`"test"` placeholders despite 110k tokens of real
+work — a StructuredOutput schema-gaming failure); B2 re-grounded inline by reading
+publish.go/composition.go/meta.go.
+
+**Fix plan (8 PRs + 1 cluster spike).** Code PRs first (independent), docs PRs
+sequenced after (they overlap configuration.md/cli.md/quickstart.md). Each PR =
+own `.wt/` worktree, squash-merge, human sign-off before merge.
+
+PRs landed for review:
+- **PR #40** `fix(render): fall back to a writable cache dir for the nonroot runtime`
+  (H2). `resolveCacheDir` takes the OS-user-cache lookup as a param, probes it via
+  MkdirAll, falls back to `<tmp>/cuefn-cache`. Precedence unchanged. Unit tests +
+  doc reframe (fresh install needs NO DRC; only readOnlyRootFilesystem does).
+  `moon run root:check` green.
+- **PR #41** `fix(schema): emit XRD defaults for required, fully-defaultable fields`
+  (H3 + M10). New `materializeDefaults` pass in `GenerateXRD` (after inline, before
+  selfCheck) sets `{}`/`[]` defaults on required empty-satisfiable fields. New
+  `nesteddefault` fixture; example/derisked XRDs byte-identical (xrd-check green).
+  Dropped an apiserver `defaulting` round-trip test — it dragged in
+  cel-go/antlr/etcd/apiserver (reverted go.mod); direct assertions + selfCheck
+  suffice. `moon run root:check` green.
+
+**Key grounding facts for the remaining PRs:**
+- **B2 (function name):** `cuefn publish` already has `--function-name`, defaulting
+  to `lastPathSegment(--function-ref)` = `function-cuefn`. composition.go comment
+  ASSUMES that matches the dependsOn-derived name — but Crossplane derives a
+  DIFFERENT name (persona saw `meigma-function-cuefn`), and the quickstart
+  hand-installs a THIRD (`cuefn`). **The one empirical unknown** = what
+  metadata.name Crossplane's pkg manager gives a `dependsOn.function:
+  ghcr.io/meigma/function-cuefn` auto-install. Needs a throwaway-cluster spike.
+  Decision (mine): compute the derived name (likely via crossplane-runtime
+  `xpkg.ToDNSLabel`) so a single `kubectl apply` of the Configuration resolves, no
+  hand-installed duplicate (also kills M5).
+- **B3 (env-configs):** composition.go ALWAYS prepends the env step; meta.go
+  dependsOn lists only cuefn. Fix = emit the env step (with selector) + add it to
+  dependsOn ONLY when `--environment-config` given (Option A). Shares the
+  dependsOn-naming unknown with B2.
+- **B1 (install refs):** docs/quickstart `function-cuefn:v0` 404s. Decision (mine):
+  pin to `:v0.1.1` + add to release-please `extra-files` for auto-bump (keep the
+  no-moving-tag, signed posture) rather than publish a mutable `:v0`.
+
+**Next:** a throwaway-kind spike to resolve the B2/B3 dependsOn-name question,
+then Wave-2 blocker PRs, then docs PRs (H1+M4, corrections), then polish
+(M7+L3+nit, M8). Paused here for developer review of #40/#41.
