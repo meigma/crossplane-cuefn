@@ -145,9 +145,9 @@ func NewOCILoader(cfg OCIConfig) (*OCILoader, error) {
 // from cache. A non-existent ref (404/NAME_UNKNOWN/MANIFEST_UNKNOWN) propagates
 // rather than falling back.
 func (o *OCILoader) Load(ctx context.Context, ref string) (Loaded, error) {
-	mv, err := module.ParseVersion(ref)
+	mv, err := parseModuleRef(ref)
 	if err != nil {
-		return Loaded{}, fmt.Errorf("invalid module reference %q (want path@version): %w", ref, err)
+		return Loaded{}, err
 	}
 
 	m, err := o.client.GetModule(ctx, mv)
@@ -171,6 +171,21 @@ func (o *OCILoader) Load(ctx context.Context, ref string) (Loaded, error) {
 	return o.loaded(dir), nil
 }
 
+// parseModuleRef parses an OCI module reference, replacing CUE's terse
+// "not canonical" error with one that names the real requirement: fetching a
+// module over OCI needs a full version (path@vX.Y.Z), whereas a major-only ref
+// like path@v0 works only with --dir, where the local loader ignores the version.
+func parseModuleRef(ref string) (module.Version, error) {
+	mv, err := module.ParseVersion(ref)
+	if err != nil {
+		return module.Version{}, fmt.Errorf(
+			"invalid module reference %q: fetching over OCI needs a full version like "+
+				"path@v0.1.0; a major-only ref like path@v0 works only with --dir: %w",
+			ref, err)
+	}
+	return mv, nil
+}
+
 // ResolveDigest resolves ref ("path@version") to its current OCI manifest digest
 // ("sha256:...") by querying the same registry the loader fetches modules from.
 // It is the publish-time half of the schema<->runtime digest lock-step: the
@@ -180,9 +195,9 @@ func (o *OCILoader) Load(ctx context.Context, ref string) (Loaded, error) {
 // registry surfaces as a clear error naming ref; no digest cache fallback is
 // used because publish must observe the live digest.
 func (o *OCILoader) ResolveDigest(ctx context.Context, ref string) (string, error) {
-	mv, err := module.ParseVersion(ref)
+	mv, err := parseModuleRef(ref)
 	if err != nil {
-		return "", fmt.Errorf("invalid module reference %q (want path@version): %w", ref, err)
+		return "", err
 	}
 
 	m, err := o.client.GetModule(ctx, mv)
