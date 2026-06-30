@@ -243,6 +243,11 @@ Without the rule the fetch silently returns nothing, the delivered bucket stays
 empty, and any guarded resource never renders — a silent under-render. See
 [why reads go through the core controller](../explanation/required-resources-fixpoint.md#reads-and-rbac).
 
+This grants the **read** side (`get`/`list`/`watch` on requested objects).
+Composing native kinds beyond the core workloads needs the separate **write**
+grant — see
+[configure the function runtime](configure-the-runtime.md#grant-rbac-for-composed-native-kinds).
+
 ## See also
 
 - [Required resources and the fixpoint](../explanation/required-resources-fixpoint.md)

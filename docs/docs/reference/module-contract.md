@@ -159,11 +159,11 @@ the same schema the XRD is generated from. The engine fills `out.input` by JSON
 marshalling, so an integral spec value (e.g. a `float64` replica count from
 YAML) unifies cleanly against a bounded integer field.
 
-`out.input.environment` is populated in-cluster by an upstream
-`function-environment-configs` step that merges the referenced
-`EnvironmentConfig` into the pipeline context (context key
-`apiextensions.crossplane.io/environment`). With `cuefn render`, the `--env` file
-supplies it directly.
+`out.input.environment` is populated in-cluster by a
+`function-environment-configs` step — present when the Configuration is published
+with `--environment-config` — that merges the referenced `EnvironmentConfig` into
+the pipeline context (context key `apiextensions.crossplane.io/environment`). With
+`cuefn render`, the `--env` file supplies it directly.
 
 ### Outputs the engine reads
 
@@ -224,6 +224,13 @@ The module's readiness hint maps to the runtime/render readiness as follows:
 | `"Ready"` | `"True"` | Ready |
 | `"NotReady"` | `"False"` | Not ready |
 | _(absent)_ | `Unspecified` | Unspecified |
+
+!!! warning "Conditionless resources need an explicit `ready` hint"
+    `Unspecified` defers to Crossplane's default readiness check, which waits for a
+    `Ready=True` **status condition** on the composed object. Objects with no such
+    condition — a ConfigMap, Secret, or PVC — therefore never report ready, so an
+    unmarked one holds the whole XR at `Ready=False` indefinitely. Mark such a
+    resource `ready: "Ready"` when its existence alone is sufficient.
 
 ## Requiring cluster resources
 
@@ -300,9 +307,9 @@ both work because the seeded value is a concrete list. See
 
 The contract above is published as a CUE module of **closed** definitions,
 `github.com/meigma/crossplane-cuefn/contract@v0`. Importing it and unifying your
-module against it validates the shape at author time (`cue vet` / editor) — a
-misspelled or unknown field is rejected before render. The example module adopts
-it:
+module against it validates the shape at author time (`cue vet -c=false` / editor)
+— a misspelled or unknown field is rejected before render. The example module
+adopts it:
 
 ```cue
 import "github.com/meigma/crossplane-cuefn/contract@v0"

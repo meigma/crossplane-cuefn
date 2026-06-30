@@ -70,9 +70,15 @@ out: contract.#Transform & {
 fails immediately:
 
 ```
-$ cue vet ./...
+$ cue vet -c=false ./...
 out.resorces: field not allowed
 ```
+
+Use `-c=false`: `cue vet` requires concreteness by default, and a module whose
+`#Spec` has a required field with no default is intentionally non-concrete until an
+XR supplies one — so bare `cue vet ./...` reports those fields as "incomplete" and
+exits non-zero on an otherwise-correct module. `-c=false` keeps the closedness
+check (the `field not allowed` error above) without the concreteness requirement.
 
 Without the contract, that typo is silently accepted and simply renders no
 resources at runtime. The same applies to an invalid `ready` hint (only `"Ready"`

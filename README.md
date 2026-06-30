@@ -35,10 +35,11 @@ a versioned Crossplane Configuration.
   it passes, or naming the first offending field and exiting non-zero.
 - `cuefn publish <module-ref> --package <oci-ref> [flags]` builds and pushes an
   installable Crossplane **Configuration** package (`xpkg`) from one CUE module in
-  a single command: it generates the XRD, builds a pipeline Composition wired to
-  `function-environment-configs` then `cuefn`, writes the package metadata
-  (`crossplane.yaml`, depending on the cuefn function), and pushes the assembled
-  package to the destination registry. The Composition records both the module's
+  a single command: it generates the XRD, builds a pipeline Composition (the
+  `cuefn` step, plus `function-environment-configs` when `--environment-config` is
+  given), writes the package metadata (`crossplane.yaml`, depending on the cuefn
+  function), and pushes the assembled package to the destination registry. The
+  Composition records both the module's
   semver ref **and** its resolved OCI manifest digest, so the runtime verifies the
   module has not drifted (the author half of the digest lock-step). `--insecure`
   pushes over plain HTTP for a local/dev registry; `--function-ref` /
@@ -87,7 +88,7 @@ To keep that one module honest, cuefn also ships an importable **module
 contract** — a separately versioned CUE module of closed definitions
 (`github.com/meigma/crossplane-cuefn/contract@v0`, on the CUE Central Registry)
 that authors unify their `#API` and `out` transform against, so a misspelled or
-unknown field is caught by `cue vet` at author time rather than at render.
+unknown field is caught by `cue vet -c=false` at author time rather than at render.
 Adoption is optional and the plain module renders identically.
 
 ## Loading modules from an OCI registry

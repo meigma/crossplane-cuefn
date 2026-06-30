@@ -39,7 +39,10 @@ On success: `pushed registry.example.com/xapp-configuration:v0.1.0`.
 | Flag | Use |
 |------|-----|
 | `--function-ref` | The cuefn Function package the Configuration depends on (default `ghcr.io/meigma/function-cuefn`). |
+| `--function-name` | In-cluster Function name the `cuefn` step references. Defaults to the name Crossplane derives for the `dependsOn` Function, so a single install resolves; override only if you install the Function under a different name. |
 | `--function-version` | Semver constraint for that dependency (default `>=v0.0.0`). |
+| `--environment-config` | Name of an EnvironmentConfig to merge (repeatable). Supplying any adds the `function-environment-configs` step and declares it in `dependsOn`. |
+| `--environment-config-function-ref` / `--environment-config-function-version` | Override the env-config function package/version recorded in `dependsOn` (defaults to crossplane-contrib's `function-environment-configs`). |
 | `--name` | Configuration `metadata.name` (default `<plural>-configuration`). |
 | `--crossplane-constraint` | Restrict the supported Crossplane version. |
 | `--dir` | Build the XRD/Composition from a local directory (digest still from the registry). |
@@ -56,6 +59,8 @@ docker pull registry.example.com/xapp-configuration:v0.1.0
 crossplane xpkg extract --from-daemon registry.example.com/xapp-configuration:v0.1.0 -o out.gz
 ```
 
-Install it alongside the Function, then instantiate XRs — see the
-[Quickstart](../quickstart.md). Full flag list:
+Install just the Configuration — its `dependsOn` auto-installs the function(s) —
+then instantiate XRs; see the [Quickstart](../quickstart.md). To point the
+in-cluster function at a non-central module registry, see
+[configure the function runtime](configure-the-runtime.md). Full flag list:
 [CLI reference](../reference/cli.md#publish).

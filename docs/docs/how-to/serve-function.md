@@ -53,5 +53,6 @@ If you harden the Deployment with a read-only root filesystem (no writable
 `/tmp`), mount an `emptyDir` and point `CUE_CACHE_DIR` at it.
 
 See [Configuration & environment](../reference/configuration.md) for the cache
-and registry details, and the [CLI reference](../reference/cli.md#function) for
-every flag.
+and registry details, the [CLI reference](../reference/cli.md#function) for every
+flag, and [configure the function runtime](configure-the-runtime.md) for setting
+these on the **installed** in-cluster Function.

@@ -39,7 +39,7 @@ mise run package-function -- --output function.xpkg
 ```sh
 cuefn publish-function \
   --runtime-image image.tar \
-  --package registry.example.com/function-cuefn:v0.1.0
+  --package registry.example.com/function-cuefn:v0.1.1
 ```
 
 ## Push a multi-arch index
@@ -51,7 +51,7 @@ multi-arch index. Pass `--runtime-image` once per arch base:
 cuefn publish-function \
   --runtime-image image-amd64.tar \
   --runtime-image image-arm64.tar \
-  --package registry.example.com/function-cuefn:v0.1.0
+  --package registry.example.com/function-cuefn:v0.1.1
 ```
 
 The destination registry must serve **HTTPS** (Crossplane's package manager is
