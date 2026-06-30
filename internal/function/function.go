@@ -89,6 +89,12 @@ func (f *Function) RunFunction(ctx context.Context, req *fnv1.RunFunctionRequest
 		return rsp, nil
 	}
 
+	required, err := request.GetRequiredResources(req)
+	if err != nil {
+		response.Fatal(rsp, errors.Wrap(err, "cannot get required resources"))
+		return rsp, nil
+	}
+
 	spec, _ := oxr.Resource.Object["spec"].(map[string]any)
 	inputs := render.Inputs{
 		Spec: spec,
@@ -96,7 +102,8 @@ func (f *Function) RunFunction(ctx context.Context, req *fnv1.RunFunctionRequest
 			Name:      oxr.Resource.GetName(),
 			Namespace: oxr.Resource.GetNamespace(),
 		},
-		Environment: environmentFromContext(req),
+		Environment:       environmentFromContext(req),
+		RequiredResources: requiredToInputs(required),
 	}
 
 	result, err := render.New(loader).Render(ctx, in.Module, inputs)
@@ -114,6 +121,19 @@ func (f *Function) RunFunction(ctx context.Context, req *fnv1.RunFunctionRequest
 		response.Fatal(rsp, errors.Wrap(err, "cannot patch desired composite status"))
 		return rsp, nil
 	}
+
+	// Emit the module's requirements on every successful call so Crossplane's
+	// per-call proto.Equal comparison detects the fixpoint. The capability check
+	// gates only the diagnostic Warning: a Crossplane that does not advertise
+	// CAPABILITY_REQUIRED_RESOURCES never iterates, so a module that hides
+	// resources behind a requirement guard would render empty forever.
+	if len(result.Requirements) > 0 &&
+		!request.HasCapability(req, fnv1.Capability_CAPABILITY_REQUIRED_RESOURCES) {
+		response.Warning(rsp, errors.New(
+			"module emitted required-resource requirements but Crossplane does not advertise "+
+				"CAPABILITY_REQUIRED_RESOURCES; they will be ignored"))
+	}
+	setRequirements(rsp, result)
 
 	response.Normalf(rsp, "rendered %d resource(s) from module %q", len(result.Resources), in.Module)
 	response.ConditionTrue(rsp, "FunctionSuccess", "Success").TargetComposite()
@@ -140,6 +160,62 @@ func setDesiredComposed(rsp *fnv1.RunFunctionResponse, req *fnv1.RunFunctionRequ
 	}
 
 	return response.SetDesiredComposedResources(rsp, desired)
+}
+
+// requiredToInputs flattens the required resources Crossplane delivered into the
+// plain map shape the engine consumes under out.input.requiredResources. It
+// returns nil when nothing was delivered (the genuinely-first pass), and
+// otherwise preserves an empty-but-present bucket — a name keyed to a non-nil
+// empty list — as the "requested, none found" signal the engine seed mirrors.
+func requiredToInputs(in map[string][]resource.Required) map[string][]map[string]any {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string][]map[string]any, len(in))
+	for name, items := range in {
+		objs := make([]map[string]any, 0, len(items))
+		for _, it := range items {
+			if it.Resource != nil {
+				objs = append(objs, it.Resource.Object)
+			}
+		}
+		out[name] = objs
+	}
+	return out
+}
+
+// setRequirements maps the selectors the module emitted under out.requirements
+// onto the response's current Requirements.Resources field (proto field 2, not
+// the deprecated extra_resources). It builds the selector map locally and
+// assigns it once; response.To does not pre-populate rsp.Requirements, so the
+// nil-guard is load-bearing. The engine's readRequirements already guarantees
+// exactly one of matchName/matchLabels is set, so a Match-less selector cannot
+// be emitted.
+func setRequirements(rsp *fnv1.RunFunctionResponse, result render.Result) {
+	if len(result.Requirements) == 0 {
+		return
+	}
+	resources := make(map[string]*fnv1.ResourceSelector, len(result.Requirements))
+	for name, r := range result.Requirements {
+		sel := &fnv1.ResourceSelector{ApiVersion: r.APIVersion, Kind: r.Kind}
+		if r.Namespace != "" {
+			ns := r.Namespace
+			sel.Namespace = &ns
+		}
+		switch {
+		case r.MatchName != "":
+			sel.Match = &fnv1.ResourceSelector_MatchName{MatchName: r.MatchName}
+		case len(r.MatchLabels) > 0:
+			sel.Match = &fnv1.ResourceSelector_MatchLabels{
+				MatchLabels: &fnv1.MatchLabels{Labels: r.MatchLabels},
+			}
+		}
+		resources[name] = sel
+	}
+	if rsp.GetRequirements() == nil {
+		rsp.Requirements = &fnv1.Requirements{}
+	}
+	rsp.Requirements.Resources = resources
 }
 
 // setCompositeStatus patches the module's status under the desired composite's
