@@ -243,3 +243,17 @@ the gate in fresh worktrees.
 Next after #31 merges: `test(contract)` closedness PR, then PR2 `feat(render)` (the
 engine seed + readRequirements + Inputs.RequiredResources) — plan to orchestrate
 the heavier PR2/PR3 with workflows.
+
+## 2026-06-30 — #31 merged; #33 (test) open; PR2 workflow launched
+- **PR #31 merged** (squash `2a87871`); master ff'd; worktree removed.
+  release-please should raise a `contract/v0.2.0` release PR (likely #32).
+- **PR #33 open** — `test(contract): cover required-resources closedness`
+  (internal/contract only, non-bumping). Verified: `root:check` green. Awaiting
+  sign-off. Worktree `.wt/test-contract-required-resources-closedness` still live.
+- **PR2 `feat(render)` workflow launched** (`wf_e2b1be2e-5f2`) in worktree
+  `.wt/feat-render-required-resources` (off 2a87871): implement (engine seed +
+  readRequirements + Inputs.RequiredResources + Result.Requirements + Render
+  reorder + import-free testdata/required fixture + HermeticRequiredModuleDir +
+  5 render unit tests) → adversarial verify (correctness / hexagonal-purity-scope
+  / fixture-tests) → fix. I run the real gate + open the PR2 PR myself after it
+  returns. Scope locked to internal/render/** + internal/test/common/**.
