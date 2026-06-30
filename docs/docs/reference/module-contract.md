@@ -218,6 +218,26 @@ The module's readiness hint maps to the runtime/render readiness as follows:
 | `"NotReady"` | `"False"` | Not ready |
 | _(absent)_ | `Unspecified` | Unspecified |
 
+## Author-time validation with the contract module
+
+The contract above is published as a CUE module of **closed** definitions,
+`github.com/meigma/crossplane-cuefn/contract@v0`. Importing it and unifying your
+module against it validates the shape at author time (`cue vet` / editor) — a
+misspelled or unknown field is rejected before render. The example module adopts
+it:
+
+```cue
+import "github.com/meigma/crossplane-cuefn/contract@v0"
+
+#API: contract.#API & {group: "platform.meigma.io", version: "v1alpha1", kind: "XApp", plural: "xapps"}
+out: contract.#Transform & {input: {/* ... */}, resources: {/* ... */}, status: #Status & {/* ... */}}
+```
+
+`#Spec` and `#Status` are **not** wrapped — they are your own schemas and feed the
+XRD codegen. Adoption is optional (the plain shape renders identically); it adds
+the in-editor guarantee. See
+[How to enforce the module contract](../how-to/enforce-the-contract.md).
+
 ## What a render produces
 
 Rendering the example module against `example/xr.yaml` (`replicas: 2`) with no

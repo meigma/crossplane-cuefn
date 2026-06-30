@@ -42,6 +42,7 @@ nav:
       - Render a module locally: how-to/render-locally.md
       - Generate an XRD: how-to/generate-xrd.md
       - Validate an XR: how-to/validate-xr.md
+      - Enforce the module contract: how-to/enforce-the-contract.md
       - Publish a Configuration: how-to/publish-configuration.md
       - Publish the Function: how-to/publish-function.md
       - Serve the function: how-to/serve-function.md

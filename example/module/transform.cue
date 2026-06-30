@@ -3,12 +3,15 @@ package app
 import (
 	appsv1 "cue.dev/x/k8s.io/api/apps/v1"
 	corev1 "cue.dev/x/k8s.io/api/core/v1"
+	"github.com/meigma/crossplane-cuefn/contract@v0"
 )
 
-// out is the cuefn transform: the engine fills out.input with the observed XR
-// spec/metadata/environment and reads out.resources and out.status. The schema
-// definitions (#API/#Spec/#Status) stay top-level in api.cue.
-out: {
+// out is the cuefn transform, unified against the contract's closed #Transform so
+// the whole shape is validated at author time (cue vet) — a misspelled or unknown
+// field is rejected in the editor. The engine fills out.input and reads
+// out.resources and out.status; the schema definitions (#API/#Spec/#Status) stay
+// top-level in api.cue and are deliberately not wrapped.
+out: contract.#Transform & {
 	// input is filled by the engine with the observed XR spec (validated against
 	// #Spec), its metadata, and the merged environment. Defaults keep metadata and
 	// environment concrete even when the caller omits them.
@@ -17,7 +20,6 @@ out: {
 		metadata: {
 			name:       string | *"app"
 			namespace?: string
-			...
 		}
 		environment: {
 			tier: string | *"unset"
