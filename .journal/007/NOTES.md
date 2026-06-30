@@ -166,3 +166,38 @@ Worktree `build/release-archives-drop-ghd`. PR **#48**.
   against the actual `artifacts.json` — all pass. `goreleaser check` clean. `moon run
   root:check` green (11 tasks). CI watching (release-dry-run is the real exerciser).
 - Phase 1 touches NO product code (release infra only) → `build` type, cuts no release.
+
+## 2026-06-30 16:55 — Phase 1 merged; Phase 2 (brew + scoop) shipped to PR
+
+**Phase 1 (#48) merged** (LGTM): squash, master ff `fa199da..6153b52`, worktree removed.
+
+**Tap auth:** developer pointed to 1Password `Homelab` vault item "Meigma scoop/tap
+token" (a SECURE_NOTE, concealed field `token`). Read via `op item get … --fields
+label=token --reveal` (piped, never printed) → set BOTH `HOMEBREW_TAP_TOKEN` and
+`SCOOP_BUCKET_TOKEN` GitHub repo secrets to that one token (matches blob-cli's
+two-var convention). `op whoami` reported not-signed-in but `op item get` worked
+(desktop-app integration).
+
+**Phase 2 (#49)** — worktree `feat/brew-scoop-publish`:
+- `.goreleaser.yaml`: `brews` FORMULA (mac+linux, `bin.install "cuefn"`) + `scoops`
+  (windows/amd64, `cuefn.exe`). Both need an explicit **`url_template`** because
+  `release.disable` blocks URL derivation (the build errored without it —
+  "release is disabled, cannot use default url_template"). `skip_upload: auto`.
+- **`release-distribute.yml`** (new): tap push runs on the **`released`** event
+  (post-publish, so asset URLs resolve), NOT at tag time — fits draft-first. Runs
+  `goreleaser release --clean --skip=before,sbom`; `release.disable` keeps the GH
+  release untouched, only brew/scoop pushes run, via the two tap tokens.
+- **Reproducibility VERIFIED** (the linchpin of the rebuild approach): two
+  independent `goreleaser` builds at the same commit → byte-identical
+  `checksums.txt`. So the post-publish rebuild's hashes match the published assets.
+- `release-dry-run.yml`: added a snapshot tap-generation rehearsal (asserts formula
+  mac+linux blocks/install/url + scoop zip/exe) — would have caught the url_template
+  error; added `release-distribute` to the change-detect filter.
+- Verified locally: `goreleaser check` clean; generated + inspected the real
+  formula (`dist/homebrew/Formula/cuefn.rb`) + manifest (`dist/scoop/cuefn.json`);
+  replayed the dry-run validation — all pass.
+- **GoReleaser `brews` is deprecation-warned** (→ homebrew_casks), but casks are
+  macOS-only; `brews` is the only goreleaser path to a Linux formula. Risk noted.
+- `feat` type → will cut a release (which then exercises the whole publish→taps loop).
+- **Docs deferred to Phase 4** (mise + unified brew/scoop/nix/mise install docs).
+- CI watching (#49). Next: P3 nix flake, P4 mise + docs.
