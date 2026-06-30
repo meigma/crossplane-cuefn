@@ -293,3 +293,21 @@ added), fixed a gofumpt line-wrap on seedRequiredResources, ran `root:check` GRE
 product `0.2.0` release PR. Do NOT merge it mid-rollout — render-only is a
 half-wired feature. Hold product release until PR3 (function) + PR4 (cli) land.
 (Contract releases were safe to publish; product release waits for code-complete.)
+
+## 2026-06-30 — PR2 merged; PR3 (feat function) opened: #36
+PR2 (#34) merged → master `7625170`. release-please opened **#35 `chore(master):
+release 0.1.1`** (product: feat→PATCH in 0.x via bump-patch-for-minor-pre-major) —
+HELD until code-complete.
+
+PR3 workflow `wf_8a2a0b3f-0f7` (4 agents, 0 findings) implemented the function
+adapter in `.wt/feat-function-required-resources`: `requiredToInputs`
+(request.GetRequiredResources → Inputs.RequiredResources, empty-but-present
+preserved), `setRequirements` (Result.Requirements → rsp.Requirements.Resources,
+CURRENT field, oneof + *string ns, built local + assigned once), unconditional
+emission + HasCapability-gated Warning. 5 function unit tests + import-free
+matchlabels/invalidreq fixtures. SDK signatures verified vs v0.7.1 source.
+
+I reviewed the diff (faithful, all proto in function), hit a real `protogetter`
+lint (`rsp.Requirements == nil` → use `rsp.GetRequirements()`) → refactored
+setRequirements to build a local map + read via getter. Re-ran: lint 0 issues,
+`root:check` GREEN. **PR #36 open**, CI watching (bg). Merge when green.
