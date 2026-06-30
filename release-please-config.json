@@ -12,7 +12,8 @@
     ".": {
       "package-name": "crossplane-cuefn",
       "changelog-path": "CHANGELOG.md",
-      "extra-files": ["melange.yaml", "apko.yaml"]
+      "extra-files": ["melange.yaml", "apko.yaml"],
+      "exclude-paths": ["contract"]
     },
     "contract": {
       "release-type": "simple",
@@ -20,7 +21,9 @@
       "package-name": "contract",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
-      "tag-separator": "/"
+      "tag-separator": "/",
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": false
     }
   },
   "changelog-sections": [
