@@ -577,3 +577,58 @@ missing → key-present-empty). Use the CURRENT wire field `Requirements.Resourc
 - **Enforcement stays author-time-only at the contract layer** (the engine does not
   embed the contract). Carried follow-up: a function-side runtime check of a module's
   imported contract major — only matters when the function/contract reach `v1`.
+
+## Session 006 — DX hardening (product v0.1.2, PRs #40–#46)
+
+A 6-persona consumer-impersonation DX sweep (`.journal/006/DX-REPORT.md`) found the
+documented install path was broken end-to-end. The fixes below changed durable
+behavior — read before touching publish/install, the cache, or codegen.
+
+- **Configuration install is single-apply now (#44).** Crossplane installs a
+  `dependsOn` Function under a DERIVED name = `xpkg.ToDNSLabel(name.ParseReference(ref)
+  .Context().RepositoryStr())` — host-stripped, DNS-labelized, **no hash**
+  (`ghcr.io/meigma/function-cuefn` → `meigma-function-cuefn`). `pkg.DerivedFunctionName`
+  (`internal/pkg/names.go`) computes it; `cuefn publish` defaults the Composition's
+  `functionRef.name` to it, so ONE `kubectl apply` of the Configuration resolves the
+  step with no hand-installed Function. **Never hand-install a Function on the same
+  package source** — the package Lock dedups by **source**, so a duplicate bricks every
+  package ("node … already exists"). `--function-name` still overrides. Proven on a
+  live cluster (the spike); `TestDerivedFunctionName` pins the mappings.
+- **`function-environment-configs` is conditional (#44).** Emitted only with
+  `cuefn publish --environment-config <name>` — then with a selector, its own derived
+  functionRef name, AND a 2nd `dependsOn` entry to
+  `xpkg.crossplane.io/crossplane-contrib/function-environment-configs`
+  (`--environment-config-function-ref/-version` flags, default `>=v0.7.2`). The default
+  Configuration is a single cuefn step. (Was always-emitted + never in dependsOn →
+  first reconcile failed "cannot find an active FunctionRevision".)
+- **Function renders with no DRC (#40).** `render.resolveCacheDir` probes the OS user
+  cache via MkdirAll and falls back to `<tmp>/cuefn-cache` when uncreatable (the nonroot
+  read-only-root `/.cache` case). Precedence: explicit `--cache-dir` > `CUE_CACHE_DIR` >
+  OS cache > temp. Only a hardened `readOnlyRootFilesystem` deployment still needs
+  `CUE_CACHE_DIR` + an `emptyDir`.
+- **XRD codegen emits defaults for required-defaultable fields (#41).**
+  `internal/schema/materializeDefaults` (in `GenerateXRD`, after `$ref` inline, before
+  `selfCheck`) sets `{}`/`[]` defaults on required, empty-satisfiable fields (a
+  fully-defaultable struct, a keyless map, a zero-min list) so the apiserver accepts
+  `spec: {}` exactly as CUE does — restoring the no-drift guarantee. Genuinely-required
+  (no-default scalar, `minItems>0`) is left required. Example/derisked XRDs are
+  byte-identical (no required containers there).
+- **CUE error formatting (#45):** `internal/cueerr.Wrap` walks CUE's structured
+  `errors.Errors` (not the rendered tree), drops the "empty disjunction" wrapper + the
+  misleading default-branch "conflicting values", dedupes, preserves `Unwrap`. Replaced
+  the duplicated `wrapCUE` in `internal/render` (engine.go, load.go) + `internal/schema`.
+- **Author + ops docs (#46):** the correct author check is **`cue vet -c=false ./...`**
+  (bare `cue vet` fails on a required-no-default field). New how-to
+  `docs/docs/how-to/configure-the-runtime.md` — in-cluster `DeploymentRuntimeConfig`
+  (`CUE_REGISTRY` PREFIX form keeps central as fallback; container name
+  `package-runtime`; bound via `runtimeConfigRef`) + the write-side RBAC for composed
+  native kinds (aggregate-to-crossplane). **B1:** committed function refs are pinned and
+  auto-bumped — `example/{functions,deploy/functions}.yaml` carry
+  `# x-release-please-version` and are in the root component's `extra-files` (proven:
+  auto-bumped to `function-cuefn:v0.1.2`).
+- **No moving `:v0`/`:latest` tag by design** — refs are pinned + release-please-bumped.
+  Deferred (not bugs): M1 per-Input registry routing; M3 render `--strict` #Spec guard;
+  L3 "incomplete value" wording; `CUEFN_*` env not wired (only `CUE_*` work);
+  `additionalProperties:false` is deliberately prune-not-reject; the
+  `example/deploy/functions.yaml` self-host Function name still `cuefn` (mismatches the
+  derived `function-cuefn` for that path).

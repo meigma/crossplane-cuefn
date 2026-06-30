@@ -281,3 +281,21 @@ Open for the maintainer / future sessions: publish the draft GitHub releases
 feature, M3 render `--strict`, L3, additionalProperties, CUEFN_* env, the
 example/deploy self-host Function-name nuance); Dependabot #1/#2; session-001
 DESIGN/PLAN still flagged temporary.
+
+## 2026-06-30 15:37 — Close
+
+Session closed. All work landed; nothing left in flight.
+
+- **Merged (squash):** #40 (H2), #41 (H3/M10), #43 (M8), #44 (B2/B3/M5/M6/M12),
+  #45 (M7/nit), #46 (docs B1/M9/M11/L1/L2/M2/M4/H1), + release #42 → product
+  **v0.1.2** (release pipeline green; GitHub release left a DRAFT).
+- **master** ff'd to `2e43b8a`; all implementation worktrees removed (only the
+  journal worktree remains).
+- **Recorded:** `.journal/006/SUMMARY.md`, `INDEX.md` (006 → complete),
+  `TECH_NOTES.md` ("Session 006 — DX hardening (v0.1.2)"), this entry.
+- **Hand-off / open:** publish the draft GitHub releases (v0.1.2 + older drafts);
+  deferred items (M1 per-Input registry, M3 render --strict, L3, CUEFN_* env,
+  additionalProperties, example/deploy self-host name); a future coverage sweep
+  (day-2/teardown/upgrades/claims/private registries/connection-secrets/observability);
+  Dependabot #1/#2; session-001 DESIGN/PLAN temp files; a stray untracked
+  `xr.yaml` (XCfg, not session work) in the repo root.
