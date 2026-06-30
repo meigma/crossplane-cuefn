@@ -95,3 +95,43 @@ norm.
 
 Done. README revamp shipped. No release cut (docs-only). Session otherwise idle —
 awaiting any next request.
+
+## 2026-06-30 16:18 — CLI distribution investigation (brew/scoop/nix/aqua)
+
+Developer's next goal: make the `cuefn` CLI readily installable via (1) Brew,
+(2) Nix (self-hosted, no nixpkgs PR), (3) Scoop, (4) aqua/asdf (aqua preferred,
+for mise integration). Existing org infra: `meigma/homebrew-tap` + `meigma/scoop-bucket`.
+Mid-investigation the developer added: **remove `ghd.toml` in this PR** (internal
+Meigma format, not broadly used).
+
+Investigation-only request ("what would it take"). Grounded in the repo's release
+pipeline + 2 current-docs research agents (aqua/mise; self-hosted nix). Full writeup:
+**`.journal/007/DISTRIBUTION.md`**. Headline findings:
+
+- **Draft-first releases are the universal blocker:** brew/scoop/aqua/mise-github and
+  any nix *binary*-fetch all resolve `releases/download/<tag>/…`, which 404s on a draft.
+  They only work once the maintainer **publishes**. (In-repo nix *source* flake is the
+  only asset-independent path.)
+- **Removing ghd.toml unblocks archive format** (ghd.toml + the staging script were the
+  only raw-binary consumers). Recommend switching to tar.gz/zip (blob-cli convention),
+  cleaner for every channel. Blast radius is release-infra only: ghd.toml, the staging
+  script + test, release.yml stage step, release-dry-run validation, moon.yml input,
+  the `ghd download` summary line.
+- **mise integration is ≈ free** via the **`github:` backend** (`mise use
+  github:meigma/crossplane-cuefn`, `bin=cuefn`) — zero registry, and it **verifies our
+  existing SLSA/attestations** by default. (`ubi:` is deprecated + unverified.)
+- **Nix:** in-repo `flake.nix` + `buildGoModule` (source build) — no 2nd repo/token,
+  immune to draft-first, ~zero per-release toil (vendorHash tracks go.sum). GoReleaser
+  nix publisher REJECTED (can't consume raw binaries; needs published releases).
+- **aqua proper:** custom in-repo `registry.yaml` (`type: github_content`, no upstream
+  PR) for aqua-CLI users; optional upstream `aquaproj/aqua-registry` PR for `aqua g -i`
+  discoverability. asdf = skip (heaviest, unverified).
+- **Auth:** reuse `MEIGMA_RELEASE_APP` via `create-github-app-token` scoped to the tap
+  repos (confirm App installed there) vs blob-cli's `HOMEBREW_TAP_TOKEN`/`SCOOP_BUCKET_TOKEN`.
+- **Pipeline tension:** GoReleaser publishers are publish-phase (skipped by today's
+  `--skip=publish`). Feed taps from a **post-publish** job (`on: release: released`).
+- **Windows build** is new (Scoop only).
+
+Presented decisions back to developer (archive format; brew cask vs formula; aqua depth;
+make publish routine; implement-now vs plan-only). Awaiting their direction. NO code
+changes yet — investigation only; no worktree opened for this.
