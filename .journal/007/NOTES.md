@@ -135,3 +135,34 @@ pipeline + 2 current-docs research agents (aqua/mise; self-hosted nix). Full wri
 Presented decisions back to developer (archive format; brew cask vs formula; aqua depth;
 make publish routine; implement-now vs plan-only). Awaiting their direction. NO code
 changes yet — investigation only; no worktree opened for this.
+
+### Developer decisions (AskUserQuestion)
+- **Implement, phased.** **Drop aqua entirely — keep mise pure** (native `github:`
+  backend only). **tar.gz/zip archives.** **Homebrew FORMULA** (not cask; mac+linux).
+  aqua depth = mise github doc only.
+- Phase plan: P1 release artifacts (archives+windows+drop ghd) → P2 brew formula +
+  scoop (post-publish job) → P3 nix flake → P4 mise + install docs. One PR per phase,
+  sign-off before merge.
+- Prerequisite flagged to developer (gates P2 CI only): tap push needs `MEIGMA_RELEASE_APP`
+  installed on homebrew-tap + scoop-bucket, OR `HOMEBREW_TAP_TOKEN`/`SCOOP_BUCKET_TOKEN`
+  available to this repo.
+
+## 2026-06-30 16:35 — Phase 1 shipped to PR (release artifacts + drop ghd)
+
+Worktree `build/release-archives-drop-ghd`. PR **#48**.
+- `.goreleaser.yaml`: raw `formats:[binary]` → **tar.gz (unix) + zip (windows)** via
+  `format_overrides`; archives bundle `LICENSE-*` + `README.md`; added **windows/amd64**
+  build (ignore windows/arm64); SBOMs per-archive; checksums now cover archives (so the
+  SLSA attestation subjects = the downloaded artifacts).
+- **ghd removed:** `ghd.toml` + `.github/scripts/stage_ghd_release_assets.py` (+test).
+  `release.yml`: dropped the staging step; draft upload now selects Archive/SBOM/Checksum
+  from `dist/artifacts.json`; smoke test + inspection summary reworked off ghd; checksums
+  artifact path → `dist/checksums.txt`. `release-dry-run.yml`: ghd-pattern validation →
+  archive validation (5 archives/5 sboms/checksums + per-platform presence); dropped
+  ghd from change-detect filter. `moon.yml`: dropped ghd input. Net −604 lines.
+- **Verified with a real `goreleaser release --snapshot --clean`:** correct dist/ layout;
+  archives contain `cuefn`(.exe)+dual LICENSE+README; binary version-stamps; replayed all
+  new workflow shell logic (upload 11 assets, smoke host lookup, dry-run validation loop)
+  against the actual `artifacts.json` — all pass. `goreleaser check` clean. `moon run
+  root:check` green (11 tasks). CI watching (release-dry-run is the real exerciser).
+- Phase 1 touches NO product code (release infra only) → `build` type, cuts no release.
