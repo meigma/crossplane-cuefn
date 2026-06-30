@@ -113,11 +113,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
-      - name: Stage and validate ghd release assets
-        env:
-          RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
-        run: python3 .github/scripts/stage_ghd_release_assets.py --tag "$RELEASE_TAG"
-
       - name: Smoke test release binary
         env:
           RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
@@ -128,11 +123,13 @@ jobs:
           binary_name="cuefn"
           host_os="$(go env GOHOSTOS)"
           host_arch="$(go env GOHOSTARCH)"
-          bin="dist/release-assets/${binary_name}_${version}_${host_os}_${host_arch}"
+          bin="$(jq -r --arg os "$host_os" --arg arch "$host_arch" \
+            '.[] | select(.type == "Binary" and .goos == $os and .goarch == $arch) | .path' \
+            dist/artifacts.json | head -n1)"
 
-          if [ ! -x "$bin" ]; then
-            echo "failed to locate executable host binary artifact $bin" >&2
-            find dist/release-assets -maxdepth 1 -type f -print | sort >&2
+          if [ -z "$bin" ] || [ ! -x "$bin" ]; then
+            echo "failed to locate executable host binary for ${host_os}/${host_arch}" >&2
+            jq -r '.[] | select(.type == "Binary") | .path' dist/artifacts.json >&2
             exit 1
           fi
 
@@ -148,13 +145,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.resolve-release.outputs.tag }}
-        run: gh release upload "$RELEASE_TAG" dist/release-assets/* --clobber
+        run: |
+          set -euo pipefail
+
+          # Publishable artifacts: the per-platform archives, their SBOMs, and the
+          # checksums file. The raw Binary and Metadata artifacts stay in dist/.
+          mapfile -t assets < <(jq -r \
+            '.[] | select(.type == "Archive" or .type == "SBOM" or .type == "Checksum") | .path' \
+            dist/artifacts.json)
+
+          if [ "${#assets[@]}" -eq 0 ]; then
+            echo "no release assets found in dist/artifacts.json" >&2
+            exit 1
+          fi
+
+          printf 'uploading %d assets:\n' "${#assets[@]}"
+          printf '  %s\n' "${assets[@]}"
+          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
 
       - name: Upload checksums for isolated attestation
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: release-checksums
-          path: dist/release-assets/checksums.txt
+          path: dist/checksums.txt
           if-no-files-found: error
           retention-days: 1
 
@@ -572,9 +585,9 @@ jobs:
             echo
             echo '```sh'
             echo "gh release view $RELEASE_TAG --repo $GITHUB_REPOSITORY --json isDraft,assets"
-            echo "asset=\"cuefn_${RELEASE_VERSION}_\$(go env GOOS)_\$(go env GOARCH)\""
-            echo "gh attestation verify \"dist/release-assets/\${asset}\" --repo \"$GITHUB_REPOSITORY\" --signer-workflow \"$GITHUB_REPOSITORY/.github/workflows/attest.yml\" --source-ref \"refs/tags/$RELEASE_TAG\" --deny-self-hosted-runners"
-            echo "ghd download \"$GITHUB_REPOSITORY/cuefn@${RELEASE_VERSION}\" --output \"\$(mktemp -d)\""
+            echo "asset=\"cuefn_${RELEASE_VERSION}_\$(go env GOOS)_\$(go env GOARCH).tar.gz\""
+            echo "gh release download \"$RELEASE_TAG\" --repo \"$GITHUB_REPOSITORY\" --pattern \"\$asset\""
+            echo "gh attestation verify \"\$asset\" --repo \"$GITHUB_REPOSITORY\" --signer-workflow \"$GITHUB_REPOSITORY/.github/workflows/attest.yml\" --source-ref \"refs/tags/$RELEASE_TAG\" --deny-self-hosted-runners"
             echo '```'
             echo
             echo "Container verification commands:"
