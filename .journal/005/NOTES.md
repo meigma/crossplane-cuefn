@@ -257,3 +257,17 @@ the heavier PR2/PR3 with workflows.
   5 render unit tests) → adversarial verify (correctness / hexagonal-purity-scope
   / fixture-tests) → fix. I run the real gate + open the PR2 PR myself after it
   returns. Scope locked to internal/render/** + internal/test/common/**.
+
+## 2026-06-30 — Merge autonomy granted; contract phase fully landed
+Developer: "You have autonomy to merge PRs as they are approved by me. Please do
+not wait for me to do it." → Saved as memory [[merge-approved-prs-autonomously]]
++ [[crossplane-cuefn-pr-merge-workflow]] (squash + prune/ff/wt-remove mechanics).
+Going forward I perform the merge myself once a PR is approved + green.
+
+Acted on it: merged **#33** (test contract) and **#32** (`chore(master): release
+contract 0.2.0`, release-please) — both green/CLEAN. `master` at `68792eb`. Tag
+`contract/v0.2.0` pushed → `release-contract.yml` OIDC publish to the CUE Central
+Registry **in_progress** (v0.1.0's run previously succeeded). Test worktree removed.
+
+Contract phase COMPLETE: source (#31) + closedness test (#33) + published v0.2.0
+(#32). PR2 `feat(render)` workflow still running.
