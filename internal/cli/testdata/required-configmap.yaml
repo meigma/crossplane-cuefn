@@ -1,0 +1,12 @@
+# The cluster object supplied to `cuefn render --required-resources`. It matches
+# the required fixture's cfg selector (ConfigMap named app-cfg in the demo XR's
+# namespace), so the second render pass surfaces it under
+# input.requiredResources.cfg and the guarded Deployment renders with its
+# data.image.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-cfg
+  namespace: default
+data:
+  image: img:test

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
@@ -13,10 +14,11 @@ import (
 
 // renderFlags holds the flags for the render subcommand.
 type renderFlags struct {
-	dir      string
-	cacheDir string
-	xr       string
-	env      string
+	dir               string
+	cacheDir          string
+	xr                string
+	env               string
+	requiredResources string
 }
 
 // newRenderCommand builds the `cuefn render` subcommand: a cluster-free,
@@ -48,6 +50,9 @@ func newRenderCommand(options Options) *cobra.Command {
 		"directory for the CUE module cache and dependency downloads (overrides CUE_CACHE_DIR)")
 	cmd.Flags().StringVar(&f.xr, "xr", "", "path to the observed XR YAML (required)")
 	cmd.Flags().StringVar(&f.env, "env", "", "path to a merged environment YAML (optional)")
+	cmd.Flags().StringVar(&f.requiredResources, "required-resources", "",
+		"path to a YAML file or directory of cluster objects matched against the "+
+			"module's emitted requirements (mirrors crossplane render --required-resources)")
 	_ = cmd.MarkFlagRequired("xr")
 
 	return cmd
@@ -65,9 +70,34 @@ func runRender(ctx context.Context, options Options, f renderFlags, ref string) 
 		return err
 	}
 
+	// A flat bag of real cluster objects (file or directory), nil when the flag
+	// is unset.
+	objs, err := loadRequiredObjects(f.requiredResources)
+	if err != nil {
+		return err
+	}
+
 	result, err := render.New(loader).Render(ctx, ref, inputs)
 	if err != nil {
 		return fmt.Errorf("cannot render module %q: %w", ref, err)
+	}
+
+	// Requirements are by design a pure function of stable inputs, so the offline
+	// loop provably converges in exactly two passes: render to discover the
+	// emitted selectors, match the supplied objects against them, then re-render
+	// with the matched objects delivered. We assert stabilization the way
+	// Crossplane does rather than silently print a bogus render.
+	if len(objs) > 0 && len(result.Requirements) > 0 {
+		inputs.RequiredResources = matchRequirements(objs, result.Requirements)
+		second, err := render.New(loader).Render(ctx, ref, inputs)
+		if err != nil {
+			return fmt.Errorf("cannot render module %q: %w", ref, err)
+		}
+		if !reflect.DeepEqual(second.Requirements, result.Requirements) {
+			return fmt.Errorf("requirements did not stabilize for module %q: "+
+				"out.requirements must be a pure function of stable inputs", ref)
+		}
+		result = second
 	}
 
 	return printRenderResult(options, result)
@@ -128,11 +158,24 @@ type renderResource struct {
 	Object map[string]any `json:"object"`
 }
 
-// renderOutput is the printed shape of a render: the author-keyed resources and
-// the optional composite status.
+// renderRequirement is the printed shape of one selector the module emitted
+// under out.requirements, so authors discover what to supply via
+// --required-resources even when they pass none.
+type renderRequirement struct {
+	APIVersion  string            `json:"apiVersion"`
+	Kind        string            `json:"kind"`
+	MatchName   string            `json:"matchName,omitempty"`
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+	Namespace   string            `json:"namespace,omitempty"`
+}
+
+// renderOutput is the printed shape of a render: the author-keyed resources, the
+// optional emitted requirements, and the optional composite status. Requirements
+// is omitempty so the golden output of modules without requirements is unchanged.
 type renderOutput struct {
-	Resources map[string]renderResource `json:"resources"`
-	Status    map[string]any            `json:"status,omitempty"`
+	Resources    map[string]renderResource    `json:"resources"`
+	Requirements map[string]renderRequirement `json:"requirements,omitempty"`
+	Status       map[string]any               `json:"status,omitempty"`
 }
 
 // printRenderResult marshals the render result to deterministic YAML and writes
@@ -141,6 +184,18 @@ func printRenderResult(options Options, result render.Result) error {
 	out := renderOutput{Resources: make(map[string]renderResource, len(result.Resources)), Status: result.Status}
 	for name, r := range result.Resources {
 		out.Resources[name] = renderResource{Ready: string(r.Ready), Object: r.Object}
+	}
+	if len(result.Requirements) > 0 {
+		out.Requirements = make(map[string]renderRequirement, len(result.Requirements))
+		for name, r := range result.Requirements {
+			out.Requirements[name] = renderRequirement{
+				APIVersion:  r.APIVersion,
+				Kind:        r.Kind,
+				MatchName:   r.MatchName,
+				MatchLabels: r.MatchLabels,
+				Namespace:   r.Namespace,
+			}
+		}
 	}
 
 	data, err := yaml.Marshal(out)

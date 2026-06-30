@@ -63,6 +63,104 @@ func TestRenderCommand_ExampleModule(t *testing.T) {
 	assert.Equal(t, "production", data["tier"])
 }
 
+// TestRenderCommand_EmitsRequirements proves that, even with no
+// --required-resources supplied, `cuefn render` prints the selectors the module
+// emitted under out.requirements (so authors discover what to supply) and that
+// the data-dependent resource is omitted on the first pass (the seeded empty
+// bucket).
+func TestRenderCommand_EmitsRequirements(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	root := NewRootCommand(Options{Out: &stdout})
+	root.SetArgs([]string{
+		"render", "cuefn.example/required@v0.1.0",
+		"--dir", "../test/common/testdata/required",
+		"--xr", "testdata/xr-required.yaml",
+	})
+
+	require.NoError(t, root.ExecuteContext(context.Background()))
+
+	var out struct {
+		Resources    map[string]any `json:"resources"`
+		Requirements map[string]struct {
+			APIVersion string `json:"apiVersion"`
+			Kind       string `json:"kind"`
+			MatchName  string `json:"matchName"`
+			Namespace  string `json:"namespace"`
+		} `json:"requirements"`
+	}
+	require.NoError(t, yaml.Unmarshal(stdout.Bytes(), &out))
+
+	// The emitted requirement is surfaced so the author learns what to supply.
+	require.Contains(t, out.Requirements, "cfg")
+	cfg := out.Requirements["cfg"]
+	assert.Equal(t, "v1", cfg.APIVersion)
+	assert.Equal(t, "ConfigMap", cfg.Kind)
+	assert.Equal(t, "app-cfg", cfg.MatchName)
+	assert.Equal(t, "default", cfg.Namespace)
+
+	// The guarded Deployment is omitted on the first pass (empty seeded bucket).
+	assert.NotContains(t, out.Resources, "deployment-0")
+}
+
+// TestRenderCommand_RequiredResources proves the offline two-pass loop: with a
+// matching ConfigMap supplied via --required-resources, the second render pass
+// surfaces it under input.requiredResources.cfg and the guarded Deployment
+// renders with the ConfigMap's data.image — all without Docker or crossplane.
+func TestRenderCommand_RequiredResources(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	root := NewRootCommand(Options{Out: &stdout})
+	root.SetArgs([]string{
+		"render", "cuefn.example/required@v0.1.0",
+		"--dir", "../test/common/testdata/required",
+		"--xr", "testdata/xr-required.yaml",
+		"--required-resources", "testdata/required-configmap.yaml",
+	})
+
+	require.NoError(t, root.ExecuteContext(context.Background()))
+
+	var out struct {
+		Resources map[string]struct {
+			Ready  string         `json:"ready"`
+			Object map[string]any `json:"object"`
+		} `json:"resources"`
+	}
+	require.NoError(t, yaml.Unmarshal(stdout.Bytes(), &out))
+
+	require.Contains(t, out.Resources, "deployment-0")
+	dep := out.Resources["deployment-0"].Object
+	assert.Equal(t, "Deployment", dep["kind"])
+
+	spec, ok := dep["spec"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "img:test", spec["image"])
+}
+
+// TestRenderCommand_RequirementsDoNotStabilize proves cuefn render surfaces a
+// non-converging module — one whose out.requirements depends on the fetched data
+// (the anti-pattern Crossplane rejects as "requirements didn't stabilize") — as
+// an error rather than printing a bogus second-pass result. The impure fixture
+// emits a second requirement only after the first is delivered, so the
+// requirement set differs between the two passes.
+func TestRenderCommand_RequirementsDoNotStabilize(t *testing.T) {
+	t.Parallel()
+
+	root := NewRootCommand(Options{Out: &bytes.Buffer{}, Err: &bytes.Buffer{}})
+	root.SetArgs([]string{
+		"render", "cuefn.example/impure@v0.1.0",
+		"--dir", "testdata/impurereq",
+		"--xr", "testdata/xr-required.yaml",
+		"--required-resources", "testdata/required-configmap.yaml",
+	})
+
+	err := root.ExecuteContext(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "did not stabilize")
+}
+
 // TestRenderCommand_RequiresXR proves the command fails clearly when the required
 // --xr flag is omitted.
 func TestRenderCommand_RequiresXR(t *testing.T) {

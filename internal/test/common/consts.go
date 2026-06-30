@@ -15,6 +15,12 @@ package common
 // integration tests; the user-facing example Composition references the same ref.
 const ExampleModuleRef = "cuefn.example/app@v0.1.0"
 
+// RequiredModuleRef is the module ref the hermetic required-resources fixture
+// ([HermeticRequiredModuleDir]) is published under by the integration tests. The
+// requiredloop Composition (testdata/requiredloop/composition.yaml) references
+// the same ref verbatim, so the two must stay in sync.
+const RequiredModuleRef = "cuefn.example/required@v0.1.0"
+
 // DevImage is the local image tag produced by `mise run image-local`.
 const DevImage = "crossplane-cuefn:dev"
 

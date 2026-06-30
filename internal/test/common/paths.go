@@ -62,6 +62,16 @@ func HermeticRenderloopDir(t *testing.T) string {
 	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/renderloop")
 }
 
+// HermeticRequiredloopDir returns the path to the self-contained
+// required-resources render-loop assets (composition.yaml, xr.yaml,
+// configmap.yaml) the required-resources integration test drives the real
+// crossplane render against, so that test does not depend on the example/ assets
+// either. It is the sibling of [HermeticRenderloopDir].
+func HermeticRequiredloopDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/requiredloop")
+}
+
 // FreePort reserves an ephemeral TCP port, closes the listener, and returns the
 // freed port so a server can bind it. There is an inherent race between the close
 // and the rebind, but it is small enough for a single-process test (the chosen

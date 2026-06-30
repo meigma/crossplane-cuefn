@@ -1,0 +1,174 @@
+package cli
+
+import (
+	"bufio"
+	"bytes"
+	"errors"
+	"fmt"
+	"io"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+
+	utilyaml "k8s.io/apimachinery/pkg/util/yaml"
+	"sigs.k8s.io/yaml"
+
+	"github.com/meigma/crossplane-cuefn/internal/render"
+)
+
+// loadRequiredObjects reads a flat bag of real cluster objects from path, which
+// may be a single YAML file or a directory of them. It returns nil when path is
+// empty (the flag is unset). Each file may hold multiple "---"-separated
+// documents; empty documents are skipped. The objects are matched against the
+// module's emitted requirements by matchRequirements — they are not filename- or
+// directory-keyed.
+func loadRequiredObjects(path string) ([]map[string]any, error) {
+	if path == "" {
+		return nil, nil
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read required resources %q: %w", path, err)
+	}
+
+	if !info.IsDir() {
+		objs, err := readYAMLObjects(path)
+		if err != nil {
+			return nil, fmt.Errorf("cannot read required resources %q: %w", path, err)
+		}
+		return objs, nil
+	}
+
+	var objs []map[string]any
+	walkErr := filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if ext := strings.ToLower(filepath.Ext(p)); ext != ".yaml" && ext != ".yml" {
+			return nil
+		}
+		fileObjs, err := readYAMLObjects(p)
+		if err != nil {
+			return fmt.Errorf("cannot read %q: %w", p, err)
+		}
+		objs = append(objs, fileObjs...)
+		return nil
+	})
+	if walkErr != nil {
+		return nil, fmt.Errorf("cannot read required resources %q: %w", path, walkErr)
+	}
+	return objs, nil
+}
+
+// readYAMLObjects reads a YAML file that may hold multiple documents and decodes
+// each non-empty one into a map. It uses the Kubernetes multi-document reader so
+// only a "---" at column 0 separates documents — a "---" line inside a value
+// (e.g. embedded YAML in a ConfigMap datum) is not mistaken for a separator. The
+// existing readYAMLObject reads a single object only, so this is the multi-doc
+// reader the directory/file loader needs.
+func readYAMLObjects(path string) ([]map[string]any, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	var objs []map[string]any
+	reader := utilyaml.NewYAMLReader(bufio.NewReader(bytes.NewReader(data)))
+	for {
+		doc, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if strings.TrimSpace(string(doc)) == "" {
+			continue
+		}
+		var obj map[string]any
+		if err := yaml.Unmarshal(doc, &obj); err != nil {
+			return nil, err
+		}
+		if obj == nil { // a document that is only comments decodes to nil.
+			continue
+		}
+		objs = append(objs, obj)
+	}
+	return objs, nil
+}
+
+// matchRequirements groups the supplied objects under each requirement name by
+// filtering on apiVersion, kind, namespace (when the selector sets one), and
+// either matchName (exact metadata.name) or matchLabels (a subset of
+// metadata.labels). Each matched bucket is sorted by "namespace/name" for
+// determinism. Every requirement name is always present as a key, with a
+// non-nil empty slice when nothing matches, so the module sees a concrete
+// cfg: [] rather than an absent field.
+func matchRequirements(
+	objs []map[string]any,
+	reqs map[string]render.Requirement,
+) map[string][]map[string]any {
+	out := make(map[string][]map[string]any, len(reqs))
+	for name, req := range reqs {
+		matched := make([]map[string]any, 0)
+		for _, obj := range objs {
+			if matchesRequirement(obj, req) {
+				matched = append(matched, obj)
+			}
+		}
+		sort.SliceStable(matched, func(i, j int) bool {
+			return objectKey(matched[i]) < objectKey(matched[j])
+		})
+		out[name] = matched
+	}
+	return out
+}
+
+// matchesRequirement reports whether obj satisfies the selector req. It reads
+// apiVersion, kind, and metadata defensively so a malformed object simply fails
+// to match rather than panicking.
+func matchesRequirement(obj map[string]any, req render.Requirement) bool {
+	apiVersion, _ := obj["apiVersion"].(string)
+	kind, _ := obj["kind"].(string)
+	if apiVersion != req.APIVersion || kind != req.Kind {
+		return false
+	}
+
+	meta, _ := obj["metadata"].(map[string]any)
+	if req.Namespace != "" {
+		namespace, _ := meta["namespace"].(string)
+		if namespace != req.Namespace {
+			return false
+		}
+	}
+
+	if req.MatchName != "" {
+		name, _ := meta["name"].(string)
+		return name == req.MatchName
+	}
+
+	// matchLabels: every selector label must be present and equal on the object.
+	labels, _ := meta["labels"].(map[string]any)
+	for k, v := range req.MatchLabels {
+		got, ok := labels[k].(string)
+		if !ok || got != v {
+			return false
+		}
+	}
+	return true
+}
+
+// objectKey is the "namespace/name" sort key for a cluster object, read
+// defensively.
+func objectKey(obj map[string]any) string {
+	meta, _ := obj["metadata"].(map[string]any)
+	namespace, _ := meta["namespace"].(string)
+	name, _ := meta["name"].(string)
+	return namespace + "/" + name
+}
