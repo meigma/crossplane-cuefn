@@ -77,6 +77,21 @@ Flagged to developer (accepted, LGTM): the `…/releases` link is forward-lookin
 the v0.1.0–v0.1.2 GitHub releases are still drafts, so that page is empty to
 anonymous visitors until published; `go install …@latest` works regardless.
 
-PR **#47** opened against master. CI in flight (watching: blocking `ci` +
-always-running `integration`/`e2e`). Next: confirm CI green, then merge per the
-autonomous-merge norm + worktree cleanup.
+PR **#47** opened against master.
+
+## 2026-06-30 16:04 — CI green, merged, cleaned up
+
+CI all green: `ci` 1m6s (blocking gate), `integration` 2m32s, `e2e` 3m20s, GitHub
+Pages build 18s, Kusari 21s; release/image dry-runs skipped (no release-relevant
+changes). Developer had already approved (LGTM); merged per the autonomous-merge
+norm.
+
+- `gh pr merge 47 --squash --delete-branch` → `state: MERGED` (the local
+  branch-delete erroring on the held worktree is the expected cosmetic failure).
+- `master` fast-forwarded `2e43b8a..fa199da` (`docs: rewrite README as a concise
+  landing page (#47)`).
+- `wt remove docs/readme-revamp --force` (tree matched master, ⊂). `wt list` now
+  shows only `master` + `journal/jmgilman`.
+
+Done. README revamp shipped. No release cut (docs-only). Session otherwise idle —
+awaiting any next request.
