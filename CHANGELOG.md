@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.1](https://github.com/meigma/crossplane-cuefn/compare/v0.1.0...v0.1.1) (2026-06-30)
+
+
+### Features
+
+* **cli:** add cuefn render --required-resources ([#37](https://github.com/meigma/crossplane-cuefn/issues/37)) ([afc7196](https://github.com/meigma/crossplane-cuefn/commit/afc7196b104e9db3443d604618eeced57ce3888f))
+* **function:** emit and receive required resources ([#36](https://github.com/meigma/crossplane-cuefn/issues/36)) ([ce381c4](https://github.com/meigma/crossplane-cuefn/commit/ce381c459c90b0a1723bcb249db3f2d8882c086f))
+* **render:** support required resources in the engine ([#34](https://github.com/meigma/crossplane-cuefn/issues/34)) ([7625170](https://github.com/meigma/crossplane-cuefn/commit/7625170375f81963d25664c060abcdcb3afc233b))
+
 ## 0.1.0 (2026-06-30)
 
 
