@@ -171,3 +171,40 @@ PRs landed for review:
 **Next:** a throwaway-kind spike to resolve the B2/B3 dependsOn-name question,
 then Wave-2 blocker PRs, then docs PRs (H1+M4, corrections), then polish
 (M7+L3+nit, M8). Paused here for developer review of #40/#41.
+
+## 2026-06-30 14:28 — #40/#41 merged; spike done; #43 + #44 up
+
+Developer chose "merge now" + B1 = "pin + release-please auto-bump". Actions:
+- **Merged #40 (H2) + #41 (H3/M10)** (squash); worktrees removed; master ff'd to
+  `baa7d52`.
+- **#43 (M8)** open — `fix(render): clearer error for a major-only module ref over
+  OCI` (shared `parseModuleRef`). Done during the spike wait (independent file).
+- **Cluster spike (background agent)** — DEFINITIVE: Crossplane auto-installs a
+  `dependsOn` Function under `xpkg.ToDNSLabel(name.ParseReference(ref).Context().RepositoryStr())`
+  — host-stripped, DNS-labelized, **no hash**. Observed:
+  `ghcr.io/meigma/function-cuefn → meigma-function-cuefn`,
+  `xpkg.meigma.io/cuefn → cuefn`,
+  `…/crossplane-contrib/function-environment-configs → crossplane-contrib-function-environment-configs`.
+  B2 confirmed (functionRef `function-cuefn` never binds → "cannot find an active
+  FunctionRevision"). M5 confirmed: the Lock dedups by package **source**, so a
+  hand-installed Function on the same source as a dependsOn one bricks ALL packages
+  ("node … already exists"). Spike cluster torn down.
+- **#44** open — `fix(pkg,cli): bind generated functionRefs to the installed
+  Functions` (B2+B3+M5+M6+M12). `pkg.DerivedFunctionName` (new) computes the
+  derived name; `cuefn publish` defaults functionRef.name to it (—function-name
+  still overrides). The `function-environment-configs` step is now emitted ONLY
+  with `--environment-config`, referencing the env fn by its derived name + a 2nd
+  dependsOn entry (new `--environment-config-function-ref/-version` flags). Dropped
+  `lastPathSegment`. `TestDerivedFunctionName` pins the cluster-observed names.
+  `moon run root:check` + gated `TestPublish_EndToEnd` green.
+
+The **B2 grounding investigator returned a stub** (`"test"`) — re-grounded inline +
+confirmed by the spike; not a problem in the end.
+
+Remaining: a **docs/examples PR** (B1 ref pin + release-please extra-files; stop
+hand-installing a Function per M5; quickstart `--environment-config` per M12;
+example/*.yaml alignment) — depends on #44. Then **H1 how-to** (in-cluster runtime
+config: registry + cache + M4 RBAC). Then **docs corrections** (M9 `cue vet
+-c=false`, M11+L1 registry/port, L2 `go install`, M2 readiness). Then **polish**
+(M7+L3+double-print). Paused for #43/#44 review; docs PRs overlap quickstart.md so
+they sequence after #44 merges.
