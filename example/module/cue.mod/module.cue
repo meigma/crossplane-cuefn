@@ -10,4 +10,7 @@ deps: {
 		v:       "v0.7.0"
 		default: true
 	}
+	"github.com/meigma/crossplane-cuefn/contract@v0": {
+		v: "v0.1.0"
+	}
 }

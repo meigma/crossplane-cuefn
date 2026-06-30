@@ -6,14 +6,16 @@
 // registry), so an invalid object is caught at render time, not on apply.
 package app
 
+import "github.com/meigma/crossplane-cuefn/contract@v0"
+
 // #API is the concrete platform API description the CLI decodes to build the XRD
-// envelope. A single served version is supported in v1.
-#API: {
+// envelope, unified against the contract's #API so its keys are validated (and
+// scope defaulted) at author time. A single served version is supported in v1.
+#API: contract.#API & {
 	group:   "platform.meigma.io"
 	version: "v1alpha1"
 	kind:    "XApp"
 	plural:  "xapps"
-	scope:   *"Namespaced" | "Cluster"
 }
 
 // #Spec is the authoritative, closed XR spec schema. It feeds runtime

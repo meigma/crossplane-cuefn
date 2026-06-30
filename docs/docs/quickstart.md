@@ -127,6 +127,12 @@ out: {
 Binding `out.input.spec: #Spec` is the key move: the schema the XRD is generated
 from is the same value the transform renders against, so the two never drift.
 
+!!! tip "Validate the shape at author time"
+    The example also imports `github.com/meigma/crossplane-cuefn/contract@v0` and
+    writes `#API: contract.#API & {…}` / `out: contract.#Transform & {…}`, so a
+    misspelled or unknown field is caught by `cue vet` in your editor. It's
+    optional — see [How to enforce the module contract](how-to/enforce-the-contract.md).
+
 Resolve the new dependency, which records it in `cue.mod/module.cue`:
 
 ```sh
