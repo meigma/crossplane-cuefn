@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.2](https://github.com/meigma/crossplane-cuefn/compare/v0.1.1...v0.1.2) (2026-06-30)
+
+
+### Bug Fixes
+
+* collapse noisy CUE validation errors into one message ([#45](https://github.com/meigma/crossplane-cuefn/issues/45)) ([380dbd3](https://github.com/meigma/crossplane-cuefn/commit/380dbd3837f85fda14f6db0c0ebfbf18fa9bce66))
+* **pkg,cli:** bind generated functionRefs to the installed Functions ([#44](https://github.com/meigma/crossplane-cuefn/issues/44)) ([500cf9d](https://github.com/meigma/crossplane-cuefn/commit/500cf9d74e53c920e606cace5b644606e42a96de))
+* **render:** clearer error for a major-only module ref over OCI ([#43](https://github.com/meigma/crossplane-cuefn/issues/43)) ([b3bc034](https://github.com/meigma/crossplane-cuefn/commit/b3bc0346a5f771ec81d72e4f0290511d8861c519))
+* **render:** fall back to a writable cache dir for the nonroot runtime ([#40](https://github.com/meigma/crossplane-cuefn/issues/40)) ([975e612](https://github.com/meigma/crossplane-cuefn/commit/975e612f87aa3d8c84337c16a44aaae07f3582f2))
+* **schema:** emit XRD defaults for required, fully-defaultable fields ([#41](https://github.com/meigma/crossplane-cuefn/issues/41)) ([baa7d52](https://github.com/meigma/crossplane-cuefn/commit/baa7d52f1e2cded62d6d28b1034a4e9f5381a73c))
+
 ## [0.1.1](https://github.com/meigma/crossplane-cuefn/compare/v0.1.0...v0.1.1) (2026-06-30)
 
 
