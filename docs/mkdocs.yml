@@ -47,6 +47,7 @@ nav:
       - Publish a Configuration: how-to/publish-configuration.md
       - Publish the Function: how-to/publish-function.md
       - Serve the function: how-to/serve-function.md
+      - Configure the function runtime: how-to/configure-the-runtime.md
       - Local toolchain (mise): how-to/local-toolchain.md
       - Build the runtime image: how-to/build-image.md
   - Reference:

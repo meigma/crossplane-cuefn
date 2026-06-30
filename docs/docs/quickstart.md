@@ -2,18 +2,21 @@
 
 In this tutorial we will take a platform API from a blank directory to a running
 Crossplane resource: write one CUE module, render it locally, publish it, build
-and install a Configuration, install the function, and watch an XR render. By the
-end you will have seen the whole cuefn loop end to end.
+and install a Configuration, and watch an XR render. By the end you will have seen
+the whole cuefn loop end to end.
 
 The repository ships a complete example under `example/`. We will build the same
 shape from scratch so each step is visible.
 
 ## Prerequisites
 
-- `cuefn` and `cue` on your PATH. With this repo: `mise install` (see
-  [local toolchain](how-to/local-toolchain.md)), then `mise exec -- ...` or build
-  `cuefn` with `go build -o bin/cuefn ./cmd/cuefn`.
-- An OCI registry for the CUE module. A plain-HTTP local registry is fine.
+- `cuefn` and `cue` on your PATH. The quickest way without cloning is
+  `go install github.com/meigma/crossplane-cuefn/cmd/cuefn@latest`; with this repo,
+  `mise install` (see [local toolchain](how-to/local-toolchain.md)) then
+  `mise exec -- ...`, or `go build -o bin/cuefn ./cmd/cuefn`.
+- An OCI registry for the CUE module. A plain-HTTP local registry is fine for the
+  local steps; for the cluster steps the module registry must be reachable **from
+  the cluster** (see [configure the function runtime](how-to/configure-the-runtime.md)).
 - For the cluster steps: a Crossplane v2 cluster and an **HTTPS** registry for
   the Configuration and Function packages.
 
@@ -110,6 +113,7 @@ out: {
 			}
 		}
 		config: {
+			ready: "Ready"
 			object: corev1.#ConfigMap & {
 				metadata: {name: _name, labels: {app: _name, tier: _tier}}
 				data: tier: _tier
@@ -127,11 +131,17 @@ out: {
 Binding `out.input.spec: #Spec` is the key move: the schema the XRD is generated
 from is the same value the transform renders against, so the two never drift.
 
+The ConfigMap carries `ready: "Ready"` because a ConfigMap has no status
+conditions of its own — without a hint Crossplane never considers it ready and the
+XR is held at `Ready=False` (see the
+[readiness mapping](reference/module-contract.md#readiness-mapping)).
+
 !!! tip "Validate the shape at author time"
     The example also imports `github.com/meigma/crossplane-cuefn/contract@v0` and
     writes `#API: contract.#API & {…}` / `out: contract.#Transform & {…}`, so a
-    misspelled or unknown field is caught by `cue vet` in your editor. It's
-    optional — see [How to enforce the module contract](how-to/enforce-the-contract.md).
+    misspelled or unknown field is caught by `cue vet -c=false ./...` (or your
+    editor). It's optional — see
+    [How to enforce the module contract](how-to/enforce-the-contract.md).
 
 Resolve the new dependency, which records it in `cue.mod/module.cue`:
 
@@ -168,9 +178,9 @@ cuefn render cuefn.example/app@v0 --dir . --xr xr.yaml
 
 `--dir` serves the module from disk; its `cue.dev/x/k8s.io` dependency resolves
 from the central registry on the first run (and is cached after), so this stays
-cluster-free. You will see a `resources` map (a Deployment with `replicas: 2`
-marked `"True"`, a ConfigMap marked `Unspecified`) and a `status`. Add `--env` to
-see the environment flow through:
+cluster-free. You will see a `resources` map (a Deployment with `replicas: 2`, a
+ConfigMap, both marked `"True"`) and a `status`. Add `--env` to see the
+environment flow through:
 
 ```sh
 echo 'tier: production' > env.yaml
@@ -182,11 +192,14 @@ The `tier` label and ConfigMap datum change from `unset` to `production`. This
 
 ## Step 3 — Publish the module
 
-Publish the module to its CUE registry. A plain-HTTP local registry needs the
-`+insecure` suffix:
+Publish the module to its CUE registry. Start a throwaway local registry first —
+the container listens on 5000, and we publish it on host port 5001 to avoid the
+macOS AirPlay receiver that holds `localhost:5000` — then point `CUE_REGISTRY` at
+it. A plain-HTTP registry needs the `+insecure` suffix:
 
 ```sh
-export CUE_REGISTRY=localhost:5000+insecure
+docker run -d -p 5001:5000 --name cuefn-registry registry:2
+export CUE_REGISTRY=localhost:5001+insecure
 cue mod publish v0.1.0
 ```
 
@@ -194,6 +207,13 @@ cue mod publish v0.1.0
     `cuefn publish` records the module's **registry** digest. Always
     `cue mod publish` first; otherwise the Configuration can pin a digest that
     does not match your source. This ordering avoids the `--dir` footgun.
+
+!!! note "The cluster fetches the module too"
+    The in-cluster function pulls this module at render time, so for Steps 5–6 the
+    module registry must be reachable **from the cluster** and the function pointed
+    at it — see
+    [configure the function runtime](how-to/configure-the-runtime.md). A
+    `localhost` registry is fine for the local steps here.
 
 ## Step 4 — Build and push the Configuration
 
@@ -203,13 +223,17 @@ HTTPS-only), distinct from the CUE module registry:
 
 ```sh
 cuefn publish cuefn.example/app@v0.1.0 \
-  --package registry.example.com/xapp-configuration:v0.1.0
+  --package registry.example.com/xapp-configuration:v0.1.0 \
+  --environment-config app-environment
 ```
 
-`cuefn publish` generates the XRD, builds a Composition wired to
-`function-environment-configs` → `cuefn`, records the module ref **and** its
-resolved manifest digest (the runtime [digest lock-step](explanation/digest-lockstep.md)),
-and pushes the package. You can confirm the package parses:
+By default `cuefn publish` builds a single-step `cuefn` Composition. Passing
+`--environment-config app-environment` adds a `function-environment-configs` step
+(so the named EnvironmentConfig's values reach the module under
+`out.input.environment`) **and** declares both functions in the Configuration's
+`dependsOn`, so installing it pulls them automatically. It also records the module
+ref and its resolved manifest digest (the runtime
+[digest lock-step](explanation/digest-lockstep.md)). Confirm the package parses:
 
 ```sh
 # --from-daemon reads from the local Docker daemon, so pull the pushed package first
@@ -217,18 +241,13 @@ docker pull registry.example.com/xapp-configuration:v0.1.0
 crossplane xpkg extract --from-daemon registry.example.com/xapp-configuration:v0.1.0 -o out.gz
 ```
 
-## Step 5 — Install the Function and the Configuration
+## Step 5 — Install the Configuration
 
-Install the cuefn Function and your Configuration into the cluster:
+Install **only** the Configuration. Crossplane reads its `dependsOn` and
+auto-installs both functions — the cuefn function (as `meigma-function-cuefn`) and
+`function-environment-configs` — so there is nothing else to apply:
 
 ```yaml title="install.yaml"
-apiVersion: pkg.crossplane.io/v1
-kind: Function
-metadata:
-  name: cuefn
-spec:
-  package: ghcr.io/meigma/function-cuefn:v0
----
 apiVersion: pkg.crossplane.io/v1
 kind: Configuration
 metadata:
@@ -241,12 +260,56 @@ spec:
 kubectl apply -f install.yaml
 ```
 
-Crossplane installs the Configuration's XRD and Composition, and resolves the
-function dependency the Configuration declared.
+!!! warning "Do not hand-install the cuefn Function"
+    Let `dependsOn` install it. Applying your own `Function` that points at the
+    same package source as the Configuration's dependency puts two Functions on one
+    source and poisons Crossplane's package Lock — every package then goes
+    unhealthy with `node … already exists`.
+
+Point the function at your module registry. The installed function fetches the
+module at render and defaults to the CUE central registry, so a non-central
+registry is supplied through a `DeploymentRuntimeConfig` bound to the function.
+Once the dependency is installed:
+
+```sh
+kubectl get functions.pkg.crossplane.io   # wait for meigma-function-cuefn INSTALLED=True
+```
+
+```yaml title="runtime.yaml"
+apiVersion: pkg.crossplane.io/v1beta1
+kind: DeploymentRuntimeConfig
+metadata:
+  name: cuefn-runtime
+spec:
+  deploymentTemplate:
+    spec:
+      selector: {}
+      template:
+        spec:
+          containers:
+            - name: package-runtime
+              env:
+                # Prefix form: cuefn.example/* resolves from your registry, while
+                # central stays the fallback for public dependencies.
+                - name: CUE_REGISTRY
+                  value: "cuefn.example=modules.example.com"
+```
+
+```sh
+kubectl apply -f runtime.yaml
+kubectl patch function.pkg.crossplane.io meigma-function-cuefn --type merge \
+  -p '{"spec":{"runtimeConfigRef":{"name":"cuefn-runtime"}}}'
+```
+
+The cache needs no configuration — the function falls back to a writable temp dir.
+For the full registry-routing recipe and the RBAC needed to compose native kinds
+beyond core workloads, see
+[configure the function runtime](how-to/configure-the-runtime.md).
 
 ## Step 6 — Instantiate an XR and observe the result
 
-Optionally supply an `EnvironmentConfig` the Composition references:
+Supply the `EnvironmentConfig` the Composition references (its name matches the
+`--environment-config` from Step 4):
 
 ```yaml title="environment.yaml"
 apiVersion: apiextensions.crossplane.io/v1beta1
@@ -275,6 +338,14 @@ The Deployment carries `replicas: 2` from the XR spec, and the `tier` label and
 ConfigMap datum read `production` from the `EnvironmentConfig` — the same output
 you saw locally in Step 2, now rendered by the in-cluster function.
 
+!!! note "The shipped example is a teaching device"
+    The module you built here marks every resource `ready: "Ready"`, so its XR
+    reconciles to `Ready=True`. The repository's `example/module` deliberately
+    leaves its ConfigMap readiness **unspecified** (to show all three readiness
+    states), so that example's XR stays `Ready=False` until every composed
+    resource reports ready — see the
+    [readiness mapping](reference/module-contract.md#readiness-mapping).
+
 ## What you built
 
 One CUE module became two artifacts — an XRD-bearing Configuration and the
@@ -282,6 +353,8 @@ transform the runtime evaluates — from a single source of truth. To go deeper:
 
 - The [module contract](reference/module-contract.md) — the full schema and
   transform surface.
+- [Configure the function runtime](how-to/configure-the-runtime.md) — registry
+  routing, the cache, and RBAC for composed kinds.
 - [One module, two outputs](explanation/one-module-two-outputs.md) — why it is
   shaped this way.
 - The how-to guides for each command in isolation.

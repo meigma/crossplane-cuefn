@@ -61,6 +61,12 @@ comma-separated list) to route different prefixes to different registries.
 registry a Configuration or Function package is pushed to, which must be HTTPS
 (Crossplane's package manager is HTTPS-only).
 
+To set `CUE_REGISTRY` (and, when hardened, `CUE_CACHE_DIR`) on the **installed**
+function — a `DeploymentRuntimeConfig` bound to it — see
+[configure the function runtime](../how-to/configure-the-runtime.md). The values
+here apply to the local CLI (`cuefn render`, `cue mod publish`); in-cluster they
+must be injected into the function pod.
+
 ### `CUE_CACHE_DIR` / `--cache-dir`
 
 Points the module cache at a writable directory. `--cache-dir` is available on the

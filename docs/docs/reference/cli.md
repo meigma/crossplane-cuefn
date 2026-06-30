@@ -192,9 +192,10 @@ cuefn publish <module-ref> --package <oci-ref> [flags]
 
 The one-command generate → package → push flow. It loads the module, generates
 its XRD, resolves the module's live OCI manifest digest, builds a pipeline
-Composition (`function-environment-configs` then `cuefn`) recording the module
-ref **and** that digest, assembles a Crossplane **Configuration** xpkg, and
-pushes it. Recording the resolved digest is the author half of the
+Composition (the `cuefn` step, plus a leading `function-environment-configs` step
+when `--environment-config` is given) recording the module ref **and** that digest,
+assembles a Crossplane **Configuration** xpkg, and pushes it. Recording the
+resolved digest is the author half of the
 [digest lock-step](../explanation/digest-lockstep.md).
 
 **Argument.** `<module-ref>` — `path@version`.
@@ -205,11 +206,13 @@ pushes it. Recording the resolved digest is the author half of the
 | `--dir <string>` | _(empty)_ | Build the XRD/Composition from this local module directory instead of fetching it over OCI. The digest is still resolved from the registry. |
 | `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 | `--function-ref <string>` | `ghcr.io/meigma/function-cuefn` | cuefn Function package OCI ref recorded in the Configuration's `dependsOn`. |
-| `--function-name <string>` | _(last path segment of `--function-ref`)_ | In-cluster Function resource name the Composition references. |
+| `--function-name <string>` | _(the name Crossplane derives for the `--function-ref` dependency)_ | In-cluster Function resource name the Composition's `cuefn` step references. The default matches the name Crossplane gives the auto-installed `dependsOn` Function, so a single Configuration install resolves. |
 | `--function-version <string>` | `>=v0.0.0` | Semver constraint for the cuefn Function dependency. |
 | `--name <string>` | `<xrd-plural>-configuration` | Configuration package `metadata.name`. |
 | `--crossplane-constraint <string>` | _(empty)_ | Optional semver constraint on the supported Crossplane version. |
-| `--environment-config <string>` | _(none)_ | Name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable). Each is referenced by name so its values reach the module under `out.input.environment`. |
+| `--environment-config <string>` | _(none)_ | Name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable). Each is referenced by name so its values reach the module under `out.input.environment`. Supplying any adds the `function-environment-configs` step and a second `dependsOn` entry. |
+| `--environment-config-function-ref <string>` | `xpkg.crossplane.io/crossplane-contrib/function-environment-configs` | Package ref recorded in `dependsOn` for the env-config function (only when `--environment-config` is used). |
+| `--environment-config-function-version <string>` | `>=v0.7.2` | Semver constraint for the function-environment-configs dependency. |
 | `--insecure` | `false` | Push over plain HTTP (development only; for a non-loopback throwaway registry). |
 
 **Output.** Prints `pushed <ref>` to stdout on success. Exits non-zero if the

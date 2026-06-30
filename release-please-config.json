@@ -12,7 +12,12 @@
     ".": {
       "package-name": "crossplane-cuefn",
       "changelog-path": "CHANGELOG.md",
-      "extra-files": ["melange.yaml", "apko.yaml"],
+      "extra-files": [
+        "melange.yaml",
+        "apko.yaml",
+        "example/functions.yaml",
+        "example/deploy/functions.yaml"
+      ],
       "exclude-paths": ["contract"]
     },
     "contract": {
