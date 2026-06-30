@@ -1,0 +1,12 @@
+# The operator-supplied ConfigMap the required-resources Test fetches. The module
+# emits a `cfg` requirement selecting a ConfigMap by spec.configName in the XR's
+# namespace; Crossplane's core controller reads this object (via the
+# aggregate-to-crossplane RBAC grant the Go harness installs) and delivers it back
+# on the second render pass. data.image is the value the guarded resource mirrors.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: required-cfg
+  namespace: default
+data:
+  image: img:e2e

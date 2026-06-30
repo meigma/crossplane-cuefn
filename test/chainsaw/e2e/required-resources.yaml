@@ -1,0 +1,53 @@
+# Live-cluster required-resources assertion for the kind e2e. The Go harness
+# (internal/test/e2e) has already installed Crossplane, the cuefn Function, the
+# generated Configuration, AND the aggregate-to-crossplane ClusterRole that lets
+# Crossplane's core controller read ConfigMaps. This chainsaw Test applies an
+# operator ConfigMap and an XR that selects it by name, then asserts the
+# data-dependent resource rendered — proving the full fetch-and-re-invoke loop:
+# the module emits a `cfg` requirement, the core controller fetches the ConfigMap,
+# and the second render pass composes a resource derived from its data. It runs
+# with cleanup (no --skip-delete) so it leaves no state for the drift Test.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: e2e-required-resources
+spec:
+  timeouts:
+    apply: 2m
+    assert: 3m
+  steps:
+    - name: configmap-and-xr
+      description: Apply the operator ConfigMap and an XR that selects it by name.
+      try:
+        - apply:
+            file: required-configmap.yaml
+        - apply:
+            file: required-xr.yaml
+    - name: required-resource-rendered
+      description: |-
+        The XR reconciles to Ready=True and the guarded ConfigMap mirrors the
+        operator ConfigMap's data.image (img:e2e). This proves Crossplane's core
+        controller fetched the required ConfigMap via the aggregated RBAC grant and
+        the second render pass consumed the delivered cluster data.
+      try:
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XApp
+              metadata:
+                name: demo-required
+                namespace: default
+              status:
+                ready: true
+                (conditions[?type == 'Ready'] | [0].status): "True"
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: demo-required-cfg-0
+                namespace: default
+                labels:
+                  app: demo-required
+              data:
+                image: img:e2e
