@@ -208,3 +208,50 @@ config: registry + cache + M4 RBAC). Then **docs corrections** (M9 `cue vet
 -c=false`, M11+L1 registry/port, L2 `go install`, M2 readiness). Then **polish**
 (M7+L3+double-print). Paused for #43/#44 review; docs PRs overlap quickstart.md so
 they sequence after #44 merges.
+
+## 2026-06-30 14:49 — #43/#44 merged; campaign nearly complete (#45, #46 open)
+
+Developer "LGTM. Proceed." → **merged #43 + #44** (squash); master ff'd to
+`500cf9d`. Then landed the final two PRs:
+- **#45** open — `fix: collapse noisy CUE validation errors into one message`
+  (M7 + double-print). New `internal/cueerr` package walks CUE's STRUCTURED leaf
+  errors (`errors.Errors`, not the rendered tree — far less brittle), drops the
+  empty-disjunction wrapper + the misleading default-branch "conflicting values",
+  dedupes, preserves Unwrap. Replaced the two duplicated `wrapCUE` helpers
+  (render + schema; load.go too). `replicas:99` went 6 noisy lines → one:
+  `#Spec.replicas: invalid value 99 (out of bound <=10)`. L3 (incomplete-value
+  jargon) deliberately deferred. Gate green.
+- **#46** open (built by a FORK with full context) — `docs: correct the install
+  flow and add an in-cluster runtime how-to`. 15 files: quickstart Steps 3–6
+  rewritten (M5 single-install + the "don't hand-install" Lock warning, M12
+  `--environment-config`, M11/L1 registry on :5001, the DRC patch targeting
+  `meigma-function-cuefn`, L2 go install, M2 readiness); NEW
+  `how-to/configure-the-runtime.md` (H1 registry routing via DRC prefix form +
+  multi-team M1 note + cache note + M4 write-side RBAC); M9 `cue vet -c=false`;
+  reference/README env-configs prose + flag docs; B1 example refs pinned to
+  v0.1.1 with `# x-release-please-version` + added to release-please extra-files.
+  I REVIEWED the diff: quickstart is internally consistent (default ghcr ref →
+  meigma-function-cuefn everywhere), the new how-to is accurate. Gate green incl.
+  docs:build --strict.
+
+**release-please auto-opened #42 `chore(master): release 0.1.2`** from the merged
+`fix:` commits — outward-facing, left for the maintainer (best cut AFTER #45/#46
+merge so docs ship corrected).
+
+Minor follow-up caught in review: `example/deploy/functions.yaml` (advanced
+self-host path) still names its hand-installed Function `cuefn`, but a Composition
+from `--function-ref REGISTRY/function-cuefn` now derives `function-cuefn` (#44) —
+latent name mismatch in that path only; main quickstart unaffected.
+
+**Readiness re-assessment:** the DX verdict was "Not yet — blocked on onboarding."
+With B1/B2/B3 (blockers) + H1/H2/H3 (highs) + most mediums fixed and docs
+corrected, the documented path now installs+reconciles from one apply. Moves to
+**"Ready-with-caveats"** once #45/#46 merge + 0.1.2 ships.
+
+Deferred (not this campaign): M1 per-Input registry routing (feature), M3 render
+`--strict` #Spec guard (warn-vs-fail decision), L3 incomplete-value jargon,
+additionalProperties:false (deliberate), CUEFN_* env wiring; the example/deploy
+name nuance above; the two Dependabot PRs (#1, #2).
+
+Campaign PR ledger: merged #40 (H2) #41 (H3/M10) #43 (M8) #44 (B2/B3/M5/M6/M12);
+open #45 (M7/nit) #46 (docs B1/M9/M11/L1/L2/M2/M4/H1); auto #42 (release 0.1.2).
