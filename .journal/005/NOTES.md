@@ -271,3 +271,25 @@ Registry **in_progress** (v0.1.0's run previously succeeded). Test worktree remo
 
 Contract phase COMPLETE: source (#31) + closedness test (#33) + published v0.2.0
 (#32). PR2 `feat(render)` workflow still running.
+
+## 2026-06-30 — PR2 (feat render) implemented, verified, opened: #34
+Workflow `wf_e2b1be2e-5f2` (5 agents) implemented PR2 in worktree
+`.wt/feat-render-required-resources`: engine.go (Inputs.RequiredResources omitempty,
+Requirement type, Result.Requirements, readRequirements with exactly-one
+enforcement, seedRequiredResources, Render reorder fillInput→readRequirements→
+seed→re-fill→readResources), import-free fixture testdata/required +
+HermeticRequiredModuleDir, 5 render unit tests. Verify found 1 medium (both-match
+arm untested) → fixed (table test neither+both); 1 low (cluster-scope test can't
+isolate guard) → I addressed by making the comment honest (namespaced direction
+already covered by TestRenderEmitsRequirements) AND added a non-concrete-requirement
+fixture+test covering readRequirements' Validate(Concrete) branch (was untested).
+
+I reviewed the engine diff myself (faithful to design; hexagonal-pure, only `maps`
+added), fixed a gofumpt line-wrap on seedRequiredResources, ran `root:check` GREEN.
+**PR #34 open**, CI watching (`gh pr checks --watch` bg). Will merge when green
+(autonomy).
+
+**HOLD the product release PR:** merging #34 makes release-please open/refresh a
+product `0.2.0` release PR. Do NOT merge it mid-rollout — render-only is a
+half-wired feature. Hold product release until PR3 (function) + PR4 (cli) land.
+(Contract releases were safe to publish; product release waits for code-complete.)
