@@ -1,0 +1,22 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xapp-required
+spec:
+  compositeTypeRef:
+    apiVersion: platform.meigma.io/v1alpha1
+    kind: XApp
+  mode: Pipeline
+  pipeline:
+    # Fetch and evaluate the required-resources fixture module. It emits one
+    # requirement (cfg) selecting a ConfigMap by spec.configName; Crossplane
+    # fetches the match supplied via `crossplane render --required-resources`
+    # and re-invokes, and the module guards a Deployment on the delivered
+    # object's data.image. The module ref must match common.RequiredModuleRef.
+    - step: cuefn
+      functionRef:
+        name: cuefn
+      input:
+        apiVersion: cuefn.meigma.io/v1beta1
+        kind: Input
+        module: cuefn.example/required@v0.1.0

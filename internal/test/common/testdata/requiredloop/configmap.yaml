@@ -1,0 +1,12 @@
+# The cluster object supplied to `crossplane render --required-resources`. The
+# fixture's cfg requirement selects a ConfigMap named app-cfg in the demo XR's
+# namespace; Crossplane matches this object, delivers it on the second pass, and
+# the module renders a Deployment whose spec.image is this data.image — proving
+# the required-resources fetch loop flows end to end.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-cfg
+  namespace: default
+data:
+  image: ghcr.io/stefanprodan/podinfo:6.7.0
