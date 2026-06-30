@@ -404,3 +404,26 @@ REMAINING contract work (now UNBLOCKED — contract is live on Central):
   product patch. (Decide at impl.)
 - **Closedness test PR:** re-add `internal/contract` test (saved at /tmp/contract-test/) as non-bumping
   `test(contract)`. NOTE: internal/contract is a PRODUCT path → a `test`-typed commit won't bump product.
+
+## 2026-06-29 19:45 — Product v0.1.0 release.yml GREEN; B2 + test PRs open (contract work complete)
+- **release.yml SUCCESS** (run 28411908550): all jobs green (GoReleaser binaries, melange x2 arch,
+  container-image, function-package, all attestations). v0.1.0 draft GitHub release has all binaries+SBOMs+
+  checksums; function-cuefn pushed to ghcr. Product v0.1.0 fully built/signed (draft for user to publish).
+- **#28** `test(contract): prove the contract definitions are closed` — restored internal/contract test
+  (from /tmp/contract-test/). go test + root:check green. CI green (ci/integration/e2e). Non-bumping.
+- **#29 (B2)** `docs(example): adopt the importable contract in the example` — worktree
+  `.wt/docs-example-adopt-contract`. The example now imports `github.com/meigma/crossplane-cuefn/contract@v0`
+  + unifies `#API: contract.#API & {...}` and `out: contract.#Transform & {...}`; `cue mod tidy` added the
+  dep (resolves from Central, no CUE_REGISTRY). #Spec/#Status stay unwrapped. **Dropped the metadata `...`**
+  (the contract closes metadata to {name, namespace?}). Docs (fork): new how-to enforce-the-contract.md +
+  mkdocs nav + module-contract section + quickstart tip + one-module-two-outputs note.
+  - **Verified:** render → same resources; `cuefn generate` → XRD BYTE-IDENTICAL (codegen reduces to
+    #API/#Spec/#Status defs; #API: contract.#API & {...} decodes the same envelope); `cue vet` on the real
+    example REJECTS an injected `out.resorces` typo ("field not allowed") — closedness live in the canonical
+    example. `moon run root:check` green (11 tasks; example-check resolves the contract from Central).
+  - Non-bumping (`docs`). The hermetic test fixtures stay import-free/offline.
+- **Both #28 + #29 are the final contract pieces** — non-bumping (no release). Awaiting merge.
+- **CONTRACT INITIATIVE COMPLETE** (once #28+#29 merge): module-contract v2 (`out` nesting, #19) + the
+  importable closed contract (#20/#21) + monorepo CI publishing via release-please+OIDC (contract v0.1.0 LIVE
+  on Central) + product v0.1.0 released + example adopts the contract + closedness test + docs. Versioning:
+  contract welded to function major (both v0), bump-minor-pre-major; release-as bootstrap removed (#27).
