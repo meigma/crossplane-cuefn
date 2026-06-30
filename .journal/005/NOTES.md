@@ -368,3 +368,32 @@ Verified myself: only 1 `example/module` ref left (the disclaimer); `docs:build
 Next: merge #39 → then merge #35 (`release 0.1.1`) per developer decision
 (release after e2e+docs). Optional deferred follow-up: adopt a `cfg` requirement
 in example/module so the how-to command runs against the shipped example.
+
+## 2026-06-30 — ROLLOUT COMPLETE: required-resources shipped; product v0.1.1 cut
+PR6 (#39) merged → master `703da08`. #35 (`release 0.1.1`) merged → master
+`13f8587`. Release Please succeeded → **tag `v0.1.1`** + **draft GitHub release
+v0.1.1**; the **Release pipeline** (GoReleaser binaries + melange/apko image +
+Function xpkg + keyless cosign + SLSA attestations) is running (watching). Draft
+awaits maintainer publish (repo `draft: true`).
+
+**The required-resources feature is fully shipped:**
+- contract `v0.2.0` (published to CUE Central Registry) — #31 source, #33 test,
+  #32 release.
+- product code: PR2 render (#34), PR3 function (#36), PR4 cli (#37).
+- PR5 e2e (#38) — proven on a real kind cluster (CI e2e green: fetched a real
+  ConfigMap, rendered the guarded resource, reconcile/drift intact).
+- PR6 docs (#39) — how-to + fixpoint explanation + reference, accuracy-verified.
+- product `v0.1.1` cut (#35) — tag + draft + pipeline.
+
+Every PR: workflow (implement → adversarial verify → fix) + my own gate run +
+squash-merge under merge autonomy. Two adversarial-verify catches worth noting:
+the e2e namespace/collision HIGH (would have failed CI e2e) and the docs
+"test-offline points at the no-requirements example" HIGH (docs-drift). Real lint
+issues fixed along the way (protogetter, golines) + the YAML-splitter correctness
+bug. Session goal (design doc) fully executed.
+
+Open/deferred (non-blocking): adopt a `cfg` requirement in example/module so the
+how-to command is runnable against the shipped example; the function-side runtime
+contract-major check (from session 004); maintainer to publish the v0.1.1 +
+contract v0.2.0 draft releases. Old draft releases v0.1.0 / contract v0.1.0 also
+still draft.
