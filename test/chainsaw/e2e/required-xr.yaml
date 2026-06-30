@@ -1,0 +1,12 @@
+# An XR whose spec.configName selects the operator ConfigMap (required-cfg) applied
+# alongside it. The module turns that selection into a `cfg` requirement; once
+# Crossplane fetches the ConfigMap the second render pass emits the guarded
+# resource (a ConfigMap named demo-required-cfg-0) mirroring its data.image.
+apiVersion: platform.meigma.io/v1alpha1
+kind: XApp
+metadata:
+  name: demo-required
+  namespace: default
+spec:
+  image: ghcr.io/stefanprodan/podinfo:6.7.0
+  configName: required-cfg

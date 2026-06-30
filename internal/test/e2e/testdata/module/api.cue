@@ -21,6 +21,15 @@ package app
 #Spec: {
 	image:    string | *"ghcr.io/stefanprodan/podinfo:6.7.0"
 	replicas: *1 | int & >=1 & <=10
+	// configName selects the operator-supplied ConfigMap this XR reads at render
+	// time via out.requirements.cfg. It defaults to a sentinel that no fixture
+	// (and no operator) ever creates as a ConfigMap, so the requirement stays a
+	// pure, concrete function of the spec while an XR that omits it (the demo XR)
+	// selects a name that matches nothing: the delivered bucket stays empty and
+	// the guarded resource is absent, leaving its composed set byte-identical. The
+	// required-resources test sets this explicitly to a distinctly-named operator
+	// ConfigMap to exercise the fetch.
+	configName: string | *"none"
 }
 
 // #Status is the optional XR status schema. The transform returns a value of

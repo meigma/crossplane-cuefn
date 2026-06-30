@@ -75,7 +75,9 @@ func requireE2E(t *testing.T) {
 // loop on a real kind cluster and asserts the distinctive in-cluster behaviors via
 // chainsaw: XR Ready=True with composed Deployment/Service/ConfigMap, status from
 // #Status, API-server defaulting of an omitted field, the EnvironmentConfig value
-// surfacing in a composed resource, and the digest-drift guard.
+// surfacing in a composed resource, a required-resource fetch (the core controller
+// reads an operator-supplied ConfigMap via aggregated RBAC and a second render pass
+// renders a data-dependent resource), and the digest-drift guard.
 func TestE2E_Kind(t *testing.T) {
 	requireE2E(t)
 
@@ -144,6 +146,15 @@ func TestE2E_Kind(t *testing.T) {
 
 	// --- Reconcile assertions (criteria 1-4) ----------------------------------
 	runChainsaw(ctx, t, cluster, "reconcile.yaml", true /* skipDelete */)
+
+	// --- Required resources (criterion 6) -------------------------------------
+	// Apply a real ConfigMap plus an XR that selects it by name, and assert the
+	// guarded composed resource mirrors the ConfigMap's data — proving the core
+	// controller fetched it via the aggregate-to-crossplane RBAC grant and the
+	// second render pass consumed the delivered cluster data. Runs with cleanup
+	// (skipDelete=false) so its ConfigMap and XR are gone before the drift step
+	// republishes a different module under the same version.
+	runChainsaw(ctx, t, cluster, "required-resources.yaml", false /* skipDelete */)
 
 	// --- Digest-drift guard (criterion 5) -------------------------------------
 	// Republish DIFFERENT content under the SAME version, then force a reconcile.
@@ -273,6 +284,24 @@ metadata:
   name: function-environment-configs
 spec:
   package: xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.2
+---
+# Required-resource reads go through Crossplane's CORE controller ServiceAccount,
+# not the function pod. This aggregate-to-crossplane ClusterRole is absorbed by
+# Crossplane's aggregated crossplane ClusterRole, granting the core controller
+# get/list/watch on ConfigMaps. Without it the fetch for the module's cfg
+# requirement silently returns nothing, the delivered bucket stays empty, and the
+# guarded resource never renders (a silent under-render). This is an operator
+# responsibility for every kind a module can request.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: crossplane-cuefn-required-configmaps
+  labels:
+    rbac.crossplane.io/aggregate-to-crossplane: "true"
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "list", "watch"]
 `, modClusterRef, functionName, fnRef)
 }
 
