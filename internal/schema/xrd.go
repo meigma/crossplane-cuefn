@@ -102,6 +102,12 @@ func GenerateXRD(module cue.Value) (*xv2.CompositeResourceDefinition, error) {
 		top.Properties["status"] = *statusSchema
 	}
 
+	// Give required-but-fully-defaultable fields an explicit empty default so the
+	// API server materializes the same value CUE fills from an empty spec. Must
+	// run after inlining so nested ($ref) structs are visible, and before
+	// selfCheck so the materialized schema is what we structurally validate.
+	materializeDefaults(top)
+
 	if err := selfCheck(top); err != nil {
 		return nil, err
 	}
