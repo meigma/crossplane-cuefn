@@ -64,6 +64,56 @@ func TestContract_TransformClosedness(t *testing.T) {
 		require.NoError(t, bad.Err())
 		require.Error(t, transform.Unify(bad).Validate(), "#Transform must reject an invalid readiness hint")
 	})
+
+	t.Run("optional requirements and requiredResources are accepted", func(t *testing.T) {
+		valid := ctx.CompileString(`{
+			input: {
+				spec: {}, metadata: {name: "demo"}, environment: {}
+				requiredResources: {cfg: [{apiVersion: "v1", kind: "ConfigMap"}]}
+			}
+			requirements: {cfg: {apiVersion: "v1", kind: "ConfigMap", matchName: "app-cfg"}}
+			resources: {}
+		}`)
+		require.NoError(t, valid.Err())
+		require.NoError(t, transform.Unify(valid).Validate(),
+			"#Transform must accept the optional requirements + requiredResources fields")
+	})
+
+	t.Run("a misspelled requirements field is rejected", func(t *testing.T) {
+		typo := ctx.CompileString(`{
+			input: {spec: {}, metadata: {name: "demo"}, environment: {}}
+			resources: {}
+			requirments: {cfg: {apiVersion: "v1", kind: "ConfigMap", matchName: "x"}}
+		}`)
+		require.NoError(t, typo.Err())
+		err := transform.Unify(typo).Validate()
+		require.Error(t, err, "#Transform must reject a misspelled requirements field")
+		assert.Contains(t, err.Error(), "requirments")
+	})
+
+	t.Run("an unknown field inside a requirement is rejected", func(t *testing.T) {
+		bad := ctx.CompileString(`{
+			input: {spec: {}, metadata: {name: "demo"}, environment: {}}
+			resources: {}
+			requirements: {cfg: {apiVersion: "v1", kind: "ConfigMap", matchName: "x", nope: true}}
+		}`)
+		require.NoError(t, bad.Err())
+		require.Error(t, transform.Unify(bad).Validate(), "#Requirement must reject an unknown field")
+	})
+
+	t.Run("a requirement with neither matchName nor matchLabels still satisfies the contract", func(t *testing.T) {
+		// "exactly one of matchName/matchLabels" is enforced by the engine at
+		// render time, not by the contract (both are optional). This test pins
+		// that contract-level intent so a future tightening is a deliberate change.
+		loose := ctx.CompileString(`{
+			input: {spec: {}, metadata: {name: "demo"}, environment: {}}
+			resources: {}
+			requirements: {cfg: {apiVersion: "v1", kind: "ConfigMap"}}
+		}`)
+		require.NoError(t, loose.Err())
+		require.NoError(t, transform.Unify(loose).Validate(),
+			"#Requirement leaves match-arm enforcement to the engine, not the contract")
+	})
 }
 
 // TestContract_APIClosedness proves #API accepts the envelope keys (defaulting
