@@ -43,3 +43,40 @@ Open threads carried in (from sessions 004–006, all non-blocking):
 
 Plan: await the developer's actual request, then load any task-relevant skills
 before doing substantive work.
+
+## 2026-06-30 16:01 — README revamp → PR #47
+
+Goal: revamp the README, which the developer judged too long, too thick, missing a
+quick example, and mixing dev/publishing flows that belong in CONTRIBUTING.md. The
+README is the landing page — convey value fast, get started, hand off to docs.
+
+Approach + decisions:
+- Loaded `readme-writer`; surveyed README (278 lines), CONTRIBUTING.md (50),
+  `docs/index.md`, quickstart, and the how-to/reference/explanation docs that
+  already own the depth.
+- Worktree `docs/readme-revamp` (`.wt/docs-readme-revamp`) off `origin/master`.
+- **README rewritten 278 → 130 lines:** value prop up top (one CUE module → both
+  halves: the CLI that packages a Configuration + the runtime function; "no Go, no
+  patch-and-transform"), `go install` install, a **verified** minimal CUE module +
+  `render`/`publish` example, a 6-command table, and a docs hand-off. Dropped the
+  deep internals (OCI two-cache, CUE_REGISTRY/CACHE mechanics, noxpkg math) — they
+  already live in docs/explanation + reference/configuration.
+- **CONTRIBUTING.md 50 → 99 lines:** absorbed the dev toolchain (mise/moon), heavy
+  test suites, image build, and the release/supply-chain layer — summarized +
+  linked to existing docs, not re-dumped.
+- **docs/index.md:** fixed the stale "README covers the development workflow and
+  supply-chain layer" pointer → CONTRIBUTING.md.
+
+Verification:
+- Built `cuefn`, ran the README's exact CUE snippet: `cuefn render` yields the
+  Deployment with `replicas: 3` from the XR; `cuefn generate` yields a structural
+  XRD with defaults/bounds. Example is real, not hand-waved.
+- `moon run docs:build` passes under `--strict`.
+
+Flagged to developer (accepted, LGTM): the `…/releases` link is forward-looking —
+the v0.1.0–v0.1.2 GitHub releases are still drafts, so that page is empty to
+anonymous visitors until published; `go install …@latest` works regardless.
+
+PR **#47** opened against master. CI in flight (watching: blocking `ci` +
+always-running `integration`/`e2e`). Next: confirm CI green, then merge per the
+autonomous-merge norm + worktree cleanup.
