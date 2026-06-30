@@ -349,3 +349,22 @@ rely on CI `e2e` check before merge.
 recommended releasing AFTER PR5 (e2e proof) + PR6 (docs) so it ships proven +
 documented. Holding #35 (safe default) until they decide — product release is
 outward-facing (binaries/image/Function xpkg/attestations to ghcr).
+
+## 2026-06-30 — PR5 merged (e2e GREEN on kind); PR6 (docs) opened: #39
+PR5 (#38) merged → master `fda04e4`. **CI `e2e` job PASSED (3m17s)** — the live
+kind cluster fetched a real ConfigMap and rendered the guarded resource;
+reconcile/drift stayed green (additive-safety held). Feature proven end-to-end.
+
+PR6 workflow `wf_2b47a8b7-54e` wrote the docs in `.wt/docs-required-resources`:
+new how-to/require-resources + explanation/required-resources-fixpoint, reference
+updates (module-contract/cli/input), mkdocs nav. **Accuracy verify caught a HIGH**
+(the exact docs-drift risk from the session-005 freshness audit): the how-to's
+"test offline" step pointed `--dir` at the SHIPPED `example/module`, which emits
+no requirements → command would contradict the doc. Fixed: decoupled to a
+reader-authored `./my-module` + an honest note that the example emits none.
+Verified myself: only 1 `example/module` ref left (the disclaimer); `docs:build
+--strict` PASS; scope docs/** only. **PR #39 open**, CI watching.
+
+Next: merge #39 → then merge #35 (`release 0.1.1`) per developer decision
+(release after e2e+docs). Optional deferred follow-up: adopt a `cfg` requirement
+in example/module so the how-to command runs against the shipped example.
