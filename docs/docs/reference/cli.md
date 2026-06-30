@@ -108,12 +108,27 @@ the bytes come from the directory.
 | `--xr <string>` | _(required)_ | Path to the observed XR YAML. |
 | `--env <string>` | _(empty)_ | Path to a merged environment YAML. Its top-level keys become `out.input.environment` in the module. |
 | `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR` or the OS cache). |
+| `--required-resources <string>` | _(empty)_ | Path to a YAML file or directory of cluster objects matched against the module's emitted `out.requirements` selectors (mirrors `crossplane render --required-resources`). Multi-document files are split; objects are matched by selector, not keyed by filename. |
 
 **Output.** YAML to stdout: a `resources` map keyed by the author's resource
 names, each entry carrying `object` (the rendered Kubernetes object) and `ready`
 (`"True"`, `"False"`, or `Unspecified`), plus an optional top-level `status`.
-Exits non-zero if the XR cannot be read, the module cannot be loaded, the spec
-violates `#Spec`, or `resources`/`status` do not fully evaluate.
+When the module emits `out.requirements`, render also prints a `requirements` map
+of the emitted selectors, so authors discover what to supply via
+`--required-resources` even when they pass none. Exits non-zero if the XR cannot
+be read, the module cannot be loaded, the spec violates `#Spec`, or
+`resources`/`status` do not fully evaluate.
+
+**Required resources.** When `--required-resources` is supplied and the module
+emits requirements, render runs a fixed two-pass loop — render to discover the
+selectors, match the supplied objects against them, then re-render with the
+matches delivered under `out.input.requiredResources`. Because requirements must
+be a pure function of stable inputs, this provably converges in two passes; if
+the second pass emits different requirements, render fails with a stabilization
+error rather than printing a bogus result (the same `requirements didn't
+stabilize` outcome Crossplane produces in-cluster). See
+[how to require cluster resources](../how-to/require-resources.md) and
+[required resources and the fixpoint](../explanation/required-resources-fixpoint.md).
 
 ---
 
