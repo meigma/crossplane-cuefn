@@ -216,3 +216,30 @@ Developer reviewed the two open questions:
    → Marked DECIDED; contract-disjunction tightening is a deferred nicety.
 Doc status bumped to "review decisions recorded 2026-06-30; awaiting go-ahead to
 implement". Journal re-committed. Still awaiting greenlight on PR1 (contract bump).
+
+## 2026-06-30 — PR1 (contract) opened: #31
+Developer greenlit ("LGTM. Proceed."). Worktree `feat/contract-required-resources`
+off master e41d12a... (current 69cc959). Implemented PR1 solo (small, prototype-
+proven) with rigorous real verification, NOT a workflow.
+
+Added to `contract/contract.cue` (additive, optional): `#Required`, `#Requirement`,
+`#Input.requiredResources?`, `#Transform.requirements?`. Verified: `cue vet` clean,
+`internal/contract` test passes, `moon run root:check` GREEN.
+
+**release-please split decision (important):** the root/product component excludes
+only `contract/`, NOT `internal/contract/`. A single `feat(contract)` squash
+touching `internal/contract/contract_test.go` would make release-please cut a
+SPURIOUS product release for a test-only change. So PR1 = `contract/contract.cue`
+ONLY (→ contract/v0.2.0, no product release). The closedness test for the new
+fields (subtests written + verified earlier, then reverted off this branch) ships
+as a separate `test(contract)` PR — mirrors the session-004 #20 (source) / #28
+(test) split. **PR #31** open, awaiting human sign-off.
+
+**GOTCHA re-confirmed (session-004 lesson):** `root:lint` first failed on stale
+paths from a DELETED sibling worktree (`docs-example-adopt-contract`) poisoning the
+shared golangci-lint cache → `golangci-lint cache clean` fixed it. Run this before
+the gate in fresh worktrees.
+
+Next after #31 merges: `test(contract)` closedness PR, then PR2 `feat(render)` (the
+engine seed + readRequirements + Inputs.RequiredResources) — plan to orchestrate
+the heavier PR2/PR3 with workflows.
