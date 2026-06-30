@@ -54,14 +54,20 @@ type CompositionInput struct {
 	ExpectedDigest string
 	// FunctionName is the in-cluster Function resource name the cuefn step
 	// references (the functionRef.name). It must match the Function name the
-	// installed Configuration's dependsOn entry produces.
+	// installed Configuration's dependsOn entry produces — see DerivedFunctionName.
 	FunctionName string
 	// EnvironmentConfigRefs are the names of EnvironmentConfigs the
 	// function-environment-configs step merges into the pipeline context (by
-	// Reference) before cuefn evaluates the module. When empty the step is still
-	// present but selects nothing, so cuefn sees an empty environment. Each name
+	// Reference) before cuefn evaluates the module. When empty the step is omitted
+	// entirely, so a default install needs only the cuefn Function. Each name
 	// becomes a `type: Reference` entry in the step's Input.
 	EnvironmentConfigRefs []string
+	// EnvironmentConfigFunctionName is the in-cluster Function resource name the
+	// function-environment-configs step references. Like FunctionName it must match
+	// the auto-installed Function name (DerivedFunctionName of the env-config
+	// function package). Only used when EnvironmentConfigRefs is non-empty;
+	// defaults to "function-environment-configs" when blank.
+	EnvironmentConfigFunctionName string
 }
 
 // GenerateComposition builds a pipeline-mode Composition for xrd. Its
@@ -87,10 +93,20 @@ func GenerateComposition(xrd *xv2.CompositeResourceDefinition, in CompositionInp
 		return nil, err
 	}
 
-	envStep, err := envConfigPipelineStep(in.EnvironmentConfigRefs)
-	if err != nil {
-		return nil, err
+	// The function-environment-configs step is emitted only when EnvironmentConfigs
+	// are requested. Emitting it unconditionally (as before) put a step in every
+	// Composition whose Function the Configuration never declared as a dependency,
+	// so the first reconcile failed "cannot find an active FunctionRevision"; and
+	// when no refs were selected the step merged nothing — a silent no-op.
+	var pipeline []apiextv1.PipelineStep
+	if refs := nonBlank(in.EnvironmentConfigRefs); len(refs) > 0 {
+		envStep, err := envConfigPipelineStep(in.EnvironmentConfigFunctionName, refs)
+		if err != nil {
+			return nil, err
+		}
+		pipeline = append(pipeline, envStep)
 	}
+	pipeline = append(pipeline, cuefnStep)
 
 	comp := &apiextv1.Composition{
 		TypeMeta: metav1.TypeMeta{
@@ -105,14 +121,22 @@ func GenerateComposition(xrd *xv2.CompositeResourceDefinition, in CompositionInp
 				APIVersion: apiVersion,
 				Kind:       kind,
 			},
-			Mode: apiextv1.CompositionModePipeline,
-			Pipeline: []apiextv1.PipelineStep{
-				envStep,
-				cuefnStep,
-			},
+			Mode:     apiextv1.CompositionModePipeline,
+			Pipeline: pipeline,
 		},
 	}
 	return comp, nil
+}
+
+// nonBlank returns the non-empty, trimmed entries of refs.
+func nonBlank(refs []string) []string {
+	out := make([]string, 0, len(refs))
+	for _, r := range refs {
+		if strings.TrimSpace(r) != "" {
+			out = append(out, r)
+		}
+	}
+	return out
 }
 
 // compositeTypeRef derives the Composition's compositeTypeRef from the XRD: its
@@ -152,31 +176,26 @@ func referenceableVersion(xrd *xv2.CompositeResourceDefinition) string {
 	return ""
 }
 
-// envConfigPipelineStep builds the function-environment-configs step. When refs
-// are supplied it carries an Input selecting each EnvironmentConfig by Reference,
-// so the step merges them into the pipeline context for cuefn; with no refs the
-// step is present but selects nothing.
-func envConfigPipelineStep(refs []string) (apiextv1.PipelineStep, error) {
+// envConfigPipelineStep builds the function-environment-configs step, selecting
+// each EnvironmentConfig in refs by Reference so the step merges them into the
+// pipeline context for cuefn. funcName is the in-cluster Function resource name
+// the step references; it must match the auto-installed env-config Function name
+// (it defaults to envConfigFunctionName when blank). refs must be non-empty.
+func envConfigPipelineStep(funcName string, refs []string) (apiextv1.PipelineStep, error) {
+	if funcName == "" {
+		funcName = envConfigFunctionName
+	}
 	step := apiextv1.PipelineStep{
 		Step:        envConfigStepName,
-		FunctionRef: apiextv1.FunctionReference{Name: envConfigFunctionName},
-	}
-	if len(refs) == 0 {
-		return step, nil
+		FunctionRef: apiextv1.FunctionReference{Name: funcName},
 	}
 
 	configs := make([]map[string]any, 0, len(refs))
 	for _, name := range refs {
-		if strings.TrimSpace(name) == "" {
-			continue
-		}
 		configs = append(configs, map[string]any{
 			"type": "Reference",
 			"ref":  map[string]any{"name": name},
 		})
-	}
-	if len(configs) == 0 {
-		return step, nil
 	}
 
 	input := map[string]any{

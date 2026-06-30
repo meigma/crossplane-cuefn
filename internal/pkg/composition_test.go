@@ -12,10 +12,11 @@ import (
 	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
-// TestGenerateComposition_StepOrder proves the Composition is pipeline-mode with
-// the env-config step first and the cuefn step second, and that its
-// compositeTypeRef is derived from the XRD's group/version/kind.
-func TestGenerateComposition_StepOrder(t *testing.T) {
+// TestGenerateComposition_DefaultPipeline proves the Composition is pipeline-mode
+// with a single cuefn step when no EnvironmentConfigs are requested (so a default
+// install needs only the cuefn Function), and that its compositeTypeRef is derived
+// from the XRD's group/version/kind.
+func TestGenerateComposition_DefaultPipeline(t *testing.T) {
 	xrd := common.FixtureXRD(t)
 
 	comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
@@ -30,10 +31,8 @@ func TestGenerateComposition_StepOrder(t *testing.T) {
 	assert.Equal(t, "platform.meigma.io/v1alpha1", comp.Spec.CompositeTypeRef.APIVersion)
 	assert.Equal(t, "XApp", comp.Spec.CompositeTypeRef.Kind)
 
-	require.Len(t, comp.Spec.Pipeline, 2)
-	assert.Equal(t, "function-environment-configs", comp.Spec.Pipeline[0].Step)
-	assert.Equal(t, "function-environment-configs", comp.Spec.Pipeline[0].FunctionRef.Name)
-	assert.Equal(t, "cuefn", comp.Spec.Pipeline[1].Step)
+	require.Len(t, comp.Spec.Pipeline, 1)
+	assert.Equal(t, "cuefn", comp.Spec.Pipeline[0].Step)
 }
 
 // TestGenerateComposition_LockStep proves the cuefn step's Input round-trips into
@@ -50,7 +49,8 @@ func TestGenerateComposition_LockStep(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	step := comp.Spec.Pipeline[1]
+	step := comp.Spec.Pipeline[0]
+	require.Equal(t, "cuefn", step.Step)
 	require.NotNil(t, step.Input, "cuefn step must carry an Input")
 
 	var in inputv1beta1.Input
@@ -72,36 +72,52 @@ func TestGenerateComposition_FunctionName(t *testing.T) {
 		FunctionName: "my-cuefn",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "my-cuefn", withName.Spec.Pipeline[1].FunctionRef.Name)
+	assert.Equal(t, "my-cuefn", withName.Spec.Pipeline[0].FunctionRef.Name)
 
 	defaulted, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
 		Module: "cuefn.example/app@v0.1.0",
 	})
 	require.NoError(t, err)
-	assert.Equal(t, "cuefn", defaulted.Spec.Pipeline[1].FunctionRef.Name)
+	assert.Equal(t, "cuefn", defaulted.Spec.Pipeline[0].FunctionRef.Name)
 }
 
 // TestGenerateComposition_EnvironmentConfigs proves the function-environment-configs
-// step carries a Reference Input for each requested EnvironmentConfig, so its
-// values reach the module under input.environment, and that the step carries no
-// Input when none are requested (the default, backward-compatible shape).
+// step is emitted only when EnvironmentConfigs are requested, carries a Reference
+// Input for each, and references the env-config Function by the supplied
+// (Crossplane-derived) name.
 func TestGenerateComposition_EnvironmentConfigs(t *testing.T) {
 	xrd := common.FixtureXRD(t)
 
-	t.Run("none", func(t *testing.T) {
+	t.Run("none omits the env step", func(t *testing.T) {
 		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{Module: "cuefn.example/app@v0.1.0"})
 		require.NoError(t, err)
-		assert.Nil(t, comp.Spec.Pipeline[0].Input, "env-config step must carry no Input when no refs are given")
+		require.Len(t, comp.Spec.Pipeline, 1)
+		assert.Equal(t, "cuefn", comp.Spec.Pipeline[0].Step, "no env step when no EnvironmentConfigs requested")
+	})
+
+	t.Run("default env function name", func(t *testing.T) {
+		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
+			Module:                "cuefn.example/app@v0.1.0",
+			EnvironmentConfigRefs: []string{"app-environment"},
+		})
+		require.NoError(t, err)
+		require.Len(t, comp.Spec.Pipeline, 2)
+		assert.Equal(t, "function-environment-configs", comp.Spec.Pipeline[0].FunctionRef.Name)
 	})
 
 	t.Run("references", func(t *testing.T) {
 		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
-			Module:                "cuefn.example/app@v0.1.0",
-			EnvironmentConfigRefs: []string{"app-environment", "shared-env"},
+			Module:                        "cuefn.example/app@v0.1.0",
+			EnvironmentConfigRefs:         []string{"app-environment", "shared-env"},
+			EnvironmentConfigFunctionName: "crossplane-contrib-function-environment-configs",
 		})
 		require.NoError(t, err)
 
+		require.Len(t, comp.Spec.Pipeline, 2)
 		step := comp.Spec.Pipeline[0]
+		assert.Equal(t, "function-environment-configs", step.Step)
+		assert.Equal(t, "crossplane-contrib-function-environment-configs", step.FunctionRef.Name)
+		assert.Equal(t, "cuefn", comp.Spec.Pipeline[1].Step)
 		require.NotNil(t, step.Input, "env-config step must carry an Input when refs are given")
 
 		var in struct {
