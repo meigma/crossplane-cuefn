@@ -19,16 +19,18 @@ import (
 
 // publishFlags holds the flags for the publish subcommand.
 type publishFlags struct {
-	dir             string
-	cacheDir        string
-	pkgRef          string
-	functionRef     string
-	functionName    string
-	functionVersion string
-	name            string
-	crossplane      string
-	environmentRefs []string
-	insecure        bool
+	dir                string
+	cacheDir           string
+	pkgRef             string
+	functionRef        string
+	functionName       string
+	functionVersion    string
+	name               string
+	crossplane         string
+	environmentRefs    []string
+	envFunctionRef     string
+	envFunctionVersion string
+	insecure           bool
 }
 
 const (
@@ -38,6 +40,12 @@ const (
 	// `cuefn publish-function` ships the Function xpkg.
 	defaultFunctionRef     = "ghcr.io/meigma/function-cuefn"
 	defaultFunctionVersion = ">=v0.0.0"
+
+	// defaultEnvConfigFunctionRef / Version are the well-known crossplane-contrib
+	// function-environment-configs package, recorded in dependsOn when a published
+	// Configuration uses EnvironmentConfigs (--environment-config).
+	defaultEnvConfigFunctionRef     = "xpkg.crossplane.io/crossplane-contrib/function-environment-configs"
+	defaultEnvConfigFunctionVersion = ">=v0.7.2"
 )
 
 // newPublishCommand builds the `cuefn publish` subcommand: the one-command
@@ -75,9 +83,14 @@ func newPublishCommand(options Options) *cobra.Command {
 	cmd.Flags().StringVar(&f.functionRef, "function-ref", defaultFunctionRef,
 		"cuefn Function package OCI ref recorded in the Configuration's dependsOn")
 	cmd.Flags().StringVar(&f.functionName, "function-name", "",
-		"in-cluster Function resource name the Composition references (defaults to the function-ref's last path segment)")
+		"in-cluster Function resource name the Composition references "+
+			"(defaults to the name Crossplane derives for the function-ref dependency)")
 	cmd.Flags().StringVar(&f.functionVersion, "function-version", defaultFunctionVersion,
 		"semver constraint for the cuefn Function dependency")
+	cmd.Flags().StringVar(&f.envFunctionRef, "environment-config-function-ref", defaultEnvConfigFunctionRef,
+		"function-environment-configs package recorded in dependsOn when --environment-config is used")
+	cmd.Flags().StringVar(&f.envFunctionVersion, "environment-config-function-version", defaultEnvConfigFunctionVersion,
+		"semver constraint for the function-environment-configs dependency")
 	cmd.Flags().StringVar(&f.name, "name", "",
 		"Configuration package metadata.name (defaults to <xrd-plural>-configuration)")
 	cmd.Flags().StringVar(&f.crossplane, "crossplane-constraint", "",
@@ -123,22 +136,44 @@ func runPublish(ctx context.Context, options Options, f publishFlags, ref string
 		return err
 	}
 
-	comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
-		Module:                ref,
-		ExpectedDigest:        digest,
-		FunctionName:          functionName(f),
-		EnvironmentConfigRefs: f.environmentRefs,
-	})
+	fnName, err := functionName(f)
 	if err != nil {
-		return fmt.Errorf("cannot build composition for module %q: %w", ref, err)
+		return err
 	}
 
-	meta, err := pkg.GenerateConfigurationMeta(pkg.ConfigurationMeta{
+	compInput := pkg.CompositionInput{
+		Module:                ref,
+		ExpectedDigest:        digest,
+		FunctionName:          fnName,
+		EnvironmentConfigRefs: f.environmentRefs,
+	}
+	metaInput := pkg.ConfigurationMeta{
 		Name:                 configurationName(f, xrd.Spec.Names.Plural),
 		CrossplaneConstraint: f.crossplane,
 		FunctionPackage:      f.functionRef,
 		FunctionVersion:      f.functionVersion,
-	})
+	}
+
+	// When the Composition uses EnvironmentConfigs, the env-config Function must be
+	// referenced by its Crossplane-derived name and declared as a dependency, so a
+	// single Configuration install pulls it and the step resolves.
+	if hasEnvironmentConfigs(f.environmentRefs) {
+		var envName string
+		envName, err = pkg.DerivedFunctionName(f.envFunctionRef)
+		if err != nil {
+			return err
+		}
+		compInput.EnvironmentConfigFunctionName = envName
+		metaInput.EnvironmentConfigFunctionPackage = f.envFunctionRef
+		metaInput.EnvironmentConfigFunctionVersion = f.envFunctionVersion
+	}
+
+	comp, err := pkg.GenerateComposition(xrd, compInput)
+	if err != nil {
+		return fmt.Errorf("cannot build composition for module %q: %w", ref, err)
+	}
+
+	meta, err := pkg.GenerateConfigurationMeta(metaInput)
 	if err != nil {
 		return fmt.Errorf("cannot build configuration metadata: %w", err)
 	}
@@ -179,13 +214,27 @@ func remotePushOptions() []remote.Option {
 	return []remote.Option{remote.WithAuthFromKeychain(authn.DefaultKeychain)}
 }
 
-// functionName resolves the Composition's functionRef.name: the explicit flag,
-// else the last path segment of the function package ref.
-func functionName(f publishFlags) string {
+// functionName resolves the Composition's cuefn functionRef.name: the explicit
+// --function-name flag, else the name Crossplane derives for the auto-installed
+// function dependency (pkg.DerivedFunctionName of --function-ref). The derived
+// name is what the Configuration's dependsOn installs, so the pipeline step binds
+// to it from a single Configuration install with no hand-installed Function.
+func functionName(f publishFlags) (string, error) {
 	if strings.TrimSpace(f.functionName) != "" {
-		return f.functionName
+		return f.functionName, nil
 	}
-	return lastPathSegment(f.functionRef)
+	return pkg.DerivedFunctionName(f.functionRef)
+}
+
+// hasEnvironmentConfigs reports whether any non-blank EnvironmentConfig ref was
+// requested.
+func hasEnvironmentConfigs(refs []string) bool {
+	for _, r := range refs {
+		if strings.TrimSpace(r) != "" {
+			return true
+		}
+	}
+	return false
 }
 
 // configurationName resolves the Configuration metadata.name: the explicit flag,
@@ -198,19 +247,4 @@ func configurationName(f publishFlags, plural string) string {
 		return "configuration"
 	}
 	return plural + "-configuration"
-}
-
-// lastPathSegment returns the final path segment of an OCI ref, stripping any tag
-// or digest, e.g. "xpkg.meigma.io/cuefn:v0" -> "cuefn".
-func lastPathSegment(ref string) string {
-	s := ref
-	if i := strings.LastIndex(s, "/"); i >= 0 {
-		s = s[i+1:]
-	}
-	if i := strings.IndexAny(s, ":@"); i >= 0 {
-		s = s[:i]
-	}
-	// An empty result is fine: GenerateComposition defaults the functionRef name
-	// when FunctionName is blank.
-	return s
 }

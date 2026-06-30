@@ -35,6 +35,14 @@ type ConfigurationMeta struct {
 	// FunctionVersion is the dependsOn semver version constraint
 	// (e.g. ">=v0.1.0").
 	FunctionVersion string
+	// EnvironmentConfigFunctionPackage is the dependsOn ref for the
+	// function-environment-configs Function; when set, a second dependsOn entry is
+	// emitted so installing the Configuration also pulls it (only needed when the
+	// Composition uses EnvironmentConfigs). Empty omits the dependency.
+	EnvironmentConfigFunctionPackage string
+	// EnvironmentConfigFunctionVersion is the version constraint for the
+	// function-environment-configs dependency; used only when the package is set.
+	EnvironmentConfigFunctionVersion string
 }
 
 // GenerateConfigurationMeta builds the meta.pkg.crossplane.io/v1 Configuration
@@ -61,6 +69,12 @@ func GenerateConfigurationMeta(m ConfigurationMeta) (*metav1cp.Configuration, er
 		Function: &funcPkg,
 		Version:  m.FunctionVersion,
 	}}
+	if envPkg := strings.TrimSpace(m.EnvironmentConfigFunctionPackage); envPkg != "" {
+		spec.DependsOn = append(spec.DependsOn, metav1cp.Dependency{
+			Function: &envPkg,
+			Version:  m.EnvironmentConfigFunctionVersion,
+		})
+	}
 
 	return &metav1cp.Configuration{
 		TypeMeta: metav1.TypeMeta{

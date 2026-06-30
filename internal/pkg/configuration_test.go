@@ -64,15 +64,15 @@ func TestBuildConfigurationImage_EmbeddedDocs(t *testing.T) {
 	assert.Equal(t, "apiextensions.crossplane.io/v2", docs[1].APIVersion)
 	assert.Equal(t, "CompositeResourceDefinition", docs[1].Kind)
 
-	// Composition: pipeline mode, env-config then cuefn.
+	// Composition: pipeline mode with the single cuefn step (the fixture requests
+	// no EnvironmentConfigs).
 	assert.Equal(t, "apiextensions.crossplane.io/v1", docs[2].APIVersion)
 	assert.Equal(t, "Composition", docs[2].Kind)
 	assert.Equal(t, "Pipeline", docs[2].Spec["mode"])
 	pipeline, ok := docs[2].Spec["pipeline"].([]any)
 	require.True(t, ok)
-	require.Len(t, pipeline, 2)
-	assert.Equal(t, "function-environment-configs", common.StepName(t, pipeline[0]))
-	assert.Equal(t, "cuefn", common.StepName(t, pipeline[1]))
+	require.Len(t, pipeline, 1)
+	assert.Equal(t, "cuefn", common.StepName(t, pipeline[0]))
 }
 
 // TestBuildConfigurationImage_Errors proves an incomplete Configuration errors
