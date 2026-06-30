@@ -20,6 +20,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strings"
 
 	"cuelang.org/go/cue"
@@ -49,6 +50,12 @@ type Inputs struct {
 	// Environment is the merged EnvironmentConfig data from the pipeline context,
 	// empty when no environment was supplied.
 	Environment map[string]any `json:"environment,omitempty"`
+
+	// RequiredResources holds the cluster objects Crossplane fetched for the
+	// requirements this module emitted on a previous pass, keyed by the author's
+	// requirement name. An empty list means "requested but none found". omitempty
+	// keeps it off out.input before any requirement is delivered.
+	RequiredResources map[string][]map[string]any `json:"requiredResources,omitempty"`
 }
 
 // Resource is a single composed resource produced by a module: a finished
@@ -71,6 +78,21 @@ type Result struct {
 
 	// Status is the status the module returned, or nil when it returned none.
 	Status map[string]any
+
+	// Requirements holds the selectors the module emitted under out.requirements,
+	// keyed by requirement name. nil when the module declares none.
+	Requirements map[string]Requirement
+}
+
+// Requirement is one entry of out.requirements: a selector the engine returns
+// for Crossplane to fetch. Exactly one of MatchName/MatchLabels is set, enforced
+// at render time by [readRequirements].
+type Requirement struct {
+	APIVersion  string            `json:"apiVersion"`
+	Kind        string            `json:"kind"`
+	MatchName   string            `json:"matchName,omitempty"`
+	MatchLabels map[string]string `json:"matchLabels,omitempty"`
+	Namespace   string            `json:"namespace,omitempty"`
 }
 
 // Engine renders CUE modules into composed resources, readiness, and status.
@@ -111,6 +133,23 @@ func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, err
 		return Result{}, err
 	}
 
+	// Read the emitted requirements (a pure function of stable inputs) before
+	// resources, then seed an empty bucket for every declared requirement name so
+	// a data-dependent guard on input.requiredResources[name] is concrete on the
+	// first pass. Re-fill only when seeding actually added keys.
+	requirements, err := readRequirements(v)
+	if err != nil {
+		return Result{}, err
+	}
+
+	if seeded := seedRequiredResources(in.RequiredResources, requirements); seeded != nil {
+		in.RequiredResources = seeded
+		v, err = fillInput(v.Context(), v, in)
+		if err != nil {
+			return Result{}, err
+		}
+	}
+
 	resources, err := readResources(v)
 	if err != nil {
 		return Result{}, err
@@ -121,7 +160,7 @@ func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, err
 		return Result{}, err
 	}
 
-	return Result{Resources: resources, Status: status}, nil
+	return Result{Resources: resources, Status: status, Requirements: requirements}, nil
 }
 
 // fillInput projects the observed spec, fills the module's out.input field via
@@ -198,6 +237,57 @@ func readStatus(v cue.Value) (map[string]any, error) {
 		return nil, wrapCUE(err, "cannot decode `status`")
 	}
 	return out, nil
+}
+
+// readRequirements reads the optional out.requirements map: the selectors the
+// module emits for Crossplane to fetch. It returns nil when the module declares
+// none, errors when the field is present but non-concrete, and enforces that
+// each requirement sets exactly one of matchName or matchLabels (the single
+// enforcement point both the function adapter and the CLI then trust).
+func readRequirements(v cue.Value) (map[string]Requirement, error) {
+	req := v.LookupPath(cue.ParsePath("out.requirements"))
+	if !req.Exists() {
+		return nil, nil //nolint:nilnil // a module that needs nothing is valid.
+	}
+	if err := req.Validate(cue.Concrete(true)); err != nil {
+		return nil, wrapCUE(err, "`requirements` did not fully evaluate")
+	}
+
+	var out map[string]Requirement
+	if err := req.Decode(&out); err != nil {
+		return nil, wrapCUE(err, "cannot decode `requirements`")
+	}
+
+	for name, r := range out {
+		if (r.MatchName != "") == (len(r.MatchLabels) > 0) { // neither or both
+			return nil, fmt.Errorf(
+				"requirement %q must set exactly one of matchName or matchLabels", name)
+		}
+	}
+	return out, nil
+}
+
+// seedRequiredResources fills a non-nil empty bucket for every requirement name
+// not already present in existing, so a data-dependent guard on
+// input.requiredResources[name] collapses to a concrete empty list on the first
+// pass. It copies existing first and returns nil when nothing was added, so the
+// no-requirements path does exactly one fill and never mutates the caller's map.
+func seedRequiredResources(
+	existing map[string][]map[string]any,
+	reqs map[string]Requirement,
+) map[string][]map[string]any {
+	var out map[string][]map[string]any
+	for name := range reqs {
+		if _, ok := existing[name]; ok {
+			continue
+		}
+		if out == nil {
+			out = make(map[string][]map[string]any, len(reqs))
+			maps.Copy(out, existing)
+		}
+		out[name] = []map[string]any{} // non-nil empty list -> concrete cfg: []
+	}
+	return out
 }
 
 // toReady maps a module readiness hint to the SDK enum: "Ready" becomes

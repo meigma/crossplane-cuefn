@@ -42,6 +42,17 @@ func HermeticModuleDir(t *testing.T) string {
 	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/module")
 }
 
+// HermeticRequiredModuleDir returns the path to the self-contained
+// required-resources test-fixture module
+// (internal/test/common/testdata/required). It emits one requirement and guards
+// a resource on the delivered objects, exercising out.requirements and
+// out.input.requiredResources. Like [HermeticModuleDir] it is import-free, so
+// the tests resolve no registry.
+func HermeticRequiredModuleDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/required")
+}
+
 // HermeticRenderloopDir returns the path to the self-contained crossplane
 // render-loop assets (composition.yaml, xr.yaml, environmentconfig.yaml) the
 // render-loop integration test drives, so that test does not depend on the
