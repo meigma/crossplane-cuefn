@@ -427,3 +427,11 @@ REMAINING contract work (now UNBLOCKED — contract is live on Central):
   importable closed contract (#20/#21) + monorepo CI publishing via release-please+OIDC (contract v0.1.0 LIVE
   on Central) + product v0.1.0 released + example adopts the contract + closedness test + docs. Versioning:
   contract welded to function major (both v0), bump-minor-pre-major; release-as bootstrap removed (#27).
+
+## 2026-06-30 00:30 — Session close
+#28 + #29 MERGED (master e41d12a). 16 PRs (#14–#29) all merged + human-signed-off. Worktrees clean.
+No new release PRs (test/docs are non-bumping). Wrote SUMMARY.md; updated INDEX (004→complete) +
+TECH_NOTES (dep-aware loading, v2, contract module, release automation). Branch invariant verified
+(`git ls-files .journal` empty on master). Loose ends (non-blocking): publish the two DRAFT GitHub
+releases after inspection; the optional function-side contract-version check; Dependabot #1/#2.
+Session closed.

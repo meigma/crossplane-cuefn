@@ -462,3 +462,68 @@ moved into the CLI E2Es). Integration tests 23→17, no assertion lost.
 **GOTCHA (caused a 61 MiB binary in #12, fixed in #13):** never `git add -A` after a bare
 `go build ./cmd/cuefn` — it writes `./cuefn` to the repo root. `/cuefn` is now gitignored.
 
+
+## Dependency-aware loading + module-contract v2 + the contract module (session 004, PRs #14–#29)
+
+### Dependency-aware local loading (#14, #15)
+`render.NewLocalLoader(dir, cfg)` attaches a `modconfig.Registry` so a local module
+that imports an OCI dep (e.g. `cue.dev/x/k8s.io`) resolves at load; the zero-value
+`render.LocalLoader{Dir}` stays offline (nil registry) for hermetic tests. Both go
+through `buildRegistry` (extracted from `NewOCILoader`). `load.go` already wires a
+non-nil `Loaded.Registry`. **Central is the default for free:** `modconfig`'s
+`DefaultRegistry = registry.cue.works` is the catch-all when `CUE_REGISTRY` is unset
+OR prefix-scoped; only a bare value replaces it (the deliberate offline/air-gap
+override the tests use). CLI: `moduleLoader(dir, cacheDir)` + a `--cache-dir` flag on
+render/generate/validate/publish.
+
+### The k8s example + test decoupling (#16, #17, #18)
+`example/module` instantiates its objects from `cue.dev/x/k8s.io/api/{apps/v1,core/v1}`
+(`apps/v1.#Deployment` pins apiVersion/kind, no surprise required fields). The tests
+are **decoupled from the example**: the hermetic self-contained fixture is
+`internal/test/common/testdata/module` (loaded via `common.HermeticModuleDir(t)`); the
+example is validated only by the blocking `xrd-check` (XRD drift) + `example-check`
+(render smoke), never woven into unit/integration tests. CI warms a CUE module cache
+(`.github/workflows/ci.yml`, keyed on `example/module/cue.mod/module.cue`).
+
+### Module-contract v2 — the `out` root (#19)
+The transform nests under a single top-level **`out`** field: the engine fills
+`out.input` and reads `out.resources`/`out.status` (4 `cue.ParsePath` literals in
+`internal/render/engine.go`). `#API`/`#Spec`/`#Status` stay **top-level definitions**.
+Codegen is UNCHANGED — `internal/schema/openapi.go` `definitionsOnly` drops the regular
+`out` field exactly like it dropped the old transform fields, so the generated XRD is
+byte-identical. A pre-v2 module (no `out`) gets a clear engine error.
+
+### The contract module (#20, #21, #28, #29)
+`contract/` is a published CUE module **`github.com/meigma/crossplane-cuefn/contract@v0`**
+(on the CUE Central Registry; resolves with zero `CUE_REGISTRY` config since central is
+default). It exposes **closed** `#API`, `#Resource` (`{object, ready?}`), `#Input`
+(`out.input`), `#Transform` (the closed `out` wrapper). Authors import it and unify:
+`#API: contract.#API & {…}`, `out: contract.#Transform & {…}` → `cue vet` rejects a
+misspelled/unknown field (e.g. `out.resorces: field not allowed`). **GUARDRAIL:**
+`#Spec`/`#Status` are NOT wrapped — they feed the XRD codegen and stay the author's
+import-free schemas. Enforcement is **author-time only** (the engine does NOT embed the
+contract; the published module is the single source of truth). `internal/contract` is
+the offline closedness regression test. The example is the reference adoption (and the
+live drift canary — it imports the contract AND is rendered by the function).
+
+**Versioning policy:** the contract's major is welded to the function's major (both
+`v0`), enforced by `bump-minor-pre-major`. Within `v0`: fix→patch, feature→minor;
+breaking stays in `0.x`; `v1` only as a deliberate coordinated bump when the function
+goes `v1`. Authors pin `@v0` (the compatibility anchor).
+
+### Release automation — release-please monorepo + OIDC (#21, #24–#27)
+Two independently-versioned components: the **product** (`.`, tag `v*` — the `cuefn`
+binary distributed as binaries + image + Function xpkg, one version) and the
+**contract** (`contract`, tag `contract/v*`, release-type `simple`, `bump-minor-pre-major`
+so it stays on `v0`). `separate-pull-requests: true`; `exclude-paths: ["contract"]` on
+root so contract-only commits never bump the product. **Publishing is headless via
+GitHub OIDC** — `.github/workflows/release-contract.yml` uses
+`cue-labs/registry-login-action` (no stored secret; one-time trust at
+`registry.cue.works/account/oidc`) + `cue mod publish` from `contract/`.
+- **release GitHub App:** `MEIGMA_RELEASE_APP_ID` (var) + `MEIGMA_RELEASE_APP_PRIVATE_KEY`
+  (secret) are configured (they were MISSING before — release-please had never run).
+- **First-release gotcha:** a never-released component's first release defaults to
+  `1.0.0` (overriding `bump-minor-pre-major`). Use `release-as: "0.1.0"` to bootstrap,
+  then remove it. CUE ignores git tags — `cue mod publish vX.Y.Z` just uploads the
+  committed `contract/` content (major must match `@v0`).
+- Non-bumping commit types (`ci`/`docs`/`test`/`chore`/`build`) cut no release.
