@@ -311,3 +311,28 @@ I reviewed the diff (faithful, all proto in function), hit a real `protogetter`
 lint (`rsp.Requirements == nil` → use `rsp.GetRequirements()`) → refactored
 setRequirements to build a local map + read via getter. Re-ran: lint 0 issues,
 `root:check` GREEN. **PR #36 open**, CI watching (bg). Merge when green.
+
+## 2026-06-30 — PR3 merged; PR4 (feat cli) opened: #37
+PR3 (#36) merged → master `ce381c4`. release-please refreshed #35 (still
+product `0.1.1`, HELD).
+
+PR4 workflow `wf_e1e24650-a68` implemented the CLI in
+`.wt/feat-cli-required-resources`: `--required-resources <file|dir>`, the new
+required_resources.go (loadRequiredObjects + matchRequirements), the fixed
+two-pass render→match→render + stabilization check, renderOutput.Requirements.
+Verify found 3 LOW (0 auto-actioned): I fixed all three myself —
+(1) loadRequiredObjects' hand-rolled `---` splitter mis-split a `---` inside a
+value → replaced with k8s `util/yaml.NewYAMLReader` (column-0 correct);
+(2) added the non-convergence test — needed an impure fixture
+(`internal/cli/testdata/impurereq`) with an author `requiredResources: cfg: […]|*[]`
+default so `out.requirements` (which impurely references requiredResources) is
+concrete on pass 1, else readRequirements errors "undefined field" before the
+seed runs (the seed runs AFTER readRequirements); (3) added a multi-key
+matchLabels test case.
+
+Phantom gopls cross-worktree compiler diagnostics appeared (undefined
+loadRequiredObjects, duplicate `name` import) — `go build ./...` was clean
+(session-003 lesson: trust go vet over LSP). Hit a real `protogetter` (PR3) and
+golines (PR4) lint — both fixed. `root:check` GREEN. **PR #37 open**, CI
+watching. PR4 is the LAST code PR → on merge, #35 `0.1.1` is feature-complete
+(will surface for release decision). Remaining: PR5 e2e, PR6 docs (non-bumping).
