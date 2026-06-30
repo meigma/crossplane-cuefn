@@ -15,9 +15,14 @@ builds:
     goos:
       - darwin
       - linux
+      - windows
     goarch:
       - amd64
       - arm64
+    ignore:
+      # Scoop only needs amd64; skip the rarely used windows/arm64 target.
+      - goos: windows
+        goarch: arm64
     flags:
       - -trimpath
     ldflags:
@@ -32,16 +37,24 @@ archives:
     ids:
       - cuefn
     formats:
-      - binary
+      - tar.gz
+    # Windows consumers (Scoop) expect a zip.
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
     name_template: >-
       {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - LICENSE*
+      - README.md
 
 checksum:
   name_template: checksums.txt
 
 sboms:
-  - id: binary
-    artifacts: binary
+  - id: archive
+    artifacts: archive
 
 changelog:
   disable: true
