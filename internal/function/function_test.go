@@ -23,11 +23,27 @@ import (
 // local loader (the tests do not depend on the user-facing example/ module).
 const moduleDir = "../test/common/testdata/module"
 
+// requiredDir is the shared hermetic required-resources fixture: it emits one
+// matchName ConfigMap requirement (cfg) and guards a Deployment on the fetched
+// objects. matchLabelsDir and invalidReqDir are package-local variants
+// exercising the matchLabels oneof arm and the exactly-one violation.
+const (
+	requiredDir    = "../test/common/testdata/required"
+	matchLabelsDir = "testdata/matchlabels"
+	invalidReqDir  = "testdata/invalidreq"
+)
+
 // localFactory returns a LoaderFactory serving the example module from disk,
 // ignoring the Input's module ref (the LocalLoader is fixed to one directory).
 func localFactory() function.LoaderFactory {
+	return factoryFor(moduleDir)
+}
+
+// factoryFor returns a LoaderFactory serving the module at dir offline, ignoring
+// the Input's module ref (the LocalLoader is fixed to one directory).
+func factoryFor(dir string) function.LoaderFactory {
 	return func(_ *v1beta1.Input) (render.ModuleLoader, error) {
-		return render.LocalLoader{Dir: moduleDir}, nil
+		return render.LocalLoader{Dir: dir}, nil
 	}
 }
 
@@ -225,4 +241,179 @@ func TestRunFunction_FatalOnMalformedOrUnreachable(t *testing.T) {
 			assert.Empty(t, rsp.GetConditions())
 		})
 	}
+}
+
+// requiredRequest is a well-formed request rendering the required-resources
+// fixture for an XApp named demo in namespace default, with the default
+// configName ("app-cfg"). The fixture emits a ConfigMap requirement keyed "cfg".
+func requiredRequest(t *testing.T) *fnv1.RunFunctionRequest {
+	t.Helper()
+	return &fnv1.RunFunctionRequest{
+		Meta: &fnv1.RequestMeta{Tag: "t"},
+		Input: resource.MustStructJSON(`{
+			"apiVersion": "cuefn.meigma.io/v1beta1",
+			"kind": "Input",
+			"module": "cuefn.example/required@v0"
+		}`),
+		Observed: &fnv1.State{
+			Composite: &fnv1.Resource{
+				Resource: resource.MustStructJSON(`{
+					"apiVersion": "platform.meigma.io/v1alpha1",
+					"kind": "XApp",
+					"metadata": {"name": "demo", "namespace": "default"},
+					"spec": {"configName": "app-cfg"}
+				}`),
+			},
+		},
+	}
+}
+
+// hasWarning reports whether the response carries a non-fatal warning result.
+func hasWarning(rsp *fnv1.RunFunctionResponse) bool {
+	for _, r := range rsp.GetResults() {
+		if r.GetSeverity() == fnv1.Severity_SEVERITY_WARNING {
+			return true
+		}
+	}
+	return false
+}
+
+// TestRunFunction_EmitsRequirements asserts the module's out.requirements selector
+// is mapped onto rsp.Requirements.Resources, keyed by the author's name, with its
+// ApiVersion/Kind/MatchName/Namespace round-tripped. The capability is advertised
+// so no diagnostic warning fires.
+func TestRunFunction_EmitsRequirements(t *testing.T) {
+	t.Parallel()
+
+	req := requiredRequest(t)
+	req.Meta.Capabilities = []fnv1.Capability{fnv1.Capability_CAPABILITY_REQUIRED_RESOURCES}
+
+	fn := function.New(factoryFor(requiredDir), logging.NewNopLogger())
+	rsp := run(t, fn, req)
+
+	sel := rsp.GetRequirements().GetResources()["cfg"]
+	require.NotNil(t, sel, "the cfg requirement must be emitted")
+	assert.Equal(t, "v1", sel.GetApiVersion())
+	assert.Equal(t, "ConfigMap", sel.GetKind())
+	assert.Equal(t, "app-cfg", sel.GetMatchName())
+	assert.Equal(t, "default", sel.GetNamespace())
+
+	// Capability advertised -> no diagnostic warning, no fatal.
+	assert.False(t, hasWarning(rsp), "no warning when the capability is advertised")
+	for _, r := range rsp.GetResults() {
+		assert.NotEqual(t, fnv1.Severity_SEVERITY_FATAL, r.GetSeverity())
+	}
+}
+
+// TestRunFunction_EmitsMatchLabels asserts the matchLabels arm of the selector
+// oneof round-trips: a requirement set with labels (and no matchName) surfaces
+// under sel.GetMatchLabels().GetLabels().
+func TestRunFunction_EmitsMatchLabels(t *testing.T) {
+	t.Parallel()
+
+	req := &fnv1.RunFunctionRequest{
+		Meta: &fnv1.RequestMeta{
+			Tag:          "t",
+			Capabilities: []fnv1.Capability{fnv1.Capability_CAPABILITY_REQUIRED_RESOURCES},
+		},
+		Input: resource.MustStructJSON(`{
+			"apiVersion": "cuefn.meigma.io/v1beta1",
+			"kind": "Input",
+			"module": "cuefn.example/matchlabels@v0"
+		}`),
+		Observed: &fnv1.State{
+			Composite: &fnv1.Resource{
+				Resource: resource.MustStructJSON(`{
+					"apiVersion": "platform.meigma.io/v1alpha1",
+					"kind": "XApp",
+					"metadata": {"name": "demo", "namespace": "default"},
+					"spec": {"appName": "app"}
+				}`),
+			},
+		},
+	}
+
+	fn := function.New(factoryFor(matchLabelsDir), logging.NewNopLogger())
+	rsp := run(t, fn, req)
+
+	sel := rsp.GetRequirements().GetResources()["cfg"]
+	require.NotNil(t, sel, "the cfg requirement must be emitted")
+	assert.Equal(t, "v1", sel.GetApiVersion())
+	assert.Equal(t, "ConfigMap", sel.GetKind())
+	assert.Empty(t, sel.GetMatchName(), "matchLabels-only selector sets no matchName")
+	assert.Equal(t, map[string]string{"app": "app"}, sel.GetMatchLabels().GetLabels())
+}
+
+// TestRunFunction_ReceivesRequiredResources asserts the required resources
+// delivered on the request reach the module under out.input.requiredResources:
+// the guarded Deployment reads the fetched ConfigMap's data.image.
+func TestRunFunction_ReceivesRequiredResources(t *testing.T) {
+	t.Parallel()
+
+	req := requiredRequest(t)
+	req.RequiredResources = map[string]*fnv1.Resources{
+		"cfg": {Items: []*fnv1.Resource{{Resource: resource.MustStructJSON(
+			`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"app-cfg","namespace":"default"},"data":{"image":"img:9"}}`,
+		)}}},
+	}
+
+	fn := function.New(factoryFor(requiredDir), logging.NewNopLogger())
+	rsp := run(t, fn, req)
+
+	dep := rsp.GetDesired().GetResources()["deployment-0"].GetResource().AsMap()
+	require.NotEmpty(t, dep, "the guarded Deployment must render from the fetched ConfigMap")
+	spec, ok := dep["spec"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "img:9", spec["image"])
+}
+
+// TestRunFunction_WarnsWithoutCapability asserts that when a module emits
+// requirements but Crossplane does not advertise the capability, a non-fatal
+// warning is added AND the requirements are still emitted (emission is
+// unconditional; the gate controls only the diagnostic).
+func TestRunFunction_WarnsWithoutCapability(t *testing.T) {
+	t.Parallel()
+
+	req := requiredRequest(t) // no Meta.Capabilities
+
+	fn := function.New(factoryFor(requiredDir), logging.NewNopLogger())
+	rsp := run(t, fn, req)
+
+	assert.True(t, hasWarning(rsp), "a warning must fire when the capability is absent")
+	assert.NotNil(t, rsp.GetRequirements().GetResources()["cfg"],
+		"requirements stay emitted regardless of the capability")
+}
+
+// TestRunFunction_InvalidRequirement asserts that a module whose requirement sets
+// both match fields fails the engine's exactly-one check and is surfaced as a
+// single Fatal result.
+func TestRunFunction_InvalidRequirement(t *testing.T) {
+	t.Parallel()
+
+	req := &fnv1.RunFunctionRequest{
+		Meta: &fnv1.RequestMeta{Tag: "t"},
+		Input: resource.MustStructJSON(`{
+			"apiVersion": "cuefn.meigma.io/v1beta1",
+			"kind": "Input",
+			"module": "cuefn.example/invalidreq@v0"
+		}`),
+		Observed: &fnv1.State{
+			Composite: &fnv1.Resource{
+				Resource: resource.MustStructJSON(`{
+					"apiVersion": "platform.meigma.io/v1alpha1",
+					"kind": "XApp",
+					"metadata": {"name": "demo", "namespace": "default"},
+					"spec": {"configName": "app-cfg"}
+				}`),
+			},
+		},
+	}
+
+	fn := function.New(factoryFor(invalidReqDir), logging.NewNopLogger())
+	rsp := run(t, fn, req)
+
+	results := rsp.GetResults()
+	require.Len(t, results, 1)
+	assert.Equal(t, fnv1.Severity_SEVERITY_FATAL, results[0].GetSeverity())
+	assert.Contains(t, results[0].GetMessage(), "exactly one")
 }
