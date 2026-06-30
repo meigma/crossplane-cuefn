@@ -30,3 +30,93 @@ Current state of the world:
 
 Plan: wait for the developer's actual request, survey task-relevant skills/notes,
 then proceed under the session protocol (PR-per-unit, human sign-off before merge).
+
+## 2026-06-30 11:50 — Goal: consumer-impersonation DX assessment (ultracode)
+
+Developer's goal: a thorough **developer-experience assessment** before declaring
+the repo consumable. Method: multiple agents impersonate **external consumers** of
+the function and use it in real-world-like cases. Substitutions allowed: ad-hoc
+local clusters (kind/k3d/ctlptl) for real clusters; well-known off-the-shelf
+software (pretend-deploy) for real apps; ttl.sh for publishing. Everything
+throwaway. Output (developer's choice): **report only** (ranked sharp edges +
+feature ideas + readiness verdict) — no repo changes this run. Scope chosen via
+AskUserQuestion: **Full e2e**, **~6 personas**, **Report only**.
+
+Design principle enforced on every agent: they are EXTERNAL CONSUMERS — may read
+only `README.md` + `docs/**` + CLI `--help` + the published contract; **forbidden**
+to read `internal/**`, `cmd/**` source, or `*_test.go`. Getting stuck is a finding.
+
+Environment grounding (inline, before launch):
+- Local tools present: kind / k3d / ctlptl / docker(OrbStack) / cue / kubectl /
+  helm / oras. `crossplane` CLI NOT on PATH (mise-pinned 2.3.3); PATH `helm` looks
+  like v4 while Crossplane chart path expects v3 (mise pins 3.18.6).
+- Built `cuefn` to scratch (`…/scratchpad/dx/bin/cuefn`); resolved pinned tool
+  paths into `…/scratchpad/dx/env.sh`.
+- **Published artifacts ARE public** on ghcr: `crossplane-cuefn` and `function-cuefn`.
+
+Two real findings surfaced BEFORE the run even started (to be confirmed by personas):
+1. **Quickstart install ref 404s:** docs say install `ghcr.io/meigma/function-cuefn:v0`
+   (also the default `--function-ref`); anonymous pull → **404**. Only the exact
+   `:v0.1.1` resolves (200). No floating `:v0`/`:latest` tag is published. A
+   verbatim quickstart follower hits a not-found.
+2. **Tool acquisition friction:** crossplane CLI not installable via PATH; helm
+   v4-vs-v3 mismatch.
+
+Workflow launched: **`cuefn-dx-assessment`**, Run ID `wf_db45cd1d-fae` (background).
+Shape: Setup (one shared kind cluster: Crossplane + `function-cuefn:v0.1.1` + a
+broad aggregate-to-crossplane RBAC) → 6 personas (doc-literalist on its OWN
+cluster; local-only; Redis/Postgres/web-app/config-reader platform builders on the
+shared cluster) → structure → dedup → adversarial verify (skeptical reproduce;
+REFUTED dropped) → completeness critic → synthesis → cleanup. Report written to
+`…/scratchpad/dx/DX-REPORT.md`. Awaiting completion notification.
+
+## 2026-06-30 13:00 — DX assessment complete
+
+Workflow `wf_db45cd1d-fae` finished: 40 agents, ~2.7M tokens, ~59 min. 48 raw
+findings → 31 canonical → **21 verified** (2 refuted, 8 low/nit passed through).
+4/6 personas reached a Ready XR; the verbatim-quickstart follower (p1) reached
+nothing. Report preserved at `.journal/006/DX-REPORT.md` (the scratch copy is
+throwaway). Full per-persona journeys are in scratch only.
+
+**Verdict: Not yet — close on the engine, blocked on onboarding.** The local
+author→render→validate→generate loop, XRD codegen, contract enforcement, and
+publish/digest-lockstep are genuinely good. But the documented quickstart fails
+end-to-end and the as-shipped function cannot render without an undocumented
+`DeploymentRuntimeConfig`.
+
+Three blockers (all CONFIRMED, all on the headline quickstart):
+- **B1** quickstart installs `function-cuefn:v0` → 404 (only `:v0.1.0/:v0.1.1`
+  published; no moving `:v0`/`:latest`).
+- **B2** generated Composition `functionRef.name: function-cuefn` ≠ the name the
+  quickstart's `install.yaml` creates (`cuefn`) ≠ the auto-installed dep
+  (`meigma-function-cuefn`). Crossplane binds by metadata.name → render fails.
+- **B3** `cuefn publish` always emits a `function-environment-configs` step but
+  omits it from the Configuration's `dependsOn` → first reconcile fails
+  "cannot find an active FunctionRevision". Hit p1/p3/p5.
+
+Two HIGHs that mean the shipped function can't render out of the box (every
+cluster persona reverse-engineered the same DRC fix):
+- **H1** no documented way to point the in-cluster function at a non-central CUE
+  registry (`CUE_REGISTRY` via `DeploymentRuntimeConfig`); the word DRC appears
+  nowhere in docs. Every non-central module → "module not found".
+- **H2** shipped function has no writable CUE cache → first render
+  `mkdir /.cache: permission denied` (nonroot, read-only fs).
+- **H3** `generate` marks fully-defaulted nested structs `required` with no
+  object-level default → apiserver rejects `spec: {}` that validate/render accept
+  (breaks the documented no-drift guarantee).
+
+Top feature ideas: function image defaults to a writable cache; per-Config/Input
+registry routing (vs one global DRC, which has a lost-update race, M1); ship the
+DRC recipe / have `cuefn publish` emit one; `cuefn doctor` preflight; generate the
+aggregate-to-crossplane ClusterRole for composed kinds (M4 RBAC wall).
+
+Biggest coverage gaps (no persona touched): day-2 delete/teardown/GC, schema-
+changing upgrades, live XR mutation, claims/cluster-scoped XRs, private/transitive
+OCI deps, authenticated private registries, connection-secret propagation,
+in-cluster observability, `publish-function`/self-hosted path.
+
+Cleanup: all `cuefn-dx-*` kind clusters deleted by the workflow; manually removed a
+stray `kind-registry-*` (registry:2) container p1 left behind. Pre-existing
+`oidc-smoke` cluster + `dagger-engine` (2 days old) left untouched. ttl.sh +
+scratch are self-expiring. Per developer's choice this run is **report-only** — no
+repo changes; triage of fixes is a separate decision.
