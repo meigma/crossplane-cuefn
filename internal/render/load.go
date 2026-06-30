@@ -7,6 +7,8 @@ import (
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/cuecontext"
 	"cuelang.org/go/cue/load"
+
+	"github.com/meigma/crossplane-cuefn/internal/cueerr"
 )
 
 // LoadModule resolves ref through loader, builds the module's CUE value, and
@@ -43,13 +45,13 @@ func LoadModule(ctx context.Context, loader ModuleLoader, ref string) (cue.Value
 	}
 	if err = insts[0].Err; err != nil {
 		ld.Cleanup()
-		return cue.Value{}, nil, wrapCUE(err, "cannot load module %q", ref)
+		return cue.Value{}, nil, cueerr.Wrap(err, "cannot load module %q", ref)
 	}
 
 	v := cctx.BuildInstance(insts[0])
 	if err = v.Err(); err != nil {
 		ld.Cleanup()
-		return cue.Value{}, nil, wrapCUE(err, "cannot build module %q", ref)
+		return cue.Value{}, nil, cueerr.Wrap(err, "cannot build module %q", ref)
 	}
 
 	return v, ld.Cleanup, nil

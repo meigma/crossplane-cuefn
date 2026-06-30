@@ -21,12 +21,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"maps"
-	"strings"
 
 	"cuelang.org/go/cue"
 	"cuelang.org/go/cue/errors"
 
 	"github.com/crossplane/function-sdk-go/resource"
+
+	"github.com/meigma/crossplane-cuefn/internal/cueerr"
 )
 
 // Metadata is the subset of an XR's metadata exposed to a module.
@@ -178,14 +179,14 @@ func fillInput(cctx *cue.Context, v cue.Value, in Inputs) (cue.Value, error) {
 
 	inVal := cctx.CompileBytes(inJSON)
 	if err = inVal.Err(); err != nil {
-		return cue.Value{}, wrapCUE(err, "cannot compile inputs")
+		return cue.Value{}, cueerr.Wrap(err, "cannot compile inputs")
 	}
 
 	v = v.FillPath(cue.ParsePath("out.input"), inVal)
 
 	input := v.LookupPath(cue.ParsePath("out.input"))
 	if err = input.Validate(cue.Concrete(true)); err != nil {
-		return cue.Value{}, wrapCUE(err, "inputs do not satisfy module #Spec")
+		return cue.Value{}, cueerr.Wrap(err, "inputs do not satisfy module #Spec")
 	}
 	return v, nil
 }
@@ -203,15 +204,15 @@ type rawResource struct {
 func readResources(v cue.Value) (map[string]Resource, error) {
 	res := v.LookupPath(cue.ParsePath("out.resources"))
 	if err := res.Err(); err != nil {
-		return nil, wrapCUE(err, "module has no usable `out.resources` field")
+		return nil, cueerr.Wrap(err, "module has no usable `out.resources` field")
 	}
 	if err := res.Validate(cue.Concrete(true)); err != nil {
-		return nil, wrapCUE(err, "`resources` did not fully evaluate")
+		return nil, cueerr.Wrap(err, "`resources` did not fully evaluate")
 	}
 
 	var raw map[string]rawResource
 	if err := res.Decode(&raw); err != nil {
-		return nil, wrapCUE(err, "cannot decode `resources`")
+		return nil, cueerr.Wrap(err, "cannot decode `resources`")
 	}
 
 	out := make(map[string]Resource, len(raw))
@@ -229,12 +230,12 @@ func readStatus(v cue.Value) (map[string]any, error) {
 		return nil, nil //nolint:nilnil // absent status is a valid, empty result.
 	}
 	if err := status.Validate(cue.Concrete(true)); err != nil {
-		return nil, wrapCUE(err, "`status` did not fully evaluate")
+		return nil, cueerr.Wrap(err, "`status` did not fully evaluate")
 	}
 
 	var out map[string]any
 	if err := status.Decode(&out); err != nil {
-		return nil, wrapCUE(err, "cannot decode `status`")
+		return nil, cueerr.Wrap(err, "cannot decode `status`")
 	}
 	return out, nil
 }
@@ -250,12 +251,12 @@ func readRequirements(v cue.Value) (map[string]Requirement, error) {
 		return nil, nil //nolint:nilnil // a module that needs nothing is valid.
 	}
 	if err := req.Validate(cue.Concrete(true)); err != nil {
-		return nil, wrapCUE(err, "`requirements` did not fully evaluate")
+		return nil, cueerr.Wrap(err, "`requirements` did not fully evaluate")
 	}
 
 	var out map[string]Requirement
 	if err := req.Decode(&out); err != nil {
-		return nil, wrapCUE(err, "cannot decode `requirements`")
+		return nil, cueerr.Wrap(err, "cannot decode `requirements`")
 	}
 
 	for name, r := range out {
@@ -302,15 +303,4 @@ func toReady(hint string) resource.Ready {
 	default:
 		return resource.ReadyUnspecified
 	}
-}
-
-// wrapCUE wraps a CUE error with a message and appends [errors.Details] so the
-// offending field path or key appears in the surfaced message.
-func wrapCUE(err error, format string, args ...any) error {
-	msg := fmt.Sprintf(format, args...)
-	details := strings.TrimRight(errors.Details(err, nil), "\n")
-	if details == "" {
-		return fmt.Errorf("%s: %w", msg, err)
-	}
-	return fmt.Errorf("%s: %w\n%s", msg, err, details)
 }

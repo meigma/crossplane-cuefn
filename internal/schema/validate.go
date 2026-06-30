@@ -3,11 +3,10 @@ package schema
 import (
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"cuelang.org/go/cue"
-	"cuelang.org/go/cue/errors"
 
+	"github.com/meigma/crossplane-cuefn/internal/cueerr"
 	"github.com/meigma/crossplane-cuefn/internal/render"
 )
 
@@ -36,23 +35,12 @@ func Validate(module cue.Value, spec map[string]any) error {
 
 	specVal := module.Context().CompileBytes(raw)
 	if err := specVal.Err(); err != nil {
-		return wrapCUE(err, "cannot compile XR spec")
+		return cueerr.Wrap(err, "cannot compile XR spec")
 	}
 
 	unified := specSchema.Unify(specVal)
 	if err := unified.Validate(cue.Concrete(true)); err != nil {
-		return wrapCUE(err, "XR spec does not satisfy #Spec")
+		return cueerr.Wrap(err, "XR spec does not satisfy #Spec")
 	}
 	return nil
-}
-
-// wrapCUE wraps a CUE error with a message and appends errors.Details so the
-// offending field path appears in the surfaced message.
-func wrapCUE(err error, format string, args ...any) error {
-	msg := fmt.Sprintf(format, args...)
-	details := strings.TrimRight(errors.Details(err, nil), "\n")
-	if details == "" {
-		return fmt.Errorf("%s: %w", msg, err)
-	}
-	return fmt.Errorf("%s: %w\n%s", msg, err, details)
 }
