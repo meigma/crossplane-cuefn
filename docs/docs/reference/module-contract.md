@@ -225,6 +225,77 @@ The module's readiness hint maps to the runtime/render readiness as follows:
 | `"NotReady"` | `"False"` | Not ready |
 | _(absent)_ | `Unspecified` | Unspecified |
 
+## Requiring cluster resources
+
+A module may ask Crossplane to fetch existing cluster objects at render time and
+read them back. Two **optional** contract fields make this work, both keyed by a
+name the author chooses (the same name in both directions). They are available
+from contract **v0.2.0** onward; a module that needs nothing omits them and is
+unaffected. The full authoring walkthrough is
+[how to require cluster resources](../how-to/require-resources.md), and the loop
+that drives it is covered in
+[required resources and the fixpoint](../explanation/required-resources-fixpoint.md).
+
+### Emitting selectors: `#Transform.requirements`
+
+`out.requirements` is an optional, author-keyed map of selectors the module emits
+for Crossplane to fetch (and that `cuefn render --required-resources` matches
+against locally):
+
+```cue
+out: requirements: cfg: contract.#Requirement & {
+	apiVersion: "v1"
+	kind:       "ConfigMap"
+	matchName:  input.spec.configName
+	namespace:  input.metadata.namespace
+}
+```
+
+Each entry is a `#Requirement`:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `apiVersion` | yes | API version of the kind to fetch. |
+| `kind` | yes | Kind to fetch. |
+| `matchName` | one of | Exact `metadata.name` of the object. |
+| `matchLabels` | one of | Label map; an object matches when it carries all of them. |
+| `namespace` | no | Namespace to read. Omitted, it reads a cluster-scoped kind, or lists a namespaced kind across all namespaces. |
+
+The engine enforces that each requirement sets **exactly one** of `matchName` or
+`matchLabels` at render time (in `readRequirements`); setting neither or both is
+an error naming the offending requirement. `out.requirements` must be a pure
+function of stable inputs (`spec`/`metadata`/`environment`) so it is identical
+every pass and the fixpoint converges — see
+[the explanation](../explanation/required-resources-fixpoint.md#why-requirements-must-be-pure-of-stable-inputs).
+
+### Receiving objects: `#Input.requiredResources`
+
+`out.input.requiredResources` is the matching optional field the engine fills
+with the objects Crossplane delivered, keyed by the same requirement name:
+
+```cue
+requiredResources?: [string]: [...#Required]
+```
+
+A populated entry holds the matched objects; an empty list means "requested, none
+found". cuefn seeds an empty list for every declared requirement name before it
+reads `out.resources`, so a guard on `input.requiredResources[name]` stays
+concrete on the first pass with no author default. `#Required` is intentionally
+**open** (any Kubernetes kind) — the author dereferences whatever fields the
+fetched object carries:
+
+```cue
+#Required: {
+	apiVersion: string
+	kind:       string
+	...
+}
+```
+
+Read the bucket back with a `for` comprehension or an `if len(...) > 0` guard;
+both work because the seeded value is a concrete list. See
+[how to require cluster resources](../how-to/require-resources.md#2-guard-the-data-dependent-resource).
+
 ## Author-time validation with the contract module
 
 The contract above is published as a CUE module of **closed** definitions,

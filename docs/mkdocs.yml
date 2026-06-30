@@ -40,6 +40,7 @@ nav:
   - Quickstart: quickstart.md
   - How-to:
       - Render a module locally: how-to/render-locally.md
+      - Require cluster resources: how-to/require-resources.md
       - Generate an XRD: how-to/generate-xrd.md
       - Validate an XR: how-to/validate-xr.md
       - Enforce the module contract: how-to/enforce-the-contract.md
@@ -55,6 +56,7 @@ nav:
       - Input CRD: reference/input.md
   - Explanation:
       - One module, two outputs: explanation/one-module-two-outputs.md
+      - Required resources and the fixpoint: explanation/required-resources-fixpoint.md
       - Schema-runtime digest lock-step: explanation/digest-lockstep.md
       - Reserved-key projection: explanation/reserved-key-projection.md
       - Lean runtime image (noxpkg): explanation/noxpkg-split.md
