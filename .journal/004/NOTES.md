@@ -358,3 +358,49 @@ contract release PR is merged. Then B2 (example adoption) + the test PR.
 
 release.yml convention mirrored: mise-action `cache: false` (fresh, mise.lock-verified) for the publish job;
 ubuntu-24.04; permissions:{} top + per-job; SHA-pinned actions.
+
+## 2026-06-29 19:00 — Contract + product BOTH released at v0.1.0 (release-please now works)
+Merged #20 (source) + #21 (wiring). release-please then FAILED — surfaced a PRE-EXISTING gap: the release
+GitHub App creds were never configured (no `MEIGMA_RELEASE_APP_ID` var, no `MEIGMA_RELEASE_APP_PRIVATE_KEY`
+secret). release-please had NEVER run since repo start (10 runs all failed at the app-token step). So 0.1.0
+in the manifest was never actually tagged.
+- **User had me set the creds from 1Password** (`op` + `gh`): item `meigma-release-please` in `Homelab` vault
+  (SECURE_NOTE; fields app_id/client_id; file attachment `key.pem`). `op item get --fields label=app_id` →
+  `gh variable set MEIGMA_RELEASE_APP_ID`; `op read "op://Homelab/meigma-release-please/key.pem" | gh secret
+  set MEIGMA_RELEASE_APP_PRIVATE_KEY`. App ID 3342783. **op read resolves a file ATTACHMENT via op://vault/
+  item/filename.** Re-ran release-please → SUCCESS.
+- **OIDC trust (user, web UI):** added a trusted publisher at registry.cue.works/account/oidc for
+  meigma/crossplane-cuefn. Filled ONLY Workflow=`.github/workflows/release-contract.yml`; left Ref/Env/TTL/
+  Auth-Account blank (Ref would pin a single tag; no GH Environment used; default TTL fine; default acct=user).
+- **release-please version saga (lessons):**
+  - First release-please run created #22 contract **1.0.0** + #23 product **0.2.0** (both WRONG).
+  - **GOTCHA: a never-released component's FIRST release defaults to 1.0.0**, overriding bump-minor-pre-major
+    (which only keeps an EXISTING 0.x in 0.x). Observed: manifest 0.1.0 → 0.2.0 (breaking→minor, pre-major
+    works); manifest 0.0.0 → 1.0.0 (initial-release default). So resetting manifest to 0.0.0 made it WORSE.
+  - **FIX (deterministic): `release-as: "0.1.0"` on both packages** forces the first release to 0.1.0. Plus
+    `exclude-paths: ["contract"]` on root so contract-only commits never bump the product (true component
+    independence). Removed release-as in a follow-up (#27) once both were cut → future bumps normal.
+  - **Second-release conflict:** after #22 merged, the product release PR (#23) CONFLICTED on the shared
+    manifest/CHANGELOG; re-running release-please did NOT auto-rebase it. FIX: delete the release-please
+    branch → re-run → it RECREATES the PR fresh against current master (clean). New PR #26.
+- **OUTCOME — both released at v0.1.0:**
+  - **Contract v0.1.0 PUBLISHED to the CUE Central Registry** via OIDC (release-contract.yml success).
+    VERIFIED end-to-end: a clean module `cue mod tidy` resolved `github.com/meigma/crossplane-cuefn/
+    contract@v0` → v0.1.0 from Central (zero CUE_REGISTRY config) and evaluated `#Transform`.
+  - **Product v0.1.0**: tag v0.1.0 + draft GitHub release created; release.yml (GoReleaser/melange/apko/
+    cosign/attest) BUILDING at checkpoint time (run 28411908550 — confirm it succeeds).
+  - Config clean: no stray release PRs; release-as removed; manifest `.: 0.1.0, contract: 0.1.0`.
+- **Versioning policy (locked with user):** contract major welded to function major (both v0). Within v0:
+  fix→patch (v0.1.1), feature→minor (v0.2.0); breaking stays in 0.x (bump-minor-pre-major). v1 only as a
+  deliberate coordinated bump when the function goes v1. Compat = pin `@v0` + docs note function↔contract;
+  the example (imports contract + is rendered by the function) is the live drift canary. Possible future:
+  function-side runtime check of the imported contract major.
+
+REMAINING contract work (now UNBLOCKED — contract is live on Central):
+- **B2 (example adoption):** example imports `github.com/meigma/crossplane-cuefn/contract@v0` (`out:
+  contract.#Transform & {...}`, `#API: contract.#API & {...}`) + `cue mod tidy` + docs (import + cue vet
+  workflow). xrd-check/example-check resolve the contract from Central (CI cache warms it). `feat`? NO —
+  touches example/ (product component) → would bump product. Use a non-product-bumping approach or accept a
+  product patch. (Decide at impl.)
+- **Closedness test PR:** re-add `internal/contract` test (saved at /tmp/contract-test/) as non-bumping
+  `test(contract)`. NOTE: internal/contract is a PRODUCT path → a `test`-typed commit won't bump product.
