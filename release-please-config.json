@@ -13,8 +13,7 @@
       "package-name": "crossplane-cuefn",
       "changelog-path": "CHANGELOG.md",
       "extra-files": ["melange.yaml", "apko.yaml"],
-      "exclude-paths": ["contract"],
-      "release-as": "0.1.0"
+      "exclude-paths": ["contract"]
     },
     "contract": {
       "release-type": "simple",
@@ -24,8 +23,7 @@
       "include-component-in-tag": true,
       "tag-separator": "/",
       "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": false,
-      "release-as": "0.1.0"
+      "bump-patch-for-minor-pre-major": false
     }
   },
   "changelog-sections": [
