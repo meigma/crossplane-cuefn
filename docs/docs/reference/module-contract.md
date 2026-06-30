@@ -24,6 +24,9 @@ deps: {
 		v:       "v0.7.0"
 		default: true
 	}
+	"github.com/meigma/crossplane-cuefn/contract@v0": {
+		v: "v0.1.0"
+	}
 }
 ```
 
@@ -32,10 +35,14 @@ The module path and major version (`cuefn.example/app@v0`) form the
 
 The `deps` block records the module's dependencies. The example transform
 instantiates its Kubernetes objects from the official Kubernetes schema
-(`cue.dev/x/k8s.io`), so the module carries that as a dependency. Run
+(`cue.dev/x/k8s.io`), and adopts the cuefn **module contract**
+(`github.com/meigma/crossplane-cuefn/contract@v0`) for author-time validation, so
+the module carries both as dependencies (the contract is imported in `api.cue` and
+`transform.cue` — see
+[author-time validation](#author-time-validation-with-the-contract-module)). Run
 `cue mod tidy` in the module directory to populate `deps` after adding an import;
 modern CUE records the resolved versions inline in `module.cue` (there is no
-separate `cue.sum`). The dependency resolves from the default central registry
+separate `cue.sum`). Both dependencies resolve from the default central registry
 (`registry.cue.works`) — see [configuration](configuration.md#cue_registry).
 
 ## The API envelope: `#API`
@@ -235,7 +242,14 @@ out: contract.#Transform & {input: {/* ... */}, resources: {/* ... */}, status: 
 
 `#Spec` and `#Status` are **not** wrapped — they are your own schemas and feed the
 XRD codegen. Adoption is optional (the plain shape renders identically); it adds
-the in-editor guarantee. See
+the in-editor guarantee.
+
+`contract.#API` is itself **closed** and defines only
+`group`/`version`/`kind`/`plural`/`scope`. The optional `shortNames`,
+`categories`, and `printerColumns` fields listed above are read by the CLI codegen
+from a plain `#API`, but they are **not** part of the contract envelope — unifying
+them with `contract.#API` is a `cue vet` error. Omit them to adopt `contract.#API`,
+or keep a plain `#API` if you need them. See
 [How to enforce the module contract](../how-to/enforce-the-contract.md).
 
 ## What a render produces

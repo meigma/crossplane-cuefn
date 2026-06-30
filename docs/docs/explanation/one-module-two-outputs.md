@@ -21,10 +21,13 @@ hand-written documents in lock-step is a maintenance tax.
 ## One CUE module
 
 cuefn collapses both artifacts into one CUE module. The module declares the
-schema as CUE definitions (`#API`, `#Spec`, optional `#Status`) and the transform
-as regular fields (`input`, `resources`, `status`). The transform binds
-`input.spec: #Spec`, so the schema is literally the same value the transform
-renders against.
+schema as top-level CUE definitions (`#API`, `#Spec`, optional `#Status`) and the
+transform as a single top-level **`out`** field — the engine fills `out.input`
+and reads `out.resources` and an optional `out.status`. The transform binds
+`out.input.spec: #Spec`, so the schema is literally the same value the transform
+renders against. (Authors typically unify `out` against the importable contract's
+`contract.#Transform` — see the
+[module contract](../reference/module-contract.md#the-transform).)
 
 From that one module, two outputs are produced:
 
