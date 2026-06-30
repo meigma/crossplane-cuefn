@@ -255,3 +255,29 @@ name nuance above; the two Dependabot PRs (#1, #2).
 
 Campaign PR ledger: merged #40 (H2) #41 (H3/M10) #43 (M8) #44 (B2/B3/M5/M6/M12);
 open #45 (M7/nit) #46 (docs B1/M9/M11/L1/L2/M2/M4/H1); auto #42 (release 0.1.2).
+
+## 2026-06-30 15:13 — Campaign complete; 0.1.2 cut
+
+Developer "LGTM. Proceed with the remaining work." → **merged #45 + #46**
+(squash); master ff'd. release-please refreshed **#42** to include all 4 fixes;
+**B1 auto-bump PROVEN** — example/functions.yaml + example/deploy/functions.yaml
+auto-bumped to `function-cuefn:v0.1.2` (+ melange/apko versions) via the
+`# x-release-please-version` + extra-files wiring. Waited for the required `ci`
+check (success), then **merged #42** → master `2e43b8a`.
+
+release-please created the **`v0.1.2` tag + a DRAFT GitHub release** (repo
+`draft: true`; maintainer publishes). The **Release pipeline** ran: Binary assets,
+melange (amd64+arm64), Container Image, Function Package, + attest-binaries/image
+all succeeded (Function Package job finishing at writeup). All 6 campaign PRs +
+the release are landed.
+
+**Net result of session 006:** DX consumer-impersonation sweep (6 personas, kind
+e2e) → 21 verified findings → grounding fan-out → 6 fix PRs closing every blocker
++ high + most mediums → product **v0.1.2**. Verdict moved Not-yet → **Ready-with-
+caveats**. The DX report lives at `.journal/006/DX-REPORT.md`.
+
+Open for the maintainer / future sessions: publish the draft GitHub releases
+(v0.1.0/0.1.1/0.1.2 + contract drafts); the deferred items (M1 per-Input registry
+feature, M3 render `--strict`, L3, additionalProperties, CUEFN_* env, the
+example/deploy self-host Function-name nuance); Dependabot #1/#2; session-001
+DESIGN/PLAN still flagged temporary.
