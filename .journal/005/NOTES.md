@@ -336,3 +336,16 @@ loadRequiredObjects, duplicate `name` import) — `go build ./...` was clean
 golines (PR4) lint — both fixed. `root:check` GREEN. **PR #37 open**, CI
 watching. PR4 is the LAST code PR → on merge, #35 `0.1.1` is feature-complete
 (will surface for release decision). Remaining: PR5 e2e, PR6 docs (non-bumping).
+
+## 2026-06-30 — PR4 merged (feature code complete); PR5 (e2e) launched
+PR4 (#37) merged → master `afc7196`. render+function+cli all on master. #35
+product release `0.1.1` refreshed, still HELD. PR5 workflow `wf_34b05eb0-0c5`
+launched in `.wt/test-e2e-required-resources`: additive requirement in the e2e
+fixture + aggregate-to-crossplane ClusterRole + new chainsaw required-resources
+test wired into TestE2E_Kind. Scope internal/test/e2e/** + test/chainsaw/**
+(test, non-bumping). Can't run kind locally → verify compile/scope/additive-safety,
+rely on CI `e2e` check before merge.
+**Release decision surfaced to developer:** #35 (`release 0.1.1`) is ready;
+recommended releasing AFTER PR5 (e2e proof) + PR6 (docs) so it ships proven +
+documented. Holding #35 (safe default) until they decide — product release is
+outward-facing (binaries/image/Function xpkg/attestations to ghcr).
