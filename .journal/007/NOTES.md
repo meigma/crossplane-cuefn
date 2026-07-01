@@ -258,3 +258,25 @@ via the native `github:` backend (the original driver — zero registry, verifie
 ghd removed. Tap tokens set from 1Password. aqua dropped per developer. Phases:
 #48 (build, archives+win+drop-ghd), #49 (feat, brew+scoop), #51 (feat, nix),
 #52 (docs). A product release is queued in release-please to activate it all.
+
+## 2026-06-30 19:28 — Phase 4 merged; distribution campaign COMPLETE
+
+**Phase 4 (#52) merged** (approved): squash, master ff `383d0fb..483e62f`, wt removed.
+All 4 PRs merged (#48/#49/#51/#52). Worktrees back to master + journal only.
+
+On master: `.github/workflows/release-distribute.yml`, `flake.nix`+`flake.lock`,
+`docs/docs/how-to/install-the-cli.md`, `.goreleaser.yaml` with brews+scoops blocks.
+
+**Handoff / open items for the developer (not blockers):**
+- **Cut + PUBLISH the queued release-please product release** to activate brew/scoop/
+  mise (taps populate on a published release; those backends fetch release assets).
+  Publishing the draft fires `release-distribute.yml` → pushes formula+manifest to
+  the taps. Nix already works (source build).
+- **Smoke-check the first real release**: `mise use github:…[bin=cuefn]` resolution +
+  attestation verify; `brew install meigma/tap/cuefn`; `scoop install meigma/cuefn`.
+- Risk carried: GoReleaser `brews` is deprecation-warned (→ casks, macOS-only);
+  revisit if upstream removes it.
+- Also still draft (pre-existing): older GitHub release drafts v0.1.0–v0.1.2.
+
+Both README PR (session start) + the 4-phase distribution campaign are DONE. Session
+otherwise idle — awaiting next request or close.
