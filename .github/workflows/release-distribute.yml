@@ -2,15 +2,15 @@
 # is published. release.yml is tag-triggered: it builds the archives and uploads
 # them to a DRAFT GitHub release, which a maintainer publishes by hand. Only then
 # do the archive download URLs resolve, so the tap manifests are pushed here, on
-# the `released` event (which fires for non-prerelease publishes, matching the
-# brews/scoops `skip_upload: auto`).
+# the `released` event (which fires for non-prerelease publishes).
 #
-# GoReleaser rebuilds the archives to compute the formula/manifest checksums. The
-# build is reproducible (-trimpath, -buildid=, mod_timestamp from the commit), so
-# the rebuilt archives are byte-identical to the published assets and the
-# checksums match. The GitHub release itself is left untouched (`release.disable`
-# in .goreleaser.yaml); only the cross-repo tap pushes run, authenticated with
-# the tap-scoped tokens.
+# The manifests are templated from the release's published checksums.txt, so their
+# hashes match the archives users download exactly. (An earlier version rebuilt the
+# archives with GoReleaser to compute the hashes, but the archive is not
+# byte-reproducible across separate CI runs — same version, same commit, different
+# bytes — so the rebuilt hashes did not match the uploaded assets.) The GitHub
+# release itself is left untouched; only the cross-repo tap pushes run, using the
+# tap-scoped tokens.
 
 name: Release Distribute
 
@@ -33,32 +33,40 @@ jobs:
     runs-on: ubuntu-24.04
     permissions:
       contents: read
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
     steps:
       - name: Check out repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
-          fetch-depth: 0
 
-      - name: Check out released tag
+      - name: Download published checksums
         env:
-          RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-        run: git checkout --detach "$RELEASE_TAG"
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p dist
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --pattern checksums.txt --dir dist --clobber
 
-      - name: Set up Go
-        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
-        with:
-          go-version-file: go.mod
-          cache: true
+      - name: Render tap manifests from checksums
+        run: |
+          python3 .github/scripts/render_tap_manifests.py \
+            --tag "$RELEASE_TAG" \
+            --checksums dist/checksums.txt \
+            --formula-out dist/cuefn.rb \
+            --scoop-out dist/cuefn.json
 
-      - name: Publish Homebrew formula and Scoop manifest
-        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
-        with:
-          distribution: goreleaser
-          version: '~> v2'
-          args: release --clean --skip=before,sbom
+      - name: Publish Homebrew formula
         env:
-          GITHUB_TOKEN: ${{ github.token }}
-          GORELEASER_CURRENT_TAG: ${{ github.event.release.tag_name || inputs.tag }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          SCOOP_BUCKET_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          .github/scripts/push_tap.sh meigma/homebrew-tap \
+            dist/cuefn.rb Formula/cuefn.rb "brew: update cuefn to ${RELEASE_TAG}"
+
+      - name: Publish Scoop manifest
+        env:
+          TAP_TOKEN: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+        run: |
+          .github/scripts/push_tap.sh meigma/scoop-bucket \
+            dist/cuefn.json cuefn.json "scoop: update cuefn to ${RELEASE_TAG}"

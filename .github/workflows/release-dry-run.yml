@@ -52,7 +52,7 @@ jobs:
           # Paths whose changes warrant a full release rehearsal: the release
           # workflows, the GoReleaser / melange / apko packaging config, the
           # Go module graph, and the binary + xpkg packaging source.
-          patterns='^(\.github/workflows/(release|release-distribute|release-dry-run|security-scan)\.yml|\.goreleaser\.ya?ml|melange\.yaml|apko\.yaml|go\.(mod|sum)|cmd/|internal/cli/(packaging|publish)|internal/pkg/|input/)'
+          patterns='^(\.github/workflows/(release|release-distribute|release-dry-run|security-scan)\.yml|\.github/scripts/|\.goreleaser\.ya?ml|melange\.yaml|apko\.yaml|go\.(mod|sum)|cmd/|internal/cli/(packaging|publish)|internal/pkg/|input/)'
 
           # Fail open: when we cannot compute a diff (no base, shallow history),
           # run the rehearsal rather than wrongly skipping it.
@@ -177,22 +177,22 @@ jobs:
             *) echo "unexpected version output: $output" >&2; exit 1 ;;
           esac
 
-      - name: Generate Homebrew formula and Scoop manifest (snapshot, no push)
-        uses: goreleaser/goreleaser-action@5daf1e915a5f0af01ddbcd89a43b8061ff4f1a89 # v7.2.2
-        with:
-          distribution: goreleaser
-          version: '~> v2'
-          args: release --snapshot --clean --skip=before,sbom
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+      - name: Render tap manifests from the dry-run checksums
+        run: |
+          set -euo pipefail
+          version="0.0.0-dryrun.${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
+          python3 .github/scripts/render_tap_manifests.py \
+            --tag "v${version}" \
+            --checksums dist/checksums.txt \
+            --formula-out dist/cuefn.rb \
+            --scoop-out dist/cuefn.json
 
-      - name: Validate generated tap manifests
+      - name: Validate rendered tap manifests
         run: |
           set -euo pipefail
 
-          formula="dist/homebrew/Formula/cuefn.rb"
-          manifest="dist/scoop/cuefn.json"
-
+          formula="dist/cuefn.rb"
+          manifest="dist/cuefn.json"
           test -f "$formula"
           test -f "$manifest"
 
@@ -206,6 +206,11 @@ jobs:
           # Scoop manifest: the windows zip and the windows binary.
           jq -e '.architecture."64bit".url | endswith(".zip")' "$manifest" >/dev/null
           jq -e '.architecture."64bit".bin | index("cuefn.exe")' "$manifest" >/dev/null
+
+          # Every hash in the rendered manifests must come from checksums.txt.
+          for h in $(grep -hoE '[0-9a-f]{64}' "$formula" "$manifest" | sort -u); do
+            grep -q "$h" dist/checksums.txt || { echo "hash $h not in checksums.txt" >&2; exit 1; }
+          done
 
   # Rehearse the container build: build per-arch signed apks on native runners and
   # assemble the image with apko, WITHOUT pushing, signing, or attesting.

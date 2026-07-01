@@ -56,44 +56,11 @@ sboms:
   - id: archive
     artifacts: archive
 
-# Publish a Homebrew formula (macOS + Linux) and a Scoop manifest (Windows) to
-# the org taps. These run in the publish phase, driven by the post-publish
-# release-distribute.yml workflow once the draft release is published, so the
-# archive download URLs resolve. GoReleaser filters archives by OS, so the
-# formula consumes the darwin/linux tarballs and the manifest the windows zip.
-# skip_upload: auto keeps prereleases out of the taps.
-brews:
-  - repository:
-      owner: meigma
-      name: homebrew-tap
-      branch: main
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
-    directory: Formula
-    # release: disabled means the URL cannot be derived from the release config,
-    # so point the formula directly at the published release asset.
-    url_template: "https://github.com/meigma/crossplane-cuefn/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    homepage: "https://github.com/meigma/crossplane-cuefn"
-    description: "Crossplane v2 composition function that renders Kubernetes resources from CUE modules"
-    license: "Apache-2.0 OR MIT"
-    skip_upload: auto
-    commit_msg_template: "brew: update {{ .ProjectName }} to {{ .Tag }}"
-    test: |
-      system "#{bin}/cuefn", "--version"
-    install: |
-      bin.install "cuefn"
-
-scoops:
-  - repository:
-      owner: meigma
-      name: scoop-bucket
-      branch: main
-      token: "{{ .Env.SCOOP_BUCKET_TOKEN }}"
-    url_template: "https://github.com/meigma/crossplane-cuefn/releases/download/{{ .Tag }}/{{ .ArtifactName }}"
-    homepage: "https://github.com/meigma/crossplane-cuefn"
-    description: "Crossplane v2 composition function that renders Kubernetes resources from CUE modules"
-    license: "Apache-2.0 OR MIT"
-    skip_upload: auto
-    commit_msg_template: "scoop: update {{ .ProjectName }} to {{ .Tag }}"
+# The Homebrew formula and Scoop manifest are NOT published by GoReleaser. They
+# are templated from the release's published checksums.txt and pushed to the org
+# taps by .github/workflows/release-distribute.yml, because a GoReleaser rebuild
+# is not byte-reproducible across separate CI runs and produced hashes that did
+# not match the uploaded archives.
 
 changelog:
   disable: true
