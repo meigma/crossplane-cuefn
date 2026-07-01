@@ -387,3 +387,22 @@ removed. PRs this session: #47 (README revamp), #48/#49/#51/#52 (dist P1–4), #
 (install.sh). release-please has a product release queued that activates the
 release-fetching methods once the developer cuts + PUBLISHES it. Nix + go install
 work today. Session idle — awaiting next request or close.
+
+## 2026-07-01 07:10 — Close
+
+Session closed. All work landed on `master` (`9a4f3ca`); worktrees back to master +
+journal only; local master == origin/master.
+
+Merged PRs (8): #47 (README revamp), #48 (archives+windows+drop-ghd), #49 (brew
+formula+scoop), #51 (nix flake), #52 (install docs), #53 (verified install.sh), #54
+(fix: template taps from checksums + robust install resolution + go-install stamping).
+Product **v0.1.3** published by the developer; taps corrected via
+`release-distribute` `workflow_dispatch tag=v0.1.3`.
+
+All install methods verified working against v0.1.3 (brew live-installed; scoop hash
+verified; install.sh default + explicit; mise; nix; go install functional).
+
+Hand-off: distribution is fully working. Only follow-ups: `go install @latest` reports
+`dev` until v0.1.4 (fix postdates v0.1.3); scoop not run on a live Windows host (hash
+verified); older release drafts still unpublished. `SUMMARY.md` + `INDEX.md` written,
+`TECH_NOTES.md` updated (Session 007 section).

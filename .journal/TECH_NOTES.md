@@ -632,3 +632,61 @@ behavior — read before touching publish/install, the cache, or codegen.
   `additionalProperties:false` is deliberately prune-not-reject; the
   `example/deploy/functions.yaml` self-host Function name still `cuefn` (mismatches the
   derived `function-cuefn` for that path).
+
+## Session 007 — README revamp + CLI distribution (product v0.1.3)
+
+The README is now a **landing page** (#47): value prop + a verified minimal CUE
+example + a command table + a docs hand-off; dev/toolchain/supply-chain content
+lives in CONTRIBUTING.md. The docs `install-the-cli.md` how-to is the canonical
+install reference.
+
+### Release artifacts (post-#48)
+`.goreleaser.yaml` builds **darwin/linux/windows** (windows amd64 only; arm64
+ignored) and archives as **tar.gz (unix) + zip (windows)** named
+`cuefn_<version>_<os>_<arch>.<ext>`, each bundling `LICENSE-*` + `README.md`.
+Per-archive SBOMs; `checksums.txt` covers the archives (so the SLSA attestation
+subjects are what users download). **`ghd` was removed** — `ghd.toml` + the staging
+script are gone; `release.yml` uploads GoReleaser's Archive/SBOM/Checksum artifacts
+straight from `dist/artifacts.json`. Binaries are authenticated by **SLSA/GitHub
+attestations via the isolated `attest.yml`** — NOT cosign (no `signs:` block; adding
+one would regress the L3 signing-token isolation).
+
+### Six install methods
+`brew install meigma/tap/cuefn` (formula, mac+linux) · `scoop install meigma/cuefn`
+(windows) · `mise use -g "github:meigma/crossplane-cuefn[bin=cuefn]"` (native
+`github:` backend — zero registry, verifies attestations+SLSA by default; **aqua was
+deliberately dropped**) · `nix profile install github:meigma/crossplane-cuefn`
+(in-repo `flake.nix`, `buildGoModule`, source build → immune to draft-first;
+`vendorHash` tracks go.sum; version via release-please extra-files; `nix.yml` guards
+staleness) · `curl -fsSL …/install.sh | bash` (verified) · `go install …@latest`.
+
+### Taps: templated from checksums, pushed post-publish (CRITICAL)
+Homebrew/Scoop are populated by **`.github/workflows/release-distribute.yml`** on the
+**`release: released`** event (post-publish, so asset URLs resolve). It does NOT use
+GoReleaser's brews/scoops (removed) and does NOT rebuild: it downloads the published
+`checksums.txt` and templates the formula + manifest from those exact hashes via
+`.github/scripts/render_tap_manifests.py`, then `push_tap.sh` git-pushes to the taps
+(tokens `HOMEBREW_TAP_TOKEN`/`SCOOP_BUCKET_TOKEN`, set from 1Password `Homelab`
+"Meigma scoop/tap token"). **Why:** a GoReleaser rebuild is NOT byte-reproducible
+across separate CI runs (proven: same v2.16.0 + same commit, different archive bytes
+— LICENSE/README mtimes), so rebuilt hashes did not match the uploaded archives and
+`brew install` failed with a checksum mismatch. To fix a bad tap entry for an existing
+tag, re-run `release-distribute` via `workflow_dispatch tag=vX.Y.Z`.
+
+### Gotchas future agents must know
+- **`install.sh` latest resolution** uses the GitHub API releases list and greps the
+  newest product `"tag_name":"vX.Y.Z"` — it does NOT use the `/releases/latest` web
+  redirect (which tracks most-recently-*published* and can surface a `contract/*`
+  draft during churn). The repo has BOTH `v*` (product) and `contract/v*` releases.
+- **`go install` version stamping**: `cmd/cuefn/main.go` `resolveBuildInfo()` reads
+  `debug.ReadBuildInfo()` when version=="dev" (ldflags unset). `go install …@vX.Y.Z`
+  → module version; `go build` from a checkout → vcs.revision/time. Release builds
+  (GoReleaser/Nix/melange set version via ldflags) skip the fallback. NOTE: a tag cut
+  before this fix (e.g. v0.1.3) still reports `dev` on `go install @that-tag`.
+- **The release dry-run** (`release-dry-run.yml`) rehearses tap rendering: it runs
+  `render_tap_manifests.py` against the dry-run `checksums.txt` and asserts every
+  rendered hash is present in `checksums.txt` (the guard that would have caught the
+  #49 bug). `.github/scripts/` is in its change-detect filter.
+- **Post-release sanity check is worth it**: passing mise/nix/install.sh-with-version
+  did NOT catch the broken brew/scoop hashes or the wrong "latest" — only running the
+  real `brew install` / default `install.sh` did.
