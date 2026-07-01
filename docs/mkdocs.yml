@@ -39,6 +39,7 @@ nav:
   - Home: index.md
   - Quickstart: quickstart.md
   - How-to:
+      - Install the CLI: how-to/install-the-cli.md
       - Render a module locally: how-to/render-locally.md
       - Require cluster resources: how-to/require-resources.md
       - Generate an XRD: how-to/generate-xrd.md

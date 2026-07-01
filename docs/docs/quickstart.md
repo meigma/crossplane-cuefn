@@ -10,8 +10,8 @@ shape from scratch so each step is visible.
 
 ## Prerequisites
 
-- `cuefn` and `cue` on your PATH. The quickest way without cloning is
-  `go install github.com/meigma/crossplane-cuefn/cmd/cuefn@latest`; with this repo,
+- `cuefn` and `cue` on your PATH. See [installing the CLI](how-to/install-the-cli.md)
+  for Homebrew, Scoop, mise, Nix, and `go install`. Working in this repo instead?
   `mise install` (see [local toolchain](how-to/local-toolchain.md)) then
   `mise exec -- ...`, or `go build -o bin/cuefn ./cmd/cuefn`.
 - An OCI registry for the CUE module. A plain-HTTP local registry is fine for the

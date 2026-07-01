@@ -18,13 +18,39 @@ produces — no Go, no patch-and-transform pipelines.
 
 ## Install
 
+**Homebrew** (macOS/Linux):
+
+```sh
+brew install meigma/tap/cuefn
+```
+
+**Scoop** (Windows):
+
+```sh
+scoop bucket add meigma https://github.com/meigma/scoop-bucket && scoop install meigma/cuefn
+```
+
+**mise** (installs from GitHub releases, verifying their attestations):
+
+```sh
+mise use -g "github:meigma/crossplane-cuefn[bin=cuefn]"
+```
+
+**Nix**:
+
+```sh
+nix profile install github:meigma/crossplane-cuefn
+```
+
+**Go**:
+
 ```sh
 go install github.com/meigma/crossplane-cuefn/cmd/cuefn@latest
 ```
 
-Prebuilt binaries are attached to each
-[release](https://github.com/meigma/crossplane-cuefn/releases). The composition
-function is published as a signed, multi-arch Crossplane **Function** package at
+See [installing the CLI](https://meigma.github.io/crossplane-cuefn/how-to/install-the-cli/)
+for prebuilt archives and provenance verification. The composition function is
+published as a signed Crossplane **Function** package at
 `ghcr.io/meigma/function-cuefn`, which Crossplane pulls automatically when you
 install a generated Configuration.
 
