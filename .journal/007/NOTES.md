@@ -201,3 +201,30 @@ two-var convention). `op whoami` reported not-signed-in but `op item get` worked
 - `feat` type → will cut a release (which then exercises the whole publish→taps loop).
 - **Docs deferred to Phase 4** (mise + unified brew/scoop/nix/mise install docs).
 - CI watching (#49). Next: P3 nix flake, P4 mise + docs.
+
+## 2026-06-30 17:25 — Phase 2 merged; Phase 3 (nix flake) shipped to PR
+
+**Phase 2 (#49) merged** (LGTM/proceed): squash, master ff `6153b52..b46bda5`, wt removed.
+
+**Phase 3 (#51)** — worktree `feat/nix-flake`:
+- **`flake.nix`**: in-repo, `buildGoModule`, `subPackages=["cmd/cuefn"]`,
+  `CGO_ENABLED=0`, `doCheck=false` (heavy suites need docker/net; unit tests in ci).
+  `meta.mainProgram="cuefn"`, license `[asl20 mit]`. Source build → immune to
+  draft-first (no release assets). `nix run github:meigma/crossplane-cuefn` works.
+- **vendorHash** computed via fakeHash→build→read-error trick:
+  `sha256-t5BISl+SDgRk8jbWXVRx6TrCSIjEoVob72O1zJUL8i8=`. Tracks go.sum only.
+- **Go version: nixpkgs unstable ships `go-1.26.4`** — exactly matches go.mod's
+  `go 1.26.4` requirement (was the main risk; confirmed at build, no override needed).
+- **Version stamping via release-please:** `version = "0.1.2"; # x-release-please-version`
+  + `flake.nix` added to root `extra-files` (mirrors melange/apko/functions.yaml).
+  commit=`self.rev or "unknown"`, date=`self.lastModifiedDate`.
+- **`.github/workflows/nix.yml`**: path-filtered (go.mod/go.sum/flake.*) `nix build` +
+  `cuefn --version` guard → catches stale vendorHash in CI, not by a consumer. Nix
+  installer action pinned `DeterminateSystems/nix-installer-action@ef8a148…` (v22).
+- `.gitignore`: `/result`.
+- **Verified locally (aarch64-darwin):** `nix build`, `./result/bin/cuefn --version`
+  → `cuefn 0.1.2`, `nix run … --version`, `nix flake check` — all pass. flake.lock
+  pins nixpkgs(unstable)+flake-utils. CI Nix job verifies x86_64-linux.
+- **GoReleaser nix publisher REJECTED** (confirmed by research): needs published
+  releases + 2nd repo; source flake is simpler + self-contained.
+- CI watching (#51). Next: P4 mise `github:` backend + unified install docs.
