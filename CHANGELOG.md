@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.4](https://github.com/meigma/crossplane-cuefn/compare/v0.1.3...v0.1.4) (2026-07-01)
+
+
+### Bug Fixes
+
+* template tap manifests from checksums; robust install resolution ([#54](https://github.com/meigma/crossplane-cuefn/issues/54)) ([9a4f3ca](https://github.com/meigma/crossplane-cuefn/commit/9a4f3cad45169d233767173335ba99530ac0d1bf))
+
 ## [0.1.3](https://github.com/meigma/crossplane-cuefn/compare/v0.1.2...v0.1.3) (2026-07-01)
 
 
