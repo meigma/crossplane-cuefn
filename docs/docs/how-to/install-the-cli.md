@@ -54,6 +54,26 @@ The flake builds from source and tracks the ref you pin, e.g.
 (`experimental-features = nix-command flakes`). To consume it from another flake,
 add it as an input and use `packages.${system}.default`.
 
+## Shell script (Linux and macOS)
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/meigma/crossplane-cuefn/master/install.sh | bash
+```
+
+The script installs the latest published release into `~/.local/bin`. It always
+verifies the archive against the release `checksums.txt`, and — when the GitHub CLI
+is installed and authenticated — verifies the release's SLSA provenance with `gh
+attestation verify`. Configure it with environment variables:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/meigma/crossplane-cuefn/master/install.sh \
+  | VERSION=v0.1.2 BIN_DIR=/usr/local/bin bash
+```
+
+Piping to a shell runs code you have not read; if you would rather not, [read the
+script](https://github.com/meigma/crossplane-cuefn/blob/master/install.sh) first,
+or use one of the package managers above.
+
 ## Go
 
 ```sh
@@ -64,12 +84,14 @@ go install github.com/meigma/crossplane-cuefn/cmd/cuefn@latest
 
 Each [release](https://github.com/meigma/crossplane-cuefn/releases) attaches
 per-platform archives (`cuefn_<version>_<os>_<arch>.tar.gz`, `.zip` on Windows), a
-`checksums.txt`, and per-archive SBOMs. Verify an archive's provenance with the
-GitHub CLI:
+`checksums.txt`, and per-archive SBOMs. Verify an archive's SLSA provenance against
+the release workflow with the GitHub CLI — the strongest check, and the one the
+shell installer runs when `gh` is available:
 
 ```sh
 gh attestation verify cuefn_<version>_<os>_<arch>.tar.gz \
-  --repo meigma/crossplane-cuefn
+  --repo meigma/crossplane-cuefn \
+  --signer-workflow meigma/crossplane-cuefn/.github/workflows/attest.yml
 ```
 
 ## Verify the install
