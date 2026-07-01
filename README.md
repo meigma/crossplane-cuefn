@@ -42,6 +42,12 @@ mise use -g "github:meigma/crossplane-cuefn[bin=cuefn]"
 nix profile install github:meigma/crossplane-cuefn
 ```
 
+**Shell** (Linux/macOS — verifies checksums, and SLSA provenance when `gh` is present):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/meigma/crossplane-cuefn/master/install.sh | bash
+```
+
 **Go**:
 
 ```sh
