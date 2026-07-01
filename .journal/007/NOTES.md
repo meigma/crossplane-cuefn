@@ -228,3 +228,33 @@ two-var convention). `op whoami` reported not-signed-in but `op item get` worked
 - **GoReleaser nix publisher REJECTED** (confirmed by research): needs published
   releases + 2nd repo; source flake is simpler + self-contained.
 - CI watching (#51). Next: P4 mise `github:` backend + unified install docs.
+
+## 2026-06-30 17:45 — Phase 3 merged; Phase 4 (install docs) shipped to PR — campaign done
+
+**Phase 3 (#51) merged** (LGTM/proceed): squash, master ff `b46bda5..383d0fb`, wt removed.
+Noted: release-please's release PR branch is accumulating the P1(build)/P2(feat)/P3(feat)
+changes — a product release is queued for the maintainer to cut (which populates the taps).
+
+**Phase 4 (#52)** — worktree `docs/install-methods`, pure `docs`:
+- New **`how-to/install-the-cli.md`**: Homebrew (`brew install meigma/tap/cuefn`),
+  Scoop (`scoop bucket add meigma … && scoop install meigma/cuefn`), **mise**
+  (`mise use -g "github:meigma/crossplane-cuefn[bin=cuefn]"` — github backend, no
+  registry, verifies attestations+SLSA by default), Nix (`nix run`/`nix profile
+  install github:meigma/crossplane-cuefn`), Go, prebuilt archives + `gh attestation
+  verify`. Added as first How-to nav entry.
+- **README Install** section: brew/scoop/mise/nix/go + link to the how-to.
+- **Quickstart prereq**: points at the install how-to.
+- `moon run docs:build --strict` passes. CI watching (#52).
+
+**Caveat (documented + flagged):** brew/scoop/mise resolve only once the NEXT release
+is PUBLISHED (taps populate on a published release; those backends fetch release
+assets). Nix works today (source build). The mise `bin=cuefn` + attestation-verify
+claims follow current mise docs — worth a real-release smoke check when a version ships.
+
+### Distribution campaign summary (all 4 phases)
+brew (formula, mac+linux) + scoop (windows) via a post-publish `release:released`
+job with reproducible-build hash matching; nix in-repo flake (source build); mise
+via the native `github:` backend (the original driver — zero registry, verified).
+ghd removed. Tap tokens set from 1Password. aqua dropped per developer. Phases:
+#48 (build, archives+win+drop-ghd), #49 (feat, brew+scoop), #51 (feat, nix),
+#52 (docs). A product release is queued in release-please to activate it all.
