@@ -280,3 +280,37 @@ On master: `.github/workflows/release-distribute.yml`, `flake.nix`+`flake.lock`,
 
 Both README PR (session start) + the 4-phase distribution campaign are DONE. Session
 otherwise idle — awaiting next request or close.
+
+## 2026-06-30 19:55 — Phase 5: curl|bash install script (PR #53)
+
+Developer asked for a `curl … | bash` install method + whether a mature boilerplate
+exists. Researched (agent): **no living boilerplate** — `godownloader` dead (archived
+2022, no successor); GoReleaser has no native install-script feature (hand-hosts its
+own); hosted services (instl.sh/webi) pipe THEIR code with zero crypto verification
+(trust-model regression for a SLSA/cosign project); ubi/eget are two-step tools, no
+verified one-liner. Recommendation (accepted): small self-hosted verified `install.sh`.
+
+Developer chose: self-hosted verified script + checksum + optional cosign.
+
+**KEY CORRECTION during impl:** cuefn's binaries are NOT cosign-signed — authenticity
+is **GitHub artifact attestations / SLSA L3 via the ISOLATED `attest.yml`** (no
+`signs:` block in goreleaser). Adding a cosign `signs` block would REGRESS the
+deliberate signing-token isolation (attest.yml mints the OIDC token away from the
+build). So honored "optional cosign" INTENT with the actual mechanism: **checksum
+always + opportunistic `gh attestation verify` if gh present+authed**. No release-
+pipeline change.
+
+`install.sh` (repo root, exec, `feat` PR #53):
+- Resolves latest PUBLISHED release via `/releases/latest` redirect (skips drafts —
+  draft-first compatible). Downloads `cuefn_<ver>_<os>_<arch>.tar.gz`, verifies vs
+  checksums.txt (abort on mismatch), opportunistic `gh attestation verify`
+  (--signer-workflow attest.yml), extracts to ~/.local/bin (no sudo), PATH warn.
+  Env: VERSION/BIN_DIR/BASE_URL (BASE_URL = test hook).
+- **Tested end-to-end**: served a real goreleaser snapshot over `python3 -m http.server`,
+  ran with BASE_URL override → download+checksum+extract+install+--version, exit 0,
+  tmp cleaned. **Negative test**: tampered checksums.txt → mismatch → non-zero exit.
+  Fixed an EXIT-trap `set -u` unbound-var bug (global tmp + cleanup fn).
+- Docs: Shell-script section in install how-to + manual `gh attestation verify` path;
+  README one-liner. docs:build --strict passes.
+- Caveat (documented): needs a PUBLISHED release to resolve (like brew/scoop/mise);
+  Nix is the only pre-release-working method. CI watching (#53).
