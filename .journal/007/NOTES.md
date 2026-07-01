@@ -318,6 +318,49 @@ pipeline change.
 **Phase 5 (#53) merged** (proceed): CI green, squash, master ff `483e62f..fcf8247`,
 wt removed. `install.sh` on master (mode 100755). Worktrees back to master + journal.
 
+## 2026-06-30 20:30 — Post-release sanity check found bugs → fix PR
+
+Developer published v0.1.3; asked for a sanity check of all install methods (except
+Windows/Scoop). Ran them:
+- ✅ **mise** (`github:...[bin=cuefn]@0.1.3`) → 0.1.3, "attestations verified".
+- ✅ **nix** (`nix run .../v0.1.3`) → 0.1.3.
+- ✅ **install.sh** w/ explicit VERSION=v0.1.3 → checksum + **SLSA gh-attestation VERIFIED**.
+- ⚠️ **go install @v0.1.3** → works but `cuefn dev` (no ldflag stamping on plain go install).
+- ❌ **install.sh DEFAULT** → web `/releases/latest` redirect returned v0.1.2 then
+  `contract/v0.2.0` (a draft!). Bug: didn't filter to product `v*`.
+- ❌ **brew** → "Formula reports different checksum". Formula sha ≠ released archive.
+- ❌ **scoop** → same (manifest hash ≠ released zip).
+
+**ROOT CAUSE (brew/scoop):** `release-distribute` REBUILT archives with goreleaser to
+compute hashes; the rebuild is NOT byte-reproducible across separate CI runs.
+CONFIRMED: release.yml and release-distribute BOTH used goreleaser **v2.16.0**, same
+commit — yet different archive bytes (likely LICENSE/README mtime in the tar). My
+earlier same-machine back-to-back repro test was misleading. The rebuild architecture
+is unsound.
+
+Developer chose (AskUserQuestion): both fixes + go-install stamping.
+
+**Fix PR (`fix/tap-checksums`, `fix` type):**
+- `release-distribute.yml` REWRITTEN: download published checksums.txt → template
+  formula + scoop from those exact hashes → git-push to taps. No rebuild. New
+  `.github/scripts/render_tap_manifests.py` (renders `on_macos/on_intel/on_arm` +
+  scoop json; fails on missing hash) + `push_tap.sh` (clone/commit/push, token from
+  $TAP_TOKEN via masked URL). Dropped goreleaser `brews`/`scoops` (+ the deprecation).
+- `release-dry-run.yml`: tap rehearsal now runs the render script vs the dry-run
+  checksums + asserts every rendered hash is in checksums.txt (added `.github/scripts/`
+  to change-detect).
+- `install.sh`: resolve_latest now uses the API `/releases?per_page=30`, greps the
+  newest `"tag_name":"vX.Y.Z"` (skips contract/*, drafts, prereleases). Verified → v0.1.3.
+- `cmd/cuefn/main.go`: `resolveBuildInfo()` uses `debug.ReadBuildInfo()` fallback when
+  version=="dev" (go install → module version; go build → vcs.revision/time). Release
+  builds (ldflags != dev) unaffected. Fixed `nonamedreturns` lint.
+- **Tested:** render hashes == v0.1.3 real checksums (all 5); resolver → v0.1.3;
+  main.go build stamps real version; dry-run rehearsal loop passes; goreleaser check
+  clean. Gate re-running after lint fix.
+- **POST-MERGE:** re-run release-distribute via workflow_dispatch tag=v0.1.3 to fix the
+  currently-wrong v0.1.3 tap hashes. (Also: developer briefly had v0.1.2 published +
+  marked latest — that + `/releases/latest` lag caused the redirect confusion.)
+
 ### Session 007 complete state
 Distribution: brew (formula) + scoop + nix flake + mise (github) + curl|bash
 install.sh — 6 methods (+ go install), all verified/attested where possible, ghd
