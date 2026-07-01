@@ -361,6 +361,25 @@ Developer chose (AskUserQuestion): both fixes + go-install stamping.
   currently-wrong v0.1.3 tap hashes. (Also: developer briefly had v0.1.2 published +
   marked latest — that + `/releases/latest` lag caused the redirect confusion.)
 
+## 2026-07-01 14:05 — Fix #54 merged + v0.1.3 taps corrected + all methods VERIFIED
+
+**#54 merged** (LGTM): master ff → `9a4f3ca`, wt removed. Then triggered
+`release-distribute` via `workflow_dispatch tag=v0.1.3` (run succeeded, 8s: download
+checksums → render → push both taps).
+
+**All install methods re-verified against v0.1.3 (real, end-to-end):**
+- ✅ **brew** — formula darwin_arm64 sha now `27a0ade4…` == checksums.txt; real
+  `brew install meigma/tap/cuefn` → `🍺 cuefn/0.1.3` → `cuefn 0.1.3`. FIXED.
+- ✅ **scoop** — manifest hash now `59e8bb2f…` == checksums.txt (windows). FIXED.
+- ✅ **install.sh DEFAULT** — resolver now returns v0.1.3 → checksum + SLSA verified
+  → installed. FIXED.
+- ✅ mise, nix, install.sh-explicit — still green.
+- **go install** — main.go fix is on master (post-v0.1.3), so `go install @v0.1.3`
+  still shows "dev" (v0.1.3 predates the fix); ships correct on the NEXT release.
+  Fix itself verified via local checkout build.
+
+Distribution is now fully working. Nothing outstanding from the sanity check.
+
 ### Session 007 complete state
 Distribution: brew (formula) + scoop + nix flake + mise (github) + curl|bash
 install.sh — 6 methods (+ go install), all verified/attested where possible, ghd
