@@ -47,17 +47,20 @@ detect_arch() {
   esac
 }
 
-# Follow the /releases/latest redirect to the tag. This skips drafts and
-# pre-releases and needs no API token.
+# Resolve the latest published PRODUCT release tag (vX.Y.Z). The repo also cuts
+# `contract/v*` releases, and the "latest" designation can lag when releases are
+# published out of order, so we take the newest non-draft `v*` release from the
+# API list rather than trusting the /releases/latest pointer. Unauthenticated
+# requests never return drafts; the `"` anchor drops pre-release (-rc) tags.
 resolve_latest() {
-  local effective
-  effective="$(curl -fsSLI -o /dev/null -w '%{url_effective}' \
-    "https://github.com/${REPO}/releases/latest")" \
-    || die "could not resolve the latest release"
-  case "$effective" in
-    */tag/*) printf '%s' "${effective##*/tag/}" ;;
-    *) die "unexpected releases URL: ${effective}" ;;
-  esac
+  local tag
+  tag="$(curl -fsSL -H 'Accept: application/vnd.github+json' \
+    "https://api.github.com/repos/${REPO}/releases?per_page=30" \
+    | grep -oE '"tag_name": *"v[0-9]+\.[0-9]+\.[0-9]+"' \
+    | sed -E 's/.*"(v[0-9]+\.[0-9]+\.[0-9]+)".*/\1/' \
+    | head -n1)"
+  [ -n "${tag}" ] || die "could not resolve the latest release — set VERSION=vX.Y.Z"
+  printf '%s' "${tag}"
 }
 
 sha256_of() {
