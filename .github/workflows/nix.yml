@@ -1,0 +1,49 @@
+# Build the flake so it cannot silently rot. The main failure mode is a stale
+# vendorHash after a go.sum change, which breaks `nix build` / `nix run` for
+# consumers but nothing else. Gate on the Go module graph and the flake files so
+# this runs only when it can actually be affected.
+
+name: Nix
+
+on:
+  pull_request:
+    branches:
+      - master
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/workflows/nix.yml'
+  push:
+    branches:
+      - master
+    paths:
+      - 'go.mod'
+      - 'go.sum'
+      - 'flake.nix'
+      - 'flake.lock'
+      - '.github/workflows/nix.yml'
+
+permissions: {}
+
+jobs:
+  flake:
+    name: Build flake
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
+
+      - name: Build the flake
+        run: nix build .#default --print-build-logs
+
+      - name: Smoke test the built binary
+        run: ./result/bin/cuefn --version

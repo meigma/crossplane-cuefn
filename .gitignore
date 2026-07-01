@@ -41,6 +41,9 @@ coverage.html
 *.prof
 vendor/
 
+# Nix build result symlink
+/result
+
 # Python
 __pycache__/
 *.py[cod]

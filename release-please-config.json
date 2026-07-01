@@ -15,6 +15,7 @@
       "extra-files": [
         "melange.yaml",
         "apko.yaml",
+        "flake.nix",
         "example/functions.yaml",
         "example/deploy/functions.yaml"
       ],
