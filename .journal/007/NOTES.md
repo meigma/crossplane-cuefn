@@ -314,3 +314,14 @@ pipeline change.
   README one-liner. docs:build --strict passes.
 - Caveat (documented): needs a PUBLISHED release to resolve (like brew/scoop/mise);
   Nix is the only pre-release-working method. CI watching (#53).
+
+**Phase 5 (#53) merged** (proceed): CI green, squash, master ff `483e62f..fcf8247`,
+wt removed. `install.sh` on master (mode 100755). Worktrees back to master + journal.
+
+### Session 007 complete state
+Distribution: brew (formula) + scoop + nix flake + mise (github) + curl|bash
+install.sh — 6 methods (+ go install), all verified/attested where possible, ghd
+removed. PRs this session: #47 (README revamp), #48/#49/#51/#52 (dist P1–4), #53
+(install.sh). release-please has a product release queued that activates the
+release-fetching methods once the developer cuts + PUBLISHES it. Nix + go install
+work today. Session idle — awaiting next request or close.
