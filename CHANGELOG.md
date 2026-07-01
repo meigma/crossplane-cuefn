@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.3](https://github.com/meigma/crossplane-cuefn/compare/v0.1.2...v0.1.3) (2026-07-01)
+
+
+### Features
+
+* add a verified shell install script ([#53](https://github.com/meigma/crossplane-cuefn/issues/53)) ([fcf8247](https://github.com/meigma/crossplane-cuefn/commit/fcf82472440811a55e4135c4b32f22c8808a9309))
+* **nix:** add an in-repo flake for nix install ([#51](https://github.com/meigma/crossplane-cuefn/issues/51)) ([383d0fb](https://github.com/meigma/crossplane-cuefn/commit/383d0fb5677e0cdb6761aa98785874e52566551e))
+* **release:** publish a Homebrew formula and Scoop manifest ([#49](https://github.com/meigma/crossplane-cuefn/issues/49)) ([b46bda5](https://github.com/meigma/crossplane-cuefn/commit/b46bda5056a6a7dda230b89b0f90bbf4e0fb215f))
+
 ## [0.1.2](https://github.com/meigma/crossplane-cuefn/compare/v0.1.1...v0.1.2) (2026-06-30)
 
 
