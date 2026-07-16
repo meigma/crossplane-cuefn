@@ -86,6 +86,27 @@ metadata:
 		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"workload", "migration"}, mapKeys(objects))
 	})
+
+	t.Run("directory ignores nested yaml files", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, "observed.yaml"), []byte(observedOne), 0o600))
+		nested := filepath.Join(dir, "stale")
+		require.NoError(t, os.Mkdir(nested, 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(nested, "observed.yaml"), []byte(`
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stale-nested-fixture
+  annotations:
+    crossplane.io/composition-resource-name: stale
+`), 0o600))
+
+		objects, err := loadObservedObjects(dir)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workload"}, mapKeys(objects))
+		assert.NotContains(t, objects, "stale", "nested fixtures must not be observed")
+	})
 }
 
 func TestLoadObservedObjectsRejectsInvalidInput(t *testing.T) {
@@ -150,6 +171,15 @@ metadata:
 		_, err := loadObservedObjects(filepath.Join(t.TempDir(), "missing.yaml"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot read observed resources")
+	})
+
+	t.Run("empty directory", func(t *testing.T) {
+		t.Parallel()
+		dir := t.TempDir()
+		_, err := loadObservedObjects(dir)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "no YAML files found")
+		assert.Contains(t, err.Error(), dir)
 	})
 }
 

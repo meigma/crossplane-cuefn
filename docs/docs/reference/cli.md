@@ -112,6 +112,10 @@ the bytes come from the directory.
 | `--required-resources <string>` | _(empty)_ | Path to a YAML file or directory of cluster objects matched against the module's emitted `out.requirements` selectors (mirrors `crossplane render --required-resources`). Multi-document files are split; objects are matched by selector, not keyed by filename. |
 | `--observed-resources <string>` | _(empty)_ | Path to a YAML file or directory of raw observed composed objects (mirrors `crossplane render --observed-resources`). Each object must carry a non-empty `crossplane.io/composition-resource-name` annotation; that value becomes the stable map key. Multi-document files are split. |
 
+For either resource flag, a directory contributes only its immediate `.yaml`
+and `.yml` files; nested directories are ignored. Supplying a directory with no
+immediate YAML files is an error, matching `crossplane render`.
+
 **Output.** YAML to stdout: a `resources` map keyed by the author's resource
 names, each entry carrying `object` (the rendered Kubernetes object) and `ready`
 (`"True"`, `"False"`, or `Unspecified`), plus an optional top-level `status`.
