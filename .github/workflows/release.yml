@@ -161,7 +161,19 @@ jobs:
 
           printf 'uploading %d assets:\n' "${#assets[@]}"
           printf '  %s\n' "${assets[@]}"
-          gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber
+          for attempt in $(seq 1 20); do
+            if gh release upload "$RELEASE_TAG" "${assets[@]}" --clobber; then
+              exit 0
+            fi
+
+            if [ "$attempt" -eq 20 ]; then
+              echo "failed to upload release assets after ${attempt} attempts" >&2
+              exit 1
+            fi
+
+            echo "release asset upload failed; retrying in 30 seconds (${attempt}/20)..." >&2
+            sleep 30
+          done
 
       - name: Upload checksums for isolated attestation
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
