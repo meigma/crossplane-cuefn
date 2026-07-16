@@ -53,6 +53,23 @@ func HermeticRequiredModuleDir(t *testing.T) string {
 	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/required")
 }
 
+// HermeticObservedModuleDir returns the path to the self-contained
+// observed-resources fixture module (internal/test/common/testdata/observed).
+// The fixture explicitly opts in to observedResources and reflects an open
+// kind-specific status value into its desired output.
+func HermeticObservedModuleDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/observed")
+}
+
+// HermeticReadinessModuleDir returns the path to the self-contained readiness
+// fixture that derives Job, Deployment, and ConfigMap readiness from observed
+// composed objects.
+func HermeticReadinessModuleDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/readiness")
+}
+
 // HermeticRenderloopDir returns the path to the self-contained crossplane
 // render-loop assets (composition.yaml, xr.yaml, environmentconfig.yaml) the
 // render-loop integration test drives, so that test does not depend on the
@@ -70,6 +87,13 @@ func HermeticRenderloopDir(t *testing.T) string {
 func HermeticRequiredloopDir(t *testing.T) string {
 	t.Helper()
 	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/requiredloop")
+}
+
+// HermeticObservedloopDir returns the Crossplane render assets used to prove
+// --observed-resources delivery through the real CLI and function protocol.
+func HermeticObservedloopDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/observedloop")
 }
 
 // FreePort reserves an ephemeral TCP port, closes the listener, and returns the

@@ -21,6 +21,15 @@ const ExampleModuleRef = "cuefn.example/app@v0.1.0"
 // the same ref verbatim, so the two must stay in sync.
 const RequiredModuleRef = "cuefn.example/required@v0.1.0"
 
+// ObservedModuleRef is the module ref the hermetic observed-resources fixture
+// ([HermeticObservedModuleDir]) is published under by the integration tests.
+// The observedloop Composition references the same ref verbatim.
+const ObservedModuleRef = "cuefn.example/observed@v0.1.0"
+
+// ReadinessModuleRef is the module ref for the dedicated observed-readiness
+// fixture used by both offline renderer tests and the live kind scenario.
+const ReadinessModuleRef = "cuefn.example/readiness@v0.1.0"
+
 // DevImage is the local image tag produced by `mise run image-local`.
 const DevImage = "crossplane-cuefn:dev"
 

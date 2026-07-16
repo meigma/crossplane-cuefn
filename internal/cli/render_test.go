@@ -139,6 +139,37 @@ func TestRenderCommand_RequiredResources(t *testing.T) {
 	assert.Equal(t, "img:test", spec["image"])
 }
 
+func TestRenderCommand_ObservedResources(t *testing.T) {
+	t.Parallel()
+
+	var stdout bytes.Buffer
+	root := NewRootCommand(Options{Out: &stdout})
+	root.SetArgs([]string{
+		"render", "cuefn.example/observed@v0.1.0",
+		"--dir", "../test/common/testdata/observed",
+		"--xr", "testdata/xr.yaml",
+		"--observed-resources", "testdata/observed-deployment.yaml",
+	})
+
+	require.NoError(t, root.ExecuteContext(context.Background()))
+
+	var out struct {
+		Resources map[string]struct {
+			Ready  string         `json:"ready"`
+			Object map[string]any `json:"object"`
+		} `json:"resources"`
+		Status map[string]any `json:"status"`
+	}
+	require.NoError(t, yaml.Unmarshal(stdout.Bytes(), &out))
+
+	probe := out.Resources["probe"]
+	assert.Equal(t, "True", probe.Ready)
+	data, ok := probe.Object["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "seen", data["evidence"])
+	assert.Equal(t, true, out.Status["workloadReady"])
+}
+
 // TestRenderCommand_RequirementsDoNotStabilize proves cuefn render surfaces a
 // non-converging module — one whose out.requirements depends on the fetched data
 // (the anti-pattern Crossplane rejects as "requirements didn't stabilize") — as

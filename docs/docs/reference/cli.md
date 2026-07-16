@@ -110,6 +110,11 @@ the bytes come from the directory.
 | `--env <string>` | _(empty)_ | Path to a merged environment YAML. Its top-level keys become `out.input.environment` in the module. |
 | `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 | `--required-resources <string>` | _(empty)_ | Path to a YAML file or directory of cluster objects matched against the module's emitted `out.requirements` selectors (mirrors `crossplane render --required-resources`). Multi-document files are split; objects are matched by selector, not keyed by filename. |
+| `--observed-resources <string>` | _(empty)_ | Path to a YAML file or directory of raw observed composed objects (mirrors `crossplane render --observed-resources`). Each object must carry a non-empty `crossplane.io/composition-resource-name` annotation; that value becomes the stable map key. Multi-document files are split. |
+
+For either resource flag, a directory contributes only its immediate `.yaml`
+and `.yml` files; nested directories are ignored. Supplying a directory with no
+immediate YAML files is an error, matching `crossplane render`.
 
 **Output.** YAML to stdout: a `resources` map keyed by the author's resource
 names, each entry carrying `object` (the rendered Kubernetes object) and `ready`
@@ -130,6 +135,14 @@ error rather than printing a bogus result (the same `requirements didn't
 stabilize` outcome Crossplane produces in-cluster). See
 [how to require cluster resources](../how-to/require-resources.md) and
 [required resources and the fixpoint](../explanation/required-resources-fixpoint.md).
+
+**Observed resources.** `--observed-resources` supplies point-in-time composed
+object snapshots to modules that explicitly opt in to
+`out.input.observedResources`. cuefn preserves each full object body and derives
+its key from the standard composition-resource-name annotation; a missing, empty,
+or duplicate key is an error. The object's physical `metadata.name` is not used
+as the key. Modules that do not opt in render exactly as before. See
+[derive readiness from observed resources](../how-to/derive-readiness-from-observed-resources.md).
 
 ---
 

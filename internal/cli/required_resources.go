@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sort"
@@ -25,43 +24,63 @@ import (
 // module's emitted requirements by matchRequirements — they are not filename- or
 // directory-keyed.
 func loadRequiredObjects(path string) ([]map[string]any, error) {
+	return loadResourceObjects(path, "required resources")
+}
+
+// loadResourceObjects reads a flat bag of Kubernetes objects from a YAML file
+// or the immediate YAML children of a directory, using label in contextual
+// errors. It is shared by the required- and observed-resource flags so both
+// match Crossplane's non-recursive directory semantics while accepting the same
+// safe multi-document input conventions.
+func loadResourceObjects(path, label string) ([]map[string]any, error) {
 	if path == "" {
 		return nil, nil
 	}
 
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, fmt.Errorf("cannot read required resources %q: %w", path, err)
+		return nil, fmt.Errorf("cannot read %s %q: %w", label, path, err)
 	}
 
 	if !info.IsDir() {
-		objs, err := readYAMLObjects(path)
-		if err != nil {
-			return nil, fmt.Errorf("cannot read required resources %q: %w", path, err)
+		objs, readErr := readYAMLObjects(path)
+		if readErr != nil {
+			return nil, fmt.Errorf("cannot read %s %q: %w", label, path, readErr)
 		}
 		return objs, nil
 	}
 
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, fmt.Errorf("cannot read %s %q: cannot read directory: %w", label, path, err)
+	}
+
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		if ext := filepath.Ext(entry.Name()); ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+		files = append(files, filepath.Join(path, entry.Name()))
+	}
+	if len(files) == 0 {
+		return nil, fmt.Errorf(
+			"cannot read %s %q: no YAML files found in %q (.yaml or .yml)",
+			label,
+			path,
+			path,
+		)
+	}
+
 	var objs []map[string]any
-	walkErr := filepath.WalkDir(path, func(p string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if d.IsDir() {
-			return nil
-		}
-		if ext := strings.ToLower(filepath.Ext(p)); ext != ".yaml" && ext != ".yml" {
-			return nil
-		}
-		fileObjs, err := readYAMLObjects(p)
-		if err != nil {
-			return fmt.Errorf("cannot read %q: %w", p, err)
+	for _, file := range files {
+		fileObjs, readErr := readYAMLObjects(file)
+		if readErr != nil {
+			return nil, fmt.Errorf("cannot read %s %q: cannot read %q: %w", label, path, file, readErr)
 		}
 		objs = append(objs, fileObjs...)
-		return nil
-	})
-	if walkErr != nil {
-		return nil, fmt.Errorf("cannot read required resources %q: %w", path, walkErr)
 	}
 	return objs, nil
 }

@@ -31,12 +31,15 @@ The function decodes **only** the typed fields above. The `Input` type embeds
 `ObjectMeta`, but only so that controller-gen emits a CRD for it; any `metadata`
 an author sets is ignored.
 
-!!! note "Required resources do not change this type"
+!!! note "Runtime resource data does not change this type"
     A module that [requires cluster resources](../how-to/require-resources.md)
     adds no fields here. Required resources arrive in the RunFunction *request*
     (Crossplane fetches them), and the selectors come from the *module output*
     (`out.requirements`) — neither is step configuration. The `Input` type stays
     `{module, expectedDigest}`, so adopting the feature needs no CRD regeneration.
+    The same is true of [observed composed resources](module-contract.md#observing-composed-resources):
+    Crossplane supplies them on the request, and explicit module opt-in controls
+    whether cuefn exposes them under `out.input.observedResources`.
 
 ## Embedded CRD
 

@@ -79,6 +79,38 @@ func TestContract_TransformClosedness(t *testing.T) {
 			"#Transform must accept the optional requirements + requiredResources fields")
 	})
 
+	t.Run("observedResources accepts full kind-specific objects", func(t *testing.T) {
+		valid := ctx.CompileString(`{
+			input: {
+				spec: {}, metadata: {name: "demo"}, environment: {}
+				observedResources: {workload: {
+					apiVersion: "apps/v1"
+					kind: "Deployment"
+					spec: {replicas: 2}
+					status: {observedGeneration: 4, vendorDetail: {revision: "abc"}}
+				}}
+			}
+			resources: {}
+		}`)
+		require.NoError(t, valid.Err())
+		require.NoError(t, transform.Unify(valid).Validate(),
+			"#ObservedResource must preserve open kind-specific spec and status")
+	})
+
+	t.Run("a misspelled observedResources field is rejected", func(t *testing.T) {
+		typo := ctx.CompileString(`{
+			input: {
+				spec: {}, metadata: {name: "demo"}, environment: {}
+				observedResorces: {}
+			}
+			resources: {}
+		}`)
+		require.NoError(t, typo.Err())
+		err := transform.Unify(typo).Validate()
+		require.Error(t, err, "#Input must reject a misspelled observedResources field")
+		assert.Contains(t, err.Error(), "observedResorces")
+	})
+
 	t.Run("a misspelled requirements field is rejected", func(t *testing.T) {
 		typo := ctx.CompileString(`{
 			input: {spec: {}, metadata: {name: "demo"}, environment: {}}

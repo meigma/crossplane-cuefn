@@ -3,10 +3,11 @@
 // produces.
 //
 // The contract with a module is intentionally narrow. The engine fills a
-// top-level input field with the observed XR's spec, metadata, and environment,
-// then reads an author-keyed resources map (each entry an object plus an
-// optional readiness hint) and an optional top-level status. Module authors
-// never see Crossplane's request/response internals.
+// top-level input field with the observed XR's spec, metadata, environment, and
+// explicitly requested observed composed resources, then reads an author-keyed
+// resources map (each entry an object plus an optional readiness hint) and an
+// optional top-level status. Module authors never see Crossplane's
+// request/response internals.
 //
 // The engine itself is pure: a [ModuleLoader] port abstracts where the module
 // bytes come from. Two adapters ship here — [LocalLoader] serves a fixed
@@ -57,6 +58,12 @@ type Inputs struct {
 	// requirement name. An empty list means "requested but none found". omitempty
 	// keeps it off out.input before any requirement is delivered.
 	RequiredResources map[string][]map[string]any `json:"requiredResources,omitempty"`
+
+	// ObservedResources holds the composed Kubernetes objects Crossplane supplied
+	// on the current request, keyed by the author's stable resource name. The
+	// engine exposes it only when the loaded module declares observedResources as
+	// a regular field under out.input; optional or absent declarations are omitted.
+	ObservedResources map[string]map[string]any `json:"observedResources,omitempty"`
 }
 
 // Resource is a single composed resource produced by a module: a finished
@@ -129,7 +136,12 @@ func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, err
 				"under a top-level `out` field")
 	}
 
-	v, err = fillInput(v.Context(), v, in)
+	includeObserved, err := usesObservedResources(v)
+	if err != nil {
+		return Result{}, err
+	}
+
+	v, err = fillInput(v.Context(), v, in, includeObserved)
 	if err != nil {
 		return Result{}, err
 	}
@@ -145,7 +157,7 @@ func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, err
 
 	if seeded := seedRequiredResources(in.RequiredResources, requirements); seeded != nil {
 		in.RequiredResources = seeded
-		v, err = fillInput(v.Context(), v, in)
+		v, err = fillInput(v.Context(), v, in, includeObserved)
 		if err != nil {
 			return Result{}, err
 		}
@@ -169,10 +181,24 @@ func (e *Engine) Render(ctx context.Context, ref string, in Inputs) (Result, err
 // JSON (rather than Go encoding) renders an integral spec value such as a float64
 // replicas count as an integer, so it unifies against a bounded int #Spec field;
 // validating the result surfaces #Spec bound violations as errors here.
-func fillInput(cctx *cue.Context, v cue.Value, in Inputs) (cue.Value, error) {
+func fillInput(cctx *cue.Context, v cue.Value, in Inputs, includeObserved bool) (cue.Value, error) {
 	in.Spec = ProjectSpec(in.Spec)
 
-	inJSON, err := json.Marshal(in)
+	payload := inputEnvelope{
+		Spec:              in.Spec,
+		Metadata:          in.Metadata,
+		Environment:       in.Environment,
+		RequiredResources: in.RequiredResources,
+	}
+	if includeObserved {
+		observed := in.ObservedResources
+		if observed == nil {
+			observed = map[string]map[string]any{}
+		}
+		payload.ObservedResources = &observed
+	}
+
+	inJSON, err := json.Marshal(payload)
 	if err != nil {
 		return cue.Value{}, fmt.Errorf("cannot marshal inputs: %w", err)
 	}
@@ -189,6 +215,40 @@ func fillInput(cctx *cue.Context, v cue.Value, in Inputs) (cue.Value, error) {
 		return cue.Value{}, cueerr.Wrap(err, "inputs do not satisfy module #Spec")
 	}
 	return v, nil
+}
+
+// inputEnvelope is the JSON shape filled under out.input. ObservedResources is
+// pointer-backed so an opted-in module receives a concrete empty object while an
+// old or non-opted-in module receives no field at all.
+type inputEnvelope struct {
+	Spec              map[string]any              `json:"spec,omitempty"`
+	Metadata          Metadata                    `json:"metadata"`
+	Environment       map[string]any              `json:"environment,omitempty"`
+	RequiredResources map[string][]map[string]any `json:"requiredResources,omitempty"`
+	ObservedResources *map[string]map[string]any  `json:"observedResources,omitempty"`
+}
+
+// usesObservedResources reports whether the module explicitly materializes
+// out.input.observedResources as a regular field. The public contract permits
+// that field optionally; inspecting the field constraint distinguishes a
+// module's regular opt-in from optional (?) and required (!) declarations.
+func usesObservedResources(v cue.Value) (bool, error) {
+	input := v.LookupPath(cue.ParsePath("out.input"))
+	if err := input.Err(); err != nil {
+		return false, cueerr.Wrap(err, "module has no usable `out.input` field")
+	}
+
+	fields, err := input.Fields(cue.Optional(true))
+	if err != nil {
+		return false, cueerr.Wrap(err, "cannot inspect `out.input` fields")
+	}
+	for fields.Next() {
+		selector := fields.Selector()
+		if selector.LabelType() == cue.StringLabel && selector.Unquoted() == "observedResources" {
+			return fields.FieldType().ConstraintType() == 0, nil
+		}
+	}
+	return false, nil
 }
 
 // rawResource is the decode target for one resources map entry. The json tags
