@@ -23,6 +23,13 @@ A module asks for `cfg` and reads back `input.requiredResources.cfg`. Nothing
 about the request or the wire protocol leaks into the module; it sees only
 ordinary CUE values, exactly as it does for spec, metadata, and environment.
 
+Required resources are for **external selected objects**. A module does not need
+to request children it already composes merely to inspect their status: those
+arrive on every function request through the separate, non-iterative
+`out.input.observedResources` path. Use requirements when the module must ask
+Crossplane to fetch something outside its composed set; use observed resources
+for self-observation and readiness.
+
 ## Crossplane owns the loop
 
 The function never fetches anything itself. It is a pure function of
@@ -125,3 +132,5 @@ request and `Requirements.Resources` on the response. The contract field names
   — the exact contract fields.
 - [One module, two outputs](one-module-two-outputs.md) — the purity principle
   this feature preserves.
+- [Derive readiness from observed resources](../how-to/derive-readiness-from-observed-resources.md)
+  — the non-iterative self-observation path.

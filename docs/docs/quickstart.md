@@ -131,9 +131,9 @@ out: {
 Binding `out.input.spec: #Spec` is the key move: the schema the XRD is generated
 from is the same value the transform renders against, so the two never drift.
 
-The ConfigMap carries `ready: "Ready"` because a ConfigMap has no status
-conditions of its own — without a hint Crossplane never considers it ready and the
-XR is held at `Ready=False` (see the
+The ConfigMap carries `ready: "Ready"` because the supported Crossplane runtime
+counts only an explicit function readiness hint. Without one it does not infer
+readiness from the object, and the XR is held at `Ready=False` (see the
 [readiness mapping](reference/module-contract.md#readiness-mapping)).
 
 !!! tip "Validate the shape at author time"
@@ -342,8 +342,8 @@ you saw locally in Step 2, now rendered by the in-cluster function.
     The module you built here marks every resource `ready: "Ready"`, so its XR
     reconciles to `Ready=True`. The repository's `example/module` deliberately
     leaves its ConfigMap readiness **unspecified** (to show all three readiness
-    states), so that example's XR stays `Ready=False` until every composed
-    resource reports ready — see the
+    states), so that example's XR remains `Ready=False` indefinitely unless the
+    module emits an explicit `Ready` hint — see the
     [readiness mapping](reference/module-contract.md#readiness-mapping).
 
 ## What you built

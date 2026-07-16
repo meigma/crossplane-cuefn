@@ -18,6 +18,12 @@ These fields live in the contract module from **v0.2.0** onward. If you adopt th
 contract for author-time validation, run `cue mod tidy` so `deps` resolves
 `github.com/meigma/crossplane-cuefn/contract@v0` to v0.2.0 or newer.
 
+!!! note "Use observed resources for composed children"
+    Do not emit a requirement just to read a Job, Deployment, or other object the
+    same module already creates. Crossplane supplies composed children through
+    `out.input.observedResources` without a fetch loop or read RBAC. See
+    [derive readiness from observed resources](derive-readiness-from-observed-resources.md).
+
 ## 1. Emit a requirement
 
 A requirement is one selector under `out.requirements`, keyed by a name you

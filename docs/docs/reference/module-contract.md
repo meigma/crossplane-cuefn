@@ -145,6 +145,8 @@ out: input: {
 		tier: string | *"unset"
 		...
 	}
+	// Declare this regular field only when the module needs self-observation.
+	observedResources: [string]: contract.#ObservedResource
 }
 ```
 
@@ -153,6 +155,7 @@ out: input: {
 | `out.input.spec` | The observed XR's `spec`, projected (reserved keys stripped) and unified against `#Spec`. |
 | `out.input.metadata` | The XR's identifying metadata: `name` (and optional `namespace`). |
 | `out.input.environment` | The merged `EnvironmentConfig` data from the pipeline context. |
+| `out.input.observedResources` | Opt-in map of observed composed objects, keyed by stable resource name. |
 
 Binding `out.input.spec: #Spec` is what ties render-time defaults/validation to
 the same schema the XRD is generated from. The engine fills `out.input` by JSON
@@ -223,14 +226,78 @@ The module's readiness hint maps to the runtime/render readiness as follows:
 |-------------|-----------------------|----------------------|
 | `"Ready"` | `"True"` | Ready |
 | `"NotReady"` | `"False"` | Not ready |
-| _(absent)_ | `Unspecified` | Unspecified |
+| _(absent)_ | `Unspecified` | Not ready |
 
 !!! warning "Conditionless resources need an explicit `ready` hint"
-    `Unspecified` defers to Crossplane's default readiness check, which waits for a
-    `Ready=True` **status condition** on the composed object. Objects with no such
-    condition — a ConfigMap, Secret, or PVC — therefore never report ready, so an
-    unmarked one holds the whole XR at `Ready=False` indefinitely. Mark such a
-    resource `ready: "Ready"` when its existence alone is sufficient.
+    With the supported Crossplane 2.3.3 runtime, only a function response carrying
+    `READY_TRUE` counts as ready. `Unspecified` is not inferred from the composed
+    object's own `Ready=True` condition. An unmarked resource therefore holds the
+    XR at `Ready=False`; conditionless objects such as ConfigMaps do so forever.
+    Derive a conservative predicate from `observedResources`, then emit
+    `ready: "Ready"` only when that predicate passes.
+
+## Observing composed resources
+
+Contract **v0.3.0** adds the optional `#Input.observedResources` field and open
+`#ObservedResource` definition. This is the self-observation path: it lets a
+module derive readiness and status from the composed objects Crossplane already
+returned on the current function request. It performs no API reads.
+
+### Explicit opt-in
+
+Importing the contract alone does not expose observations. A module opts in by
+materializing `observedResources` as a **regular** field under `out.input`:
+
+```cue
+import "github.com/meigma/crossplane-cuefn/contract@v0"
+
+out: contract.#Transform & {
+	input: {
+		spec: #Spec
+		metadata: {/* ... */}
+		environment: {/* ... */}
+		observedResources: [string]: contract.#ObservedResource
+	}
+	// ...resources and status...
+}
+```
+
+The optional field inherited from `contract.#Transform` is not an opt-in. This
+distinction preserves modules written against older closed contracts: cuefn does
+not fill an unknown field into them, so their output remains unchanged. An
+opted-in module receives a concrete `{}` on the first pass, before Crossplane has
+observed any composed resource.
+
+### Map shape and fidelity
+
+```cue
+#ObservedResource: {
+	apiVersion: string
+	kind:       string
+	...
+}
+
+observedResources: [string]: #ObservedResource
+```
+
+Each map key is the stable name the author used in `out.resources` (the
+`crossplane.io/composition-resource-name` annotation in raw render fixtures), not
+the object's physical `metadata.name`. A resource Crossplane has not observed is
+absent from the map. Each value is the full Kubernetes object body supplied by
+Crossplane; the open definition preserves kind-specific metadata, spec, and
+status fields.
+
+Connection details are a separate field in the function protocol and are never
+included. The map is a point-in-time request snapshot, so status may lag the
+latest API-server state. Modules should fail readiness closed: verify stable-key
+presence, expected identity, UID, observed generation, conditions, and counters
+as appropriate before returning `ready: "Ready"`.
+
+Because full object bodies can contain sensitive fields, treat module code and
+module registry integrity as part of the trust boundary. cuefn does not log
+observed object bodies. See
+[derive readiness from observed resources](../how-to/derive-readiness-from-observed-resources.md)
+for concrete Job, Deployment, and ConfigMap predicates.
 
 ## Requiring cluster resources
 

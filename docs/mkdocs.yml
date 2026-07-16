@@ -41,6 +41,7 @@ nav:
   - How-to:
       - Install the CLI: how-to/install-the-cli.md
       - Render a module locally: how-to/render-locally.md
+      - Derive readiness from observed resources: how-to/derive-readiness-from-observed-resources.md
       - Require cluster resources: how-to/require-resources.md
       - Generate an XRD: how-to/generate-xrd.md
       - Validate an XR: how-to/validate-xr.md
