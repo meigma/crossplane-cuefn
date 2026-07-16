@@ -92,6 +92,18 @@ func (c *Cluster) Apply(ctx context.Context, manifest []byte) ([]byte, error) {
 	return cmd.CombinedOutput()
 }
 
+// LoadImage copies a locally built image from the Docker daemon into every
+// node in this kind cluster. The readiness fixture uses the development image
+// for its short-lived Job and Deployment, so loading it keeps that proof
+// hermetic and avoids an external registry pull.
+func (c *Cluster) LoadImage(ctx context.Context, image string) error {
+	out, err := toolOutput(ctx, "kind", "load", "docker-image", image, "--name", c.name)
+	if err != nil {
+		return fmt.Errorf("cannot load image %s into kind cluster %s: %w\n%s", image, c.name, err, out)
+	}
+	return nil
+}
+
 // nodes lists the kind node container names for this cluster.
 func (c *Cluster) nodes(ctx context.Context) ([]string, error) {
 	out, err := toolOutput(ctx, "kind", "get", "nodes", "--name", c.name)

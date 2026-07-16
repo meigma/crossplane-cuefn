@@ -1,0 +1,11 @@
+# This XR starts with an active migration Job and a paused workload Deployment.
+# Releasing only pauseWorkload lets the live Deployment become Available.
+apiVersion: platform.meigma.io/v1alpha1
+kind: XReadiness
+metadata:
+  name: workload-gated
+  namespace: default
+spec:
+  release: workload
+  suspendMigration: false
+  pauseWorkload: true

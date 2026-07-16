@@ -5,42 +5,41 @@ import (
 	"os/exec"
 	"testing"
 
-	"github.com/testcontainers/testcontainers-go"
+	"github.com/stretchr/testify/require"
 )
 
-// RequireDocker skips the calling test when integration mode is off or no usable
-// Docker daemon is present, so `go test ./...` stays green on a developer machine
-// without Docker while CI (which has a daemon) runs the suite fully.
+// RequireDocker skips the calling test when integration mode is off. Once a
+// caller opts in, a missing or unusable Docker daemon is a setup failure rather
+// than a skipped green integration run.
 func RequireDocker(t *testing.T) {
 	t.Helper()
 	if os.Getenv("CUEFN_INTEGRATION") == "" {
 		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
 	}
-	testcontainers.SkipIfProviderIsNotHealthy(t)
+	docker, err := exec.LookPath("docker")
+	require.NoError(t, err, "docker must be on PATH when CUEFN_INTEGRATION is set")
+	out, err := exec.Command(docker, "info").CombinedOutput()
+	require.NoErrorf(t, err, "docker must be usable when CUEFN_INTEGRATION is set: %s", out)
 }
 
-// RequireCrossplane skips the test unless a working crossplane CLI is on PATH and
-// returns its resolved path.
+// RequireCrossplane skips the test when integration mode is off and otherwise
+// requires a working crossplane CLI, returning its resolved path.
 //
 // LookPath alone is insufficient: under the moon task runner the proto-managed
 // PATH places a generic `crossplane` shim ahead of the real, mise-pinned binary.
 // That shim is not a crossplane and exits non-zero for every invocation. We
 // therefore probe the resolved binary with the purely-local `render --help`
-// (no cluster contact) and skip when it does not behave like crossplane, so the
-// test self-skips on the shim rather than failing or — worse — passing against a
-// fake crossplane.
+// (no cluster contact) and fail an opted-in integration run when it does not
+// behave like crossplane rather than passing against a fake binary.
 func RequireCrossplane(t *testing.T) string {
 	t.Helper()
 	if os.Getenv("CUEFN_INTEGRATION") == "" {
 		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
 	}
 	path, err := exec.LookPath("crossplane")
-	if err != nil {
-		t.Skip("crossplane CLI not on PATH; skipping integration test")
-	}
-	if out, err := exec.Command(path, "render", "--help").CombinedOutput(); err != nil {
-		t.Skipf("%q is not a working crossplane CLI (%v); skipping integration test: %s", path, err, out)
-	}
+	require.NoError(t, err, "crossplane CLI must be on PATH when CUEFN_INTEGRATION is set")
+	out, err := exec.Command(path, "render", "--help").CombinedOutput()
+	require.NoErrorf(t, err, "%q must be a working crossplane CLI when CUEFN_INTEGRATION is set: %s", path, out)
 	return path
 }
 

@@ -1,0 +1,11 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: physical-workload-name
+  namespace: default
+  annotations:
+    crossplane.io/composition-resource-name: workload
+status:
+  custom:
+    nested: pending
+    vendorOnly: true

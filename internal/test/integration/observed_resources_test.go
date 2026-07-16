@@ -13,7 +13,8 @@ import (
 )
 
 // TestObservedResources_CrossplaneRender proves Crossplane's raw observed
-// object flag reaches cuefn under the stable composition-resource annotation.
+// object flag reaches cuefn under the stable composition-resource annotation
+// and changes the module's readiness output when the observation changes.
 func TestObservedResources_CrossplaneRender(t *testing.T) {
 	reg := common.StartRegistry(t)
 	crossplane := common.RequireCrossplane(t)
@@ -27,18 +28,27 @@ func TestObservedResources_CrossplaneRender(t *testing.T) {
 
 	functions := common.WriteFunctions(t, t.TempDir(), dialAddr)
 	assets := common.HermeticObservedloopDir(t)
-	cmd := exec.Command(crossplane, "render",
-		filepath.Join(assets, "xr.yaml"),
-		filepath.Join(assets, "composition.yaml"),
-		functions,
-		"--observed-resources", filepath.Join(assets, "deployment.yaml"),
-		"--timeout", "10m",
-	)
-	out, err := cmd.CombinedOutput()
-	require.NoError(t, err, "crossplane render: %s", out)
+	renderObserved := func(t *testing.T, snapshot string) string {
+		t.Helper()
+		cmd := exec.Command(crossplane, "render",
+			filepath.Join(assets, "xr.yaml"),
+			filepath.Join(assets, "composition.yaml"),
+			functions,
+			"--observed-resources", filepath.Join(assets, snapshot),
+			"--timeout", "10m",
+		)
+		out, err := cmd.CombinedOutput()
+		require.NoError(t, err, "crossplane render with %s: %s", snapshot, out)
+		return string(out)
+	}
 
-	rendered := string(out)
-	assert.Contains(t, rendered, "workloadReady: true")
-	assert.Contains(t, rendered, "evidence: seen")
-	assert.Contains(t, rendered, "vendorOnly")
+	pending := renderObserved(t, "deployment-pending.yaml")
+	assert.Contains(t, pending, "workloadReady: false")
+	assert.NotContains(t, pending, "evidence: seen")
+
+	ready := renderObserved(t, "deployment.yaml")
+	assert.Contains(t, ready, "workloadReady: true")
+	assert.Contains(t, ready, "evidence: seen")
+	assert.Contains(t, ready, "vendorOnly")
+	assert.NotEqual(t, pending, ready, "readiness output must change with the observation")
 }

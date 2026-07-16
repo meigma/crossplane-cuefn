@@ -62,6 +62,14 @@ func HermeticObservedModuleDir(t *testing.T) string {
 	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/observed")
 }
 
+// HermeticReadinessModuleDir returns the path to the self-contained readiness
+// fixture that derives Job, Deployment, and ConfigMap readiness from observed
+// composed objects.
+func HermeticReadinessModuleDir(t *testing.T) string {
+	t.Helper()
+	return filepath.Join(RepoRoot(t), "internal/test/common/testdata/readiness")
+}
+
 // HermeticRenderloopDir returns the path to the self-contained crossplane
 // render-loop assets (composition.yaml, xr.yaml, environmentconfig.yaml) the
 // render-loop integration test drives, so that test does not depend on the

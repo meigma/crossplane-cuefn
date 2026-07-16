@@ -1,0 +1,237 @@
+# Live-cluster proof that cuefn derives composed-resource readiness from the
+# observed Kubernetes objects returned by Crossplane. Two XRs isolate the Job
+# and Deployment gates; the Test mutates only XR spec booleans and lets normal
+# reconciliation update children and status.
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: e2e-observed-resource-readiness
+spec:
+  timeouts:
+    apply: 2m
+    assert: 5m
+  steps:
+    - name: create-readiness-cases
+      description: Create one migration-gated XR and one workload-gated XR.
+      try:
+        - apply:
+            file: readiness-migration-xr.yaml
+        - apply:
+            file: readiness-workload-xr.yaml
+
+    - name: migration-is-the-only-unready-resource
+      description: |-
+        The suspended Job keeps Ready=False while the active Deployment becomes
+        Available. The conditionless ConfigMap is ready from stable identity.
+      try:
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XReadiness
+              metadata:
+                name: migration-gated
+                namespace: default
+              status:
+                migrationReady: false
+                workloadReady: true
+                configReady: true
+                (conditions[?type == 'Synced'] | [0].status): "True"
+                (conditions[?type == 'Ready'] | [0].status): "False"
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: migration-gated-migration-migration
+                namespace: default
+                labels:
+                  cuefn.example/release: migration
+                  cuefn.example/readiness: migration-gated
+                (uid != ''): true
+              spec:
+                suspend: true
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: migration-gated-workload-migration
+                namespace: default
+                labels:
+                  cuefn.example/release: migration
+                  cuefn.example/readiness: migration-gated
+                (uid != ''): true
+              (status.observedGeneration == metadata.generation): true
+              status:
+                updatedReplicas: 1
+                availableReplicas: 1
+                (conditions[?type == 'Available'] | [0].status): "True"
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: migration-gated-config-migration
+                namespace: default
+                labels:
+                  cuefn.example/release: migration
+                  cuefn.example/readiness: migration-gated
+                (uid != ''): true
+              data:
+                release: migration
+              (status == `null`): true
+
+    - name: workload-is-the-only-unready-resource
+      description: |-
+        The active Job completes while the paused Deployment keeps Ready=False.
+        The conditionless ConfigMap is independently ready.
+      try:
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XReadiness
+              metadata:
+                name: workload-gated
+                namespace: default
+              status:
+                migrationReady: true
+                workloadReady: false
+                configReady: true
+                (conditions[?type == 'Synced'] | [0].status): "True"
+                (conditions[?type == 'Ready'] | [0].status): "False"
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: workload-gated-migration-workload
+                namespace: default
+                labels:
+                  cuefn.example/release: workload
+                  cuefn.example/readiness: workload-gated
+                (uid != ''): true
+              status:
+                succeeded: 1
+                (conditions[?type == 'Complete'] | [0].status): "True"
+              (length(status.conditions[?type == 'Failed' && status == 'True']) == `0`): true
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: workload-gated-workload-workload
+                namespace: default
+                labels:
+                  cuefn.example/release: workload
+                  cuefn.example/readiness: workload-gated
+                (uid != ''): true
+              spec:
+                paused: true
+              (status.availableReplicas == `null` || status.availableReplicas == `0`): true
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: workload-gated-config-workload
+                namespace: default
+                labels:
+                  cuefn.example/release: workload
+                  cuefn.example/readiness: workload-gated
+                (uid != ''): true
+              data:
+                release: workload
+              (status == `null`): true
+
+    - name: release-migration
+      description: Unsuspend the migration by patching only its XR spec gate.
+      try:
+        - patch:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XReadiness
+              metadata:
+                name: migration-gated
+                namespace: default
+              spec:
+                suspendMigration: false
+        - assert:
+            resource:
+              apiVersion: batch/v1
+              kind: Job
+              metadata:
+                name: migration-gated-migration-migration
+                namespace: default
+              status:
+                succeeded: 1
+                (conditions[?type == 'Complete'] | [0].status): "True"
+              (length(status.conditions[?type == 'Failed' && status == 'True']) == `0`): true
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XReadiness
+              metadata:
+                name: migration-gated
+                namespace: default
+              status:
+                migrationReady: true
+                workloadReady: true
+                configReady: true
+                (conditions[?type == 'Synced'] | [0].status): "True"
+                (conditions[?type == 'Ready'] | [0].status): "True"
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: migration-gated-config-migration
+                namespace: default
+                (uid != ''): true
+              (status == `null`): true
+
+    - name: release-workload
+      description: Unpause the workload by patching only its XR spec gate.
+      try:
+        - patch:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XReadiness
+              metadata:
+                name: workload-gated
+                namespace: default
+              spec:
+                pauseWorkload: false
+        - assert:
+            resource:
+              apiVersion: apps/v1
+              kind: Deployment
+              metadata:
+                name: workload-gated-workload-workload
+                namespace: default
+              (status.observedGeneration == metadata.generation): true
+              status:
+                updatedReplicas: 1
+                availableReplicas: 1
+                (conditions[?type == 'Available'] | [0].status): "True"
+        - assert:
+            resource:
+              apiVersion: platform.meigma.io/v1alpha1
+              kind: XReadiness
+              metadata:
+                name: workload-gated
+                namespace: default
+              status:
+                migrationReady: true
+                workloadReady: true
+                configReady: true
+                (conditions[?type == 'Synced'] | [0].status): "True"
+                (conditions[?type == 'Ready'] | [0].status): "True"
+        - assert:
+            resource:
+              apiVersion: v1
+              kind: ConfigMap
+              metadata:
+                name: workload-gated-config-workload
+                namespace: default
+                (uid != ''): true
+              (status == `null`): true

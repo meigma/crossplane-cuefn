@@ -271,17 +271,18 @@ tasks:
   # Kind end-to-end proof: boots a throwaway kind cluster, stands up a CA-trusted
   # HTTPS registry (Crossplane xpkgs) and a plain-HTTP registry (CUE modules),
   # installs Crossplane via helm, publishes + installs the Function (P6) and the
-  # generated Configuration (P5), instantiates an XR + EnvironmentConfig, and
+  # generated Configurations (P5), instantiates XRs + EnvironmentConfig, and
   # asserts the live reconcile (Ready, composed resources, status, defaulting,
-  # env-merge) and the digest-drift guard via chainsaw. Needs Docker plus the
-  # mise-pinned kind/kubectl/helm/chainsaw and the `crossplane-cuefn:dev` image
-  # (build it first with `mise run image-local`). Gated behind the `e2e` build tag
-  # and CUEFN_INTEGRATION (set here); self-skips when its tools are absent. Kept
-  # OUT of the default `check` graph (mirroring schema-test/render-test) so
+  # env-merge), observed Job/Deployment readiness, and the digest-drift guard via
+  # chainsaw. Needs Docker plus the mise-pinned kind/kubectl/helm/chainsaw and the
+  # `crossplane-cuefn:dev` image (build it first with `mise run image-local`).
+  # Gated behind the `e2e` build tag and CUEFN_INTEGRATION (set here); once opted
+  # in, missing prerequisites fail instead of silently skipping. Kept OUT of the
+  # default `check` graph (mirroring schema-test/render-test) so
   # `moon run root:check` stays green without a cluster. Run under `mise exec` so
   # the pinned kind/kubectl/helm/chainsaw/crossplane win over any binaries on PATH.
   e2e-test:
-    command: 'mise exec -- go test -tags e2e ./internal/test/e2e/... -run TestE2E_Kind -count 1 -timeout 30m'
+    command: 'mise exec -- go test -v -tags e2e ./internal/test/e2e/... -run TestE2E_Kind -count 1 -timeout 30m'
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:

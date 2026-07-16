@@ -43,32 +43,45 @@ const (
 	// Host-published ports are deliberately off :5000 — macOS Control Center
 	// (AirPlay Receiver) binds *:5000. The in-cluster registry port stays :5000
 	// (the container's listen port, see Registry.clusterID).
-	pkgRegPort   = 5050
-	modRegName   = "cuefn-modules" // plain HTTP, +insecure (CUE modules)
-	modRegPort   = 5051
-	moduleRef    = "cuefn.example/app@v0.1.0"
-	moduleDir    = "testdata/module"
-	functionName = "cuefn"
-	fnTag        = "v0.1.0"
-	cfgTag       = "v0.1.0"
+	pkgRegPort             = 5050
+	modRegName             = "cuefn-modules" // plain HTTP, +insecure (CUE modules)
+	modRegPort             = 5051
+	moduleRef              = "cuefn.example/app@v0.1.0"
+	moduleDir              = "testdata/module"
+	functionName           = "cuefn"
+	fnTag                  = "v0.1.0"
+	cfgTag                 = "v0.1.0"
+	appConfiguration       = "xapp-configuration"
+	readinessConfiguration = "xreadiness-configuration"
 )
 
-// requireE2E self-skips the harness unless integration mode is on and every tool
-// it shells (Docker, kind, kubectl, helm, chainsaw) plus the locally built dev
-// image are present, mirroring the other gated suites' fail-soft behavior.
+type configurationPackageOptions struct {
+	name                  string
+	moduleRef             string
+	moduleDir             string
+	environmentConfigRefs []string
+}
+
+// requireE2E self-skips the harness unless integration mode is on. Once a caller
+// opts in, absent tools or the local development image are setup failures rather
+// than silent skips.
 func requireE2E(t *testing.T) {
 	t.Helper()
 	if os.Getenv("CUEFN_INTEGRATION") == "" {
 		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the e2e moon task/workflow)")
 	}
 	for _, bin := range []string{"docker", "kind", "kubectl", "helm", "chainsaw"} {
-		if _, err := exec.LookPath(bin); err != nil {
-			t.Skipf("%s not on PATH; skipping kind e2e", bin)
-		}
+		_, err := exec.LookPath(bin)
+		require.NoErrorf(t, err, "%s must be on PATH when CUEFN_INTEGRATION is set", bin)
 	}
-	if out, err := exec.Command("docker", "image", "inspect", devImage).CombinedOutput(); err != nil {
-		t.Skipf("image %s not present (run `mise run image-local`): %s", devImage, out)
-	}
+	out, err := exec.Command("docker", "image", "inspect", devImage).CombinedOutput()
+	require.NoErrorf(
+		t,
+		err,
+		"image %s must be present when CUEFN_INTEGRATION is set (run `mise run image-local`): %s",
+		devImage,
+		out,
+	)
 }
 
 // TestE2E_Kind drives the full author->publish->install->instantiate->reconcile
@@ -77,7 +90,8 @@ func requireE2E(t *testing.T) {
 // #Status, API-server defaulting of an omitted field, the EnvironmentConfig value
 // surfacing in a composed resource, a required-resource fetch (the core controller
 // reads an operator-supplied ConfigMap via aggregated RBAC and a second render pass
-// renders a data-dependent resource), and the digest-drift guard.
+// renders a data-dependent resource), observed-resource readiness across live Jobs
+// and Deployments, and the digest-drift guard.
 func TestE2E_Kind(t *testing.T) {
 	requireE2E(t)
 
@@ -101,6 +115,10 @@ func TestE2E_Kind(t *testing.T) {
 	common.PublishModule(t, modReg.HostRef(), moduleRef, moduleDir)
 	expectedDigest := resolveDigest(ctx, t, modReg.HostRef(), moduleRef)
 	t.Logf("module %s resolved to %s", moduleRef, expectedDigest)
+	readinessModuleDir := common.HermeticReadinessModuleDir(t)
+	common.PublishModule(t, modReg.HostRef(), common.ReadinessModuleRef, readinessModuleDir)
+	readinessDigest := resolveDigest(ctx, t, modReg.HostRef(), common.ReadinessModuleRef)
+	t.Logf("module %s resolved to %s", common.ReadinessModuleRef, readinessDigest)
 
 	fnHostRef := pkgReg.HostRef() + "/function-cuefn:" + fnTag
 	fnClusterRef := pkgReg.ClusterRef() + "/function-cuefn:" + fnTag
@@ -109,7 +127,22 @@ func TestE2E_Kind(t *testing.T) {
 
 	cfgHostRef := pkgReg.HostRef() + "/configuration-xapp:" + cfgTag
 	cfgClusterRef := pkgReg.ClusterRef() + "/configuration-xapp:" + cfgTag
-	pushConfigurationPackage(ctx, t, pkgReg, cfgHostRef, expectedDigest, fnRepo)
+	appXRD := pushConfigurationPackage(ctx, t, pkgReg, cfgHostRef, expectedDigest, fnRepo,
+		configurationPackageOptions{
+			name:                  appConfiguration,
+			moduleRef:             moduleRef,
+			moduleDir:             moduleDir,
+			environmentConfigRefs: []string{"app-environment"},
+		})
+
+	readinessCfgHostRef := pkgReg.HostRef() + "/configuration-xreadiness:" + cfgTag
+	readinessCfgClusterRef := pkgReg.ClusterRef() + "/configuration-xreadiness:" + cfgTag
+	readinessXRD := pushConfigurationPackage(ctx, t, pkgReg, readinessCfgHostRef, readinessDigest, fnRepo,
+		configurationPackageOptions{
+			name:      readinessConfiguration,
+			moduleRef: common.ReadinessModuleRef,
+			moduleDir: readinessModuleDir,
+		})
 
 	// --- Cluster + Crossplane -------------------------------------------------
 	cluster, err := NewCluster(ctx, clusterName)
@@ -121,6 +154,7 @@ func TestE2E_Kind(t *testing.T) {
 		}
 		_ = cluster.Delete(context.Background())
 	})
+	require.NoError(t, cluster.LoadImage(ctx, devImage), "load development image into kind")
 
 	require.NoError(t, modReg.Connect(ctx), "connect module registry to kind network")
 	require.NoError(t, pkgReg.Connect(ctx), "connect package registry to kind network")
@@ -135,14 +169,17 @@ func TestE2E_Kind(t *testing.T) {
 	waitFor(t, cluster, "5m", "function.pkg.crossplane.io/"+functionName, "Healthy")
 	waitFor(t, cluster, "5m", "function.pkg.crossplane.io/function-environment-configs", "Healthy")
 
-	out, err = cluster.Apply(ctx, configurationManifest(cfgClusterRef))
+	out, err = cluster.Apply(ctx, configurationManifest(appConfiguration, cfgClusterRef))
 	require.NoError(t, err, "apply configuration: %s", out)
-	waitFor(t, cluster, "5m", "configuration.pkg.crossplane.io/xapp-configuration", "Healthy")
+	waitFor(t, cluster, "5m", "configuration.pkg.crossplane.io/"+appConfiguration, "Healthy")
 
-	// The XRD must be Established before XRs of the new kind can be created.
-	waitFor(t, cluster, "3m",
-		"compositeresourcedefinition.apiextensions.crossplane.io/xapps.platform.meigma.io",
-		"Established")
+	out, err = cluster.Apply(ctx, configurationManifest(readinessConfiguration, readinessCfgClusterRef))
+	require.NoError(t, err, "apply readiness configuration: %s", out)
+	waitFor(t, cluster, "5m", "configuration.pkg.crossplane.io/"+readinessConfiguration, "Healthy")
+
+	// Both XRDs must be Established before XRs of the new kinds can be created.
+	waitFor(t, cluster, "3m", "compositeresourcedefinition.apiextensions.crossplane.io/"+appXRD, "Established")
+	waitFor(t, cluster, "3m", "compositeresourcedefinition.apiextensions.crossplane.io/"+readinessXRD, "Established")
 
 	// --- Reconcile assertions (criteria 1-4) ----------------------------------
 	runChainsaw(ctx, t, cluster, "reconcile.yaml", true /* skipDelete */)
@@ -155,6 +192,15 @@ func TestE2E_Kind(t *testing.T) {
 	// (skipDelete=false) so its ConfigMap and XR are gone before the drift step
 	// republishes a different module under the same version.
 	runChainsaw(ctx, t, cluster, "required-resources.yaml", false /* skipDelete */)
+
+	// --- Observed-resource readiness -----------------------------------------
+	// Two XRs deliberately begin with one unready child apiece. Chainsaw patches
+	// only their specs, then polls the live children and aggregate XR conditions
+	// to prove readiness follows Job/Deployment observations while a conditionless
+	// ConfigMap remains ready.
+	t.Run("observed resource readiness", func(t *testing.T) {
+		runChainsaw(ctx, t, cluster, "observed-readiness.yaml", false /* skipDelete */)
+	})
 
 	// --- Digest-drift guard (criterion 5) -------------------------------------
 	// Republish DIFFERENT content under the SAME version, then force a reconcile.
@@ -209,10 +255,16 @@ func pushFunctionPackage(ctx context.Context, t *testing.T, reg *Registry, ref s
 // pushConfigurationPackage generates the XRD + Composition from the module, locks
 // the expected digest and function dependency, and pushes the Configuration xpkg
 // to the TLS package registry.
-func pushConfigurationPackage(ctx context.Context, t *testing.T, reg *Registry, ref, expectedDigest, fnRepo string) {
+func pushConfigurationPackage(
+	ctx context.Context,
+	t *testing.T,
+	reg *Registry,
+	ref, expectedDigest, fnRepo string,
+	options configurationPackageOptions,
+) string {
 	t.Helper()
 
-	mod, cleanup, err := render.LoadModule(ctx, render.LocalLoader{Dir: moduleDir}, moduleRef)
+	mod, cleanup, err := render.LoadModule(ctx, render.LocalLoader{Dir: options.moduleDir}, options.moduleRef)
 	require.NoError(t, err)
 	defer cleanup()
 
@@ -220,17 +272,17 @@ func pushConfigurationPackage(ctx context.Context, t *testing.T, reg *Registry, 
 	require.NoError(t, err)
 
 	meta, err := pkg.GenerateConfigurationMeta(pkg.ConfigurationMeta{
-		Name:            "xapp-configuration",
+		Name:            options.name,
 		FunctionPackage: fnRepo,
 		FunctionVersion: ">=v0.1.0",
 	})
 	require.NoError(t, err)
 
 	comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
-		Module:                moduleRef,
+		Module:                options.moduleRef,
 		ExpectedDigest:        expectedDigest,
 		FunctionName:          functionName,
-		EnvironmentConfigRefs: []string{"app-environment"},
+		EnvironmentConfigRefs: options.environmentConfigRefs,
 	})
 	require.NoError(t, err)
 
@@ -239,6 +291,7 @@ func pushConfigurationPackage(ctx context.Context, t *testing.T, reg *Registry, 
 
 	_, err = pkg.Push(ctx, ref, img, false, remote.WithTransport(reg.Transport()))
 	require.NoError(t, err, "push Configuration xpkg to %s", ref)
+	return xrd.Name
 }
 
 // functionInstallManifest renders the in-cluster Function install: the cuefn
@@ -285,13 +338,12 @@ metadata:
 spec:
   package: xpkg.crossplane.io/crossplane-contrib/function-environment-configs:v0.7.2
 ---
-# Required-resource reads go through Crossplane's CORE controller ServiceAccount,
-# not the function pod. This aggregate-to-crossplane ClusterRole is absorbed by
-# Crossplane's aggregated crossplane ClusterRole, granting the core controller
-# get/list/watch on ConfigMaps. Without it the fetch for the module's cfg
-# requirement silently returns nothing, the delivered bucket stays empty, and the
-# guarded resource never renders (a silent under-render). This is an operator
-# responsibility for every kind a module can request.
+# Required-resource reads and composed-resource writes go through Crossplane's
+# CORE controller ServiceAccount, not the function pod. This aggregate-to-
+# crossplane ClusterRole is absorbed by Crossplane's aggregated crossplane
+# ClusterRole. ConfigMap reads prove required-resource delivery; Job verbs let the
+# readiness fixture create and observe its composed migration Jobs. These grants
+# are an operator responsibility for every kind a module can request or compose.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -302,18 +354,21 @@ rules:
   - apiGroups: [""]
     resources: ["configmaps"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "update", "patch", "delete", "get", "list", "watch"]
 `, modClusterRef, functionName, fnRef)
 }
 
 // configurationManifest renders the Configuration package install.
-func configurationManifest(cfgRef string) []byte {
+func configurationManifest(name, cfgRef string) []byte {
 	return fmt.Appendf(nil, `apiVersion: pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: xapp-configuration
+  name: %s
 spec:
   package: %s
-`, cfgRef)
+`, name, cfgRef)
 }
 
 // waitFor blocks until the named resource reports the given condition true.
@@ -350,9 +405,10 @@ func dumpDiagnostics(t *testing.T, cluster *Cluster) {
 	for _, args := range [][]string{
 		{"get", "pkg", "-A"},
 		{"get", "xapp", "-A", "-o", "yaml"},
+		{"get", "xreadiness", "-A", "-o", "yaml"},
 		{"get", "deploy", "demo", "-n", "default", "-o", "yaml"},
 		{"get", "cm", "demo", "-n", "default", "-o", "yaml"},
-		{"get", "deploy,svc,cm", "-n", "default", "--show-labels"},
+		{"get", "jobs,deploy,svc,cm", "-A", "--show-labels"},
 		{"get", "pods", "-n", "crossplane-system"},
 	} {
 		out, _ := cluster.Kubectl(ctx, args...)
