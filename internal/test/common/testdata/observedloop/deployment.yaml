@@ -1,0 +1,14 @@
+# The physical name intentionally differs from the stable resource annotation.
+# The fixture only recognizes the "workload" key, so its rendered evidence
+# proves Crossplane derived the observation map key from the annotation.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: physical-workload-name
+  namespace: default
+  annotations:
+    crossplane.io/composition-resource-name: workload
+status:
+  custom:
+    nested: seen
+    vendorOnly: true

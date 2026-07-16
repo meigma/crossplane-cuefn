@@ -94,6 +94,11 @@ func (f *Function) RunFunction(ctx context.Context, req *fnv1.RunFunctionRequest
 		response.Fatal(rsp, errors.Wrap(err, "cannot get required resources"))
 		return rsp, nil
 	}
+	observed, err := observedToInputs(req)
+	if err != nil {
+		response.Fatal(rsp, errors.Wrap(err, "cannot get observed composed resources"))
+		return rsp, nil
+	}
 
 	spec, _ := oxr.Resource.Object["spec"].(map[string]any)
 	inputs := render.Inputs{
@@ -104,6 +109,7 @@ func (f *Function) RunFunction(ctx context.Context, req *fnv1.RunFunctionRequest
 		},
 		Environment:       environmentFromContext(req),
 		RequiredResources: requiredToInputs(required),
+		ObservedResources: observed,
 	}
 
 	result, err := render.New(loader).Render(ctx, in.Module, inputs)
@@ -139,6 +145,32 @@ func (f *Function) RunFunction(ctx context.Context, req *fnv1.RunFunctionRequest
 	response.ConditionTrue(rsp, "FunctionSuccess", "Success").TargetComposite()
 	f.log.Debug("Rendered resources", "module", in.Module, "count", len(result.Resources))
 	return rsp, nil
+}
+
+// observedToInputs extracts the observed composed object bodies Crossplane
+// supplied, keyed by their stable composition-resource names. It deliberately
+// ignores connection details, which are a separate SDK field and outside the
+// module contract. A named observation without an object body is malformed.
+func observedToInputs(req *fnv1.RunFunctionRequest) (map[string]map[string]any, error) {
+	for name, observed := range req.GetObserved().GetResources() {
+		if observed.GetResource() == nil {
+			return nil, errors.Errorf("observed composed resource %q has no resource body", name)
+		}
+	}
+
+	observed, err := request.GetObservedComposedResources(req)
+	if err != nil {
+		return nil, err
+	}
+	if len(observed) == 0 {
+		return map[string]map[string]any{}, nil
+	}
+
+	out := make(map[string]map[string]any, len(observed))
+	for name, resource := range observed {
+		out[string(name)] = resource.Resource.Object
+	}
+	return out, nil
 }
 
 // setDesiredComposed merges the rendered resources into the desired composed

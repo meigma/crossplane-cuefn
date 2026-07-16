@@ -19,6 +19,7 @@ type renderFlags struct {
 	xr                string
 	env               string
 	requiredResources string
+	observedResources string
 }
 
 // newRenderCommand builds the `cuefn render` subcommand: a cluster-free,
@@ -53,6 +54,9 @@ func newRenderCommand(options Options) *cobra.Command {
 	cmd.Flags().StringVar(&f.requiredResources, "required-resources", "",
 		"path to a YAML file or directory of cluster objects matched against the "+
 			"module's emitted requirements (mirrors crossplane render --required-resources)")
+	cmd.Flags().StringVar(&f.observedResources, "observed-resources", "",
+		"path to a YAML file or directory of observed composed objects keyed by their "+
+			"crossplane.io/composition-resource-name annotation (mirrors crossplane render --observed-resources)")
 	_ = cmd.MarkFlagRequired("xr")
 
 	return cmd
@@ -61,6 +65,10 @@ func newRenderCommand(options Options) *cobra.Command {
 // runRender reads the inputs, selects a loader, renders, and prints the result.
 func runRender(ctx context.Context, options Options, f renderFlags, ref string) error {
 	inputs, err := readRenderInputs(f)
+	if err != nil {
+		return err
+	}
+	inputs.ObservedResources, err = loadObservedObjects(f.observedResources)
 	if err != nil {
 		return err
 	}

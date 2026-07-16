@@ -1,7 +1,9 @@
 package render_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,6 +23,12 @@ const moduleDir = "../test/common/testdata/module"
 // requirement (cfg -> a ConfigMap) and guards a Deployment on the delivered
 // objects. Served offline via LocalLoader like moduleDir.
 const requiredDir = "../test/common/testdata/required"
+
+const (
+	observedDir         = "../test/common/testdata/observed"
+	observedOptionalDir = "testdata/observedoptional"
+	observedLegacyDir   = "testdata/observedlegacy"
+)
 
 // renderExample renders the canonical example module with the given inputs.
 func renderExample(t *testing.T, in render.Inputs) render.Result {
@@ -156,6 +164,130 @@ func TestRenderNonConcreteResources(t *testing.T) {
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "name")
+}
+
+func TestRenderObservedResources(t *testing.T) {
+	t.Parallel()
+
+	observed := map[string]map[string]any{
+		"workload": {
+			"apiVersion": "apps/v1",
+			"kind":       "Deployment",
+			"metadata":   map[string]any{"name": "physical-name"},
+			"status": map[string]any{
+				"custom": map[string]any{"nested": "seen", "vendorOnly": true},
+			},
+		},
+	}
+
+	tests := []struct {
+		name      string
+		observed  map[string]map[string]any
+		wantReady resource.Ready
+		wantCount int
+		wantValue string
+	}{
+		{
+			name:      "first pass receives a concrete empty map",
+			wantReady: resource.ReadyFalse,
+			wantCount: 0,
+		},
+		{
+			name:      "stable key and open status reach CUE",
+			observed:  observed,
+			wantReady: resource.ReadyTrue,
+			wantCount: 1,
+			wantValue: "seen",
+		},
+		{
+			name: "metadata name does not replace the stable key",
+			observed: map[string]map[string]any{
+				"physical-name": observed["workload"],
+			},
+			wantReady: resource.ReadyFalse,
+			wantCount: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			result, err := render.New(render.LocalLoader{Dir: observedDir}).Render(
+				context.Background(),
+				"ignored",
+				render.Inputs{
+					Metadata:          render.Metadata{Name: "demo"},
+					ObservedResources: tt.observed,
+				},
+			)
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantReady, result.Resources["probe"].Ready)
+			assert.Equal(t, tt.wantCount, common.ToInt(t, result.Status["observedCount"]))
+			assert.Equal(t, tt.wantReady == resource.ReadyTrue, result.Status["workloadReady"])
+
+			data, ok := common.Object(t, result, "probe")["data"].(map[string]any)
+			require.True(t, ok)
+			assert.Equal(t, tt.wantValue, data["evidence"])
+		})
+	}
+}
+
+func TestRenderObservedResourcesCompatibility(t *testing.T) {
+	t.Parallel()
+
+	observed := map[string]map[string]any{
+		"child": {
+			"apiVersion": "v1",
+			"kind":       "Secret",
+			"metadata":   map[string]any{"name": "sensitive"},
+			"data":       map[string]any{"token": "must-not-affect-output"},
+		},
+	}
+
+	for _, dir := range []string{observedOptionalDir, observedLegacyDir} {
+		t.Run(dir, func(t *testing.T) {
+			t.Parallel()
+
+			engine := render.New(render.LocalLoader{Dir: dir})
+			without, err := engine.Render(context.Background(), "ignored", render.Inputs{})
+			require.NoError(t, err)
+			with, err := engine.Render(context.Background(), "ignored", render.Inputs{
+				ObservedResources: observed,
+			})
+			require.NoError(t, err)
+
+			withoutJSON, err := json.Marshal(newCompatibilitySnapshot(without))
+			require.NoError(t, err)
+			withJSON, err := json.Marshal(newCompatibilitySnapshot(with))
+			require.NoError(t, err)
+			assert.True(t, bytes.Equal(withoutJSON, withJSON),
+				"optional-only and v0.2.0-closed modules must remain byte-for-byte unchanged")
+		})
+	}
+}
+
+type compatibilityResource struct {
+	Object map[string]any `json:"object"`
+	Ready  resource.Ready `json:"ready"`
+}
+
+type compatibilitySnapshot struct {
+	Resources    map[string]compatibilityResource `json:"resources"`
+	Status       map[string]any                   `json:"status"`
+	Requirements map[string]render.Requirement    `json:"requirements"`
+}
+
+func newCompatibilitySnapshot(result render.Result) compatibilitySnapshot {
+	resources := make(map[string]compatibilityResource, len(result.Resources))
+	for name, item := range result.Resources {
+		resources[name] = compatibilityResource{Object: item.Object, Ready: item.Ready}
+	}
+	return compatibilitySnapshot{
+		Resources:    resources,
+		Status:       result.Status,
+		Requirements: result.Requirements,
+	}
 }
 
 // renderRequired renders the hermetic required-resources fixture with the given

@@ -1,0 +1,17 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xapp-observed
+spec:
+  compositeTypeRef:
+    apiVersion: platform.meigma.io/v1alpha1
+    kind: XApp
+  mode: Pipeline
+  pipeline:
+    - step: cuefn
+      functionRef:
+        name: cuefn
+      input:
+        apiVersion: cuefn.meigma.io/v1beta1
+        kind: Input
+        module: cuefn.example/observed@v0.1.0

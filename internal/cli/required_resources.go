@@ -25,19 +25,27 @@ import (
 // module's emitted requirements by matchRequirements — they are not filename- or
 // directory-keyed.
 func loadRequiredObjects(path string) ([]map[string]any, error) {
+	return loadResourceObjects(path, "required resources")
+}
+
+// loadResourceObjects reads a flat bag of Kubernetes objects from a YAML file
+// or directory, using label in contextual errors. It is shared by the required-
+// and observed-resource flags so both accept the same safe multi-document input
+// conventions.
+func loadResourceObjects(path, label string) ([]map[string]any, error) {
 	if path == "" {
 		return nil, nil
 	}
 
 	info, err := os.Stat(path)
 	if err != nil {
-		return nil, fmt.Errorf("cannot read required resources %q: %w", path, err)
+		return nil, fmt.Errorf("cannot read %s %q: %w", label, path, err)
 	}
 
 	if !info.IsDir() {
 		objs, err := readYAMLObjects(path)
 		if err != nil {
-			return nil, fmt.Errorf("cannot read required resources %q: %w", path, err)
+			return nil, fmt.Errorf("cannot read %s %q: %w", label, path, err)
 		}
 		return objs, nil
 	}
@@ -61,7 +69,7 @@ func loadRequiredObjects(path string) ([]map[string]any, error) {
 		return nil
 	})
 	if walkErr != nil {
-		return nil, fmt.Errorf("cannot read required resources %q: %w", path, walkErr)
+		return nil, fmt.Errorf("cannot read %s %q: %w", label, path, walkErr)
 	}
 	return objs, nil
 }

@@ -31,6 +31,7 @@ const (
 	requiredDir    = "../test/common/testdata/required"
 	matchLabelsDir = "testdata/matchlabels"
 	invalidReqDir  = "testdata/invalidreq"
+	observedDir    = "../test/common/testdata/observed"
 )
 
 // localFactory returns a LoaderFactory serving the example module from disk,
@@ -365,6 +366,69 @@ func TestRunFunction_ReceivesRequiredResources(t *testing.T) {
 	spec, ok := dep["spec"].(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "img:9", spec["image"])
+}
+
+func TestRunFunction_ReceivesObservedComposedResources(t *testing.T) {
+	t.Parallel()
+
+	req := baseRequest(t)
+	req.Observed.Resources = map[string]*fnv1.Resource{
+		"workload": {
+			Resource: resource.MustStructJSON(`{
+				"apiVersion":"apps/v1",
+				"kind":"Deployment",
+				"metadata":{"name":"physical-name"},
+				"status":{"custom":{"nested":"seen","vendorOnly":true}}
+			}`),
+			ConnectionDetails: map[string][]byte{"password": []byte("super-secret")},
+		},
+	}
+
+	fn := function.New(factoryFor(observedDir), logging.NewNopLogger())
+	rsp := run(t, fn, req)
+
+	probe := rsp.GetDesired().GetResources()["probe"]
+	require.NotNil(t, probe)
+	assert.Equal(t, fnv1.Ready_READY_TRUE, probe.GetReady())
+
+	object := probe.GetResource().AsMap()
+	data, ok := object["data"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, "seen", data["evidence"], "open kind-specific status must reach CUE")
+	observation, ok := data["observation"].(string)
+	require.True(t, ok)
+	assert.Contains(t, observation, `"vendorOnly":true`,
+		"the fixture must echo the full observed object for this boundary assertion")
+	assert.NotContains(t, observation, "connectionDetails")
+	assert.NotContains(t, observation, "super-secret",
+		"observed connection details must never enter the CUE object input")
+}
+
+func TestRunFunction_MalformedObservedResourceIsFatalWithoutMutation(t *testing.T) {
+	t.Parallel()
+
+	req := baseRequest(t)
+	req.Observed.Resources = map[string]*fnv1.Resource{
+		"broken": {},
+	}
+	req.Desired = &fnv1.State{Resources: map[string]*fnv1.Resource{
+		"prior": {Resource: resource.MustStructJSON(
+			`{"apiVersion":"v1","kind":"ConfigMap","metadata":{"name":"prior"}}`,
+		)},
+	}}
+
+	fn := function.New(factoryFor(observedDir), logging.NewNopLogger())
+	rsp := run(t, fn, req)
+
+	results := rsp.GetResults()
+	require.Len(t, results, 1)
+	assert.Equal(t, fnv1.Severity_SEVERITY_FATAL, results[0].GetSeverity())
+	assert.Contains(t, results[0].GetMessage(), "observed composed resource")
+
+	desired := rsp.GetDesired().GetResources()
+	require.Len(t, desired, 1, "fatal observation decoding must not add partial desired resources")
+	assert.Equal(t, "prior", desired["prior"].GetResource().AsMap()["metadata"].(map[string]any)["name"])
+	assert.Empty(t, rsp.GetConditions())
 }
 
 // TestRunFunction_WarnsWithoutCapability asserts that when a module emits

@@ -142,13 +142,15 @@ tasks:
   # fast and reliable. Run under `mise exec` so the pinned crossplane CLI wins
   # over any proto shim on PATH.
   render-test:
-    command: 'mise exec -- go test ./internal/test/integration/... -run TestRenderLoop -count 1'
+    command: "mise exec -- go test -v ./internal/test/integration/... -run '^(TestRenderLoop_CrossplaneRender|TestRequiredResources_CrossplaneRender|TestObservedResources_CrossplaneRender)$' -count 1"
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
       - 'internal/test/common/testdata/renderloop/**'
+      - 'internal/test/common/testdata/requiredloop/**'
+      - 'internal/test/common/testdata/observedloop/**'
     options:
       cache: false
   # OCI module loader integration: publishes module fixtures to a throwaway OCI

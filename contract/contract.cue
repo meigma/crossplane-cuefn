@@ -21,6 +21,11 @@
 // out.input.requiredResources, both keyed by an author-chosen name. Both fields
 // are optional, so a module that needs nothing is unaffected.
 //
+// A module may inspect composed resources Crossplane has already observed by
+// promoting out.input.observedResources from the optional contract field to a
+// regular field. cuefn fills only explicitly opted-in modules, preserving older
+// closed contracts and modules that merely import this definition.
+//
 // Because #Transform/#API/#Input/#Resource are closed, a misspelled or unknown
 // field (e.g. `resorces`) is rejected by `cue vet`. The schema definitions
 // (#Spec/#Status) are deliberately NOT wrapped: they feed the XRD codegen and
@@ -76,6 +81,21 @@ package contract
 	// found". cuefn seeds an empty list per declared requirement so a guard on
 	// input.requiredResources[name] stays concrete on the first pass.
 	requiredResources?: [string]: [...#Required]
+	// observedResources are the composed objects Crossplane supplied on the
+	// current function request, keyed by the same stable names used in resources.
+	// This field is opt-in: declare it as a regular field in the module's input to
+	// receive a concrete map (empty until Crossplane observes a child).
+	observedResources?: [string]: #ObservedResource
+}
+
+// #ObservedResource is one composed Kubernetes object observed by Crossplane.
+// It is deliberately open so kind-specific metadata, spec, and status survive
+// unchanged. Connection details are a separate function-request field and are
+// never exposed here.
+#ObservedResource: {
+	apiVersion: string
+	kind:       string
+	...
 }
 
 // #Required is one cluster object Crossplane fetched for a requirement, surfaced
@@ -93,11 +113,11 @@ package contract
 // enforces that at render time. An omitted namespace reads cluster-scoped
 // objects, or lists a namespaced kind across all namespaces.
 #Requirement: {
-	apiVersion:   string
-	kind:         string
-	matchName?:   string
+	apiVersion: string
+	kind:       string
+	matchName?: string
 	matchLabels?: [string]: string
-	namespace?:   string
+	namespace?: string
 }
 
 // #Transform is the closed transform contract. Unify your top-level `out` field
