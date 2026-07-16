@@ -43,6 +43,8 @@ jobs:
         uses: DeterminateSystems/nix-installer-action@ef8a148080ab6020fd15196c2084a2eea5ff2d25 # v22
 
       - name: Build the flake
+        env:
+          NIX_CONFIG: access-tokens = github.com=${{ github.token }}
         run: nix build .#default --print-build-logs
 
       - name: Smoke test the built binary

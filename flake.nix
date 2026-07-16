@@ -13,7 +13,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         # Kept in sync with releases by release-please (see release-please-config.json).
-        version = "0.1.3"; # x-release-please-version
+        version = "0.1.4"; # x-release-please-version
       in
       {
         packages.default = pkgs.buildGoModule {
@@ -26,7 +26,7 @@
 
           # Regenerate after any go.sum change: set to pkgs.lib.fakeHash, run
           # `nix build`, and copy the sha256 from the mismatch error.
-          vendorHash = "sha256-t5BISl+SDgRk8jbWXVRx6TrCSIjEoVob72O1zJUL8i8=";
+          vendorHash = "sha256-lW2VBTyB1YFRciMh5Vp5pztnQ3g2RkFlpH2ykg8Pm5I=";
 
           subPackages = [ "cmd/cuefn" ];
           env.CGO_ENABLED = 0;
