@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/meigma/crossplane-cuefn/compare/contract/v0.2.0...contract/v0.3.0) (2026-07-16)
+
+
+### Features
+
+* expose observed composed resources to CUE modules ([#64](https://github.com/meigma/crossplane-cuefn/issues/64)) ([60ff2bf](https://github.com/meigma/crossplane-cuefn/commit/60ff2bf8da9cee7ee035beddadfd08d781655f72))
+
 ## [0.2.0](https://github.com/meigma/crossplane-cuefn/compare/contract/v0.1.0...contract/v0.2.0) (2026-06-30)
 
 
