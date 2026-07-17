@@ -8,6 +8,7 @@ import (
 
 	"github.com/meigma/crossplane-cuefn/internal/render"
 	"github.com/meigma/crossplane-cuefn/internal/schema"
+	"github.com/meigma/crossplane-cuefn/internal/snapshot"
 )
 
 // validateFlags holds the flags for the validate subcommand.
@@ -56,7 +57,7 @@ func newValidateCommand(options Options) *cobra.Command {
 // diagnostics stream and returns nil (exit zero); a violation is returned so
 // cobra exits non-zero with the field-located message.
 func runValidate(ctx context.Context, options Options, f validateFlags, xrPath string) error {
-	xr, err := readYAMLObject(xrPath)
+	xr, err := snapshot.LoadObject(xrPath)
 	if err != nil {
 		return fmt.Errorf("cannot read XR %q: %w", xrPath, err)
 	}

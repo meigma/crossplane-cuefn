@@ -1,4 +1,4 @@
-package cli
+package snapshot
 
 import (
 	"os"
@@ -28,7 +28,7 @@ func TestLoadObservedObjects(t *testing.T) {
 
 	t.Run("empty path returns empty map", func(t *testing.T) {
 		t.Parallel()
-		objects, err := loadObservedObjects("")
+		objects, err := LoadObservedObjects("")
 		require.NoError(t, err)
 		assert.Empty(t, objects)
 	})
@@ -37,7 +37,7 @@ func TestLoadObservedObjects(t *testing.T) {
 		t.Parallel()
 		path := writeObservedFixture(t, "observed.yaml", observedOne)
 
-		objects, err := loadObservedObjects(path)
+		objects, err := LoadObservedObjects(path)
 		require.NoError(t, err)
 		require.Contains(t, objects, "workload")
 		assert.NotContains(t, objects, "physical-one",
@@ -63,7 +63,7 @@ data:
   value: kept
 `)
 
-		objects, err := loadObservedObjects(path)
+		objects, err := LoadObservedObjects(path)
 		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"workload", "config"}, mapKeys(objects))
 	})
@@ -82,7 +82,7 @@ metadata:
 `), 0o600))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("ignored"), 0o600))
 
-		objects, err := loadObservedObjects(dir)
+		objects, err := LoadObservedObjects(dir)
 		require.NoError(t, err)
 		assert.ElementsMatch(t, []string{"workload", "migration"}, mapKeys(objects))
 	})
@@ -102,7 +102,7 @@ metadata:
     crossplane.io/composition-resource-name: stale
 `), 0o600))
 
-		objects, err := loadObservedObjects(dir)
+		objects, err := LoadObservedObjects(dir)
 		require.NoError(t, err)
 		assert.Equal(t, []string{"workload"}, mapKeys(objects))
 		assert.NotContains(t, objects, "stale", "nested fixtures must not be observed")
@@ -160,7 +160,7 @@ metadata:
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			path := writeObservedFixture(t, "invalid.yaml", tt.content)
-			_, err := loadObservedObjects(path)
+			_, err := LoadObservedObjects(path)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tt.want)
 		})
@@ -168,7 +168,7 @@ metadata:
 
 	t.Run("missing path", func(t *testing.T) {
 		t.Parallel()
-		_, err := loadObservedObjects(filepath.Join(t.TempDir(), "missing.yaml"))
+		_, err := LoadObservedObjects(filepath.Join(t.TempDir(), "missing.yaml"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "cannot read observed resources")
 	})
@@ -176,10 +176,32 @@ metadata:
 	t.Run("empty directory", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		_, err := loadObservedObjects(dir)
+		_, err := LoadObservedObjects(dir)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "no YAML files found")
 		assert.Contains(t, err.Error(), dir)
+	})
+}
+
+func TestKeyObservedObjects(t *testing.T) {
+	t.Parallel()
+
+	t.Run("nil objects return empty map", func(t *testing.T) {
+		t.Parallel()
+		objects, err := KeyObservedObjects(nil)
+		require.NoError(t, err)
+		require.NotNil(t, objects)
+		assert.Empty(t, objects)
+	})
+
+	t.Run("objects keyed by annotation", func(t *testing.T) {
+		t.Parallel()
+		objs, err := ParseObjects([]byte(observedOne))
+		require.NoError(t, err)
+
+		objects, err := KeyObservedObjects(objs)
+		require.NoError(t, err)
+		assert.Equal(t, []string{"workload"}, mapKeys(objects))
 	})
 }
 
