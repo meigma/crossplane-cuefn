@@ -690,3 +690,33 @@ tag, re-run `release-distribute` via `workflow_dispatch tag=vX.Y.Z`.
 - **Post-release sanity check is worth it**: passing mise/nix/install.sh-with-version
   did NOT catch the broken brew/scoop hashes or the wrong "latest" — only running the
   real `brew install` / default `install.sh` did.
+
+## Observed composed resources and readiness (session 008, contract v0.3.0, product v0.1.4)
+
+- **Explicit regular-field opt-in is the compatibility boundary.** The engine
+  fills `out.input.observedResources` only when the evaluated module materializes
+  that regular field. An opted-in first pass receives concrete `{}`; legacy and
+  contract-optional-only modules remain byte-for-byte unchanged.
+- **Stable keys, full bodies, no connection details.** The Function carries each
+  observed composed object's complete unstructured body under Crossplane's stable
+  resource key, not its physical Kubernetes name. Standalone snapshots recover the
+  same key from `crossplane.io/composition-resource-name`.
+  Connection details are deliberately excluded because they are a separate
+  sensitive channel.
+- **Snapshot directories mirror Crossplane CLI v2.3.3.** The shared observed/required
+  loader reads only sorted immediate lowercase `.yaml`/`.yml` entries, ignores
+  nested directories and other extensions, and errors when a directory contains no
+  immediate YAML. Direct files, multi-document streams, and present-but-empty YAML
+  files remain supported.
+- **Readiness must be conservative and identity-aware.** Check object identity
+  before trusting mutable status; reject stale generation and failure conditions.
+  The reference module covers Job completion/failure, Deployment observed generation
+  and availability, and a conditionless ConfigMap identified by UID.
+- **Release recovery rule:** for a failed tag release, rerun the original tag-push
+  workflow rather than substituting `workflow_dispatch`; dispatch binds attestations
+  to the branch/ref that launched it. Before publication, verify event, tag, source
+  SHA, checksums, subjects, and signer identity. Asset upload now has bounded retries
+  for transient GitHub API failures.
+- Contract releases are distributed through CUE Central. Keep their GitHub release
+  drafts unpublished while the shared release distributor remains product-only and
+  expects `checksums.txt` plus binary assets.
