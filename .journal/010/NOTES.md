@@ -54,3 +54,16 @@ negative tests, numbered step dirs (`1/observed.yaml`…) for readiness
 sequences. Assertion core stays format-agnostic in `internal/testharness` so
 an A-style suite format could be added later. Next: implementation-work
 breakdown delivered to developer; awaiting go-ahead on plan/PR arc.
+
+## 2026-07-17 15:25 — Design doc written
+`.journal/010/DESIGN.md` is the authoritative spec: section vocabulary
+(closed, hard errors on unknowns), normalized result document (explicit
+status:null / requirements:{}), three evaluators (want.cue via
+Unify+Validate(Concrete) with txtar-coordinate line padding; want.yaml exact
+golden; error.txt substrings), steps contiguous-from-1 sharing base fixtures,
+seed/--update/never-in-CI workflow, CLI spec, architecture
+(internal/snapshot extraction + internal/testharness core + thin cli
+adapter, no noxpkg work, dep: go-internal/txtar), dogfood acceptance via
+example/module tests/ + example-test moon task, 4-PR arc, 4 open questions
+(publish packaging of tests/, CI detection, diff polish, --run step
+addressing). Awaiting developer go-ahead to start PR 1.
