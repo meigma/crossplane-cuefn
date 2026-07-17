@@ -16,8 +16,8 @@ import (
 // not `function --insecure`). With no certs dir and without --insecure,
 // function-sdk-go's Serve refuses to start ("no credentials provided"); that very
 // error proves the default command reached the gRPC serve path rather than
-// printing root help/usage. It self-skips without Docker or the dev image
-// (criterion 6 / the tracked no-args cleanup).
+// printing root help/usage. With integration mode enabled, Docker and the dev
+// image are required prerequisites (criterion 6 / the tracked no-args cleanup).
 func TestImageServesFunction_NoArgs(t *testing.T) {
 	docker, image := common.RequireDevImage(t)
 

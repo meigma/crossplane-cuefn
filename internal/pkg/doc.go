@@ -31,9 +31,11 @@
 // generated from input/v1beta1 (Crossplane reads the Input CRD from the package
 // to validate pipeline step inputs), and the base is the apko-built runtime
 // image rather than empty.Image — so the package image IS the runtime image plus
-// the package layer, and `crossplane` both accepts the package and runs the
-// embedded `cuefn function` entrypoint. BuildFunctionIndex/PushIndex extend this
-// to a multi-arch index for a real release, since the package image is the
-// runtime and must run on every node arch. The Configuration path (empty base)
-// and the Function path (runtime base) share the one assembler.
+// the package layer. BuildFunctionImage specializes that generic base by moving
+// its default `function` command into the package entrypoint and clearing Cmd,
+// which lets Crossplane supply runtime flags such as `--insecure` directly.
+// BuildFunctionIndex/PushIndex extend this to a multi-arch index for a real
+// release, since the package image is the runtime and must run on every node
+// arch. The Configuration path (empty base) and the Function path (runtime base)
+// share the one assembler.
 package pkg

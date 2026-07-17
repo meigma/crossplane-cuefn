@@ -20,8 +20,8 @@ import (
 // parses it into its cache format, and the extracted stream names the expected
 // kinds (criteria 1/1c). The "function" case additionally proves the
 // embed-runtime path: the package layer rides on top of the runtime base's
-// layers without disturbing its entrypoint. No registry/Docker needed;
-// crossplane-gated once for both cases.
+// layers and normalizes its entrypoint for Crossplane runtime flags. No
+// registry/Docker needed; crossplane-gated once for both cases.
 func TestXpkgValidate(t *testing.T) {
 	bin := common.RequireCrossplane(t)
 
@@ -53,7 +53,7 @@ func TestXpkgValidate(t *testing.T) {
 				require.NoError(t, err)
 
 				// Embed-runtime: the runtime layers survive under the package
-				// layer and the runtime entrypoint is preserved.
+				// layer and the serving subcommand moves into the entrypoint.
 				imgLayers, err := img.Layers()
 				require.NoError(t, err)
 				assert.Len(t, imgLayers, len(baseLayers)+1, "package layer must ride on top of the runtime layers")
@@ -62,9 +62,14 @@ func TestXpkgValidate(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(
 					t,
-					[]string{"/usr/bin/cuefn"},
+					[]string{"/usr/bin/cuefn", "function"},
 					cfg.Config.Entrypoint,
-					"runtime entrypoint must be preserved",
+					"Function package must select the serving subcommand in its entrypoint",
+				)
+				assert.Empty(
+					t,
+					cfg.Config.Cmd,
+					"Crossplane must be free to replace the package command with runtime flags",
 				)
 				return img
 			},

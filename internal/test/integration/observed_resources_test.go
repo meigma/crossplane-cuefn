@@ -2,6 +2,7 @@ package integration_test
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
@@ -13,20 +14,30 @@ import (
 )
 
 // TestObservedResources_CrossplaneRender proves Crossplane's raw observed
-// object flag reaches cuefn under the stable composition-resource annotation
-// and changes the module's readiness output when the observation changes.
+// object flag reaches an assembled cuefn Function xpkg through the standard
+// Docker runtime and changes the module's readiness output when the observation
+// changes. It uses no Development runtime, local server, named container,
+// substituted image, or --crossplane-binary.
 func TestObservedResources_CrossplaneRender(t *testing.T) {
 	reg := common.StartRegistry(t)
 	crossplane := common.RequireCrossplane(t)
 	reg.Publish(t, common.ObservedModuleRef, common.HermeticObservedModuleDir(t))
 
-	bin := common.BuildBinary(t)
-	port := common.FreePort(t)
-	bindAddr := fmt.Sprintf("0.0.0.0:%d", port)
-	dialAddr := fmt.Sprintf("127.0.0.1:%d", port)
-	common.ServeFunction(t, bin, bindAddr, dialAddr, reg.CUERegistry(), t.TempDir())
+	_, pkgTag := loadFunctionPackage(t, "crossplane-cuefn:observed-render")
+	functions := filepath.Join(t.TempDir(), "functions.yaml")
+	registryRoute := "cuefn.example=" + reg.DockerHostAddress(t) + "+insecure"
+	manifest := fmt.Sprintf(`apiVersion: pkg.crossplane.io/v1
+kind: Function
+metadata:
+  name: cuefn
+  annotations:
+    render.crossplane.io/runtime-docker-pull-policy: Never
+    render.crossplane.io/runtime-docker-env: %q
+spec:
+  package: %q
+`, "CUE_REGISTRY="+registryRoute, pkgTag.String())
+	require.NoError(t, os.WriteFile(functions, []byte(manifest), 0o600))
 
-	functions := common.WriteFunctions(t, t.TempDir(), dialAddr)
 	assets := common.HermeticObservedloopDir(t)
 	renderObserved := func(t *testing.T, snapshot string) string {
 		t.Helper()

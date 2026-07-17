@@ -3,7 +3,10 @@
 `cuefn publish-function` assembles the cuefn **Function** package over the
 apko-built runtime image and pushes it. The package image *is* the runtime image
 plus a `package.yaml` layer (Function metadata + the embedded `Input` CRD), so it
-both installs as a Crossplane Function and serves `cuefn function`.
+both installs as a Crossplane Function and serves `cuefn function`. Assembly
+preserves the runtime layers but moves the base image's default `function`
+command into the package entrypoint and clears `Cmd`, allowing Crossplane's
+Docker runtime to supply flags such as `--insecure`.
 
 Most operators install the published `ghcr.io/meigma/function-cuefn` package and
 never run this command. Use it to ship your own build of the function.

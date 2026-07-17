@@ -59,9 +59,11 @@ the rendered objects as desired composed resources plus a patched composite
 status. Crossplane connects over mTLS by default; pass `--insecure` for local
 `crossplane render`.
 
-This is the runtime image's entry point (`apko.yaml` sets `cmd: function`), so
-the Function package both installs as a Crossplane Function and serves this
-command.
+The generic runtime image uses `/usr/bin/cuefn` as its entrypoint and `function`
+as its default command, leaving other consumers free to replace the subcommand.
+When `publish-function` assembles a Function xpkg, it moves that default command
+into the package entrypoint and clears `Cmd`, so Crossplane's standard Docker
+runtime can replace `Cmd` with flags such as `--insecure`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
@@ -255,9 +257,11 @@ Assembles the cuefn **Function** xpkg — the package metadata plus the embedded
 `Input` CRD — over one or more apko-built runtime image bases and pushes it (or
 writes it locally). The package image **is** the runtime image plus a
 `package.yaml` layer, so it both installs as a Crossplane Function and serves
-`cuefn function`. A single `--runtime-image` produces a single-arch image;
-several produce a multi-arch index (a Function package image must run on every
-node arch). This command takes no positional arguments.
+`cuefn function`. Assembly preserves the runtime layers while moving the base's
+default command into the package entrypoint and clearing `Cmd` for Crossplane's
+runtime flags. A single `--runtime-image` produces a single-arch image; several
+produce a multi-arch index (a Function package image must run on every node
+arch). This command takes no positional arguments.
 
 | Flag | Default | Description |
 |------|---------|-------------|

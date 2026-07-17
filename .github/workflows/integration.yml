@@ -1,10 +1,10 @@
 name: Integration
 
 # Heavy Docker/crossplane/envtest integration suites. These are deliberately
-# kept OUT of the blocking `ci` workflow (which runs `moon ci`, where these moon
-# tasks are `runInCI: false`) so `ci` stays fast and reliable. This workflow runs
-# them visibly on every PR and on master, but is NOT a required check — a slow
-# runner or a flaky container must not block merges. The tests themselves
+# kept OUT of the blocking `ci` workflow's `moon run root:check` graph so `ci`
+# stays fast and reliable. This workflow runs them visibly on every PR and on
+# master, but is NOT a required check — a slow runner or a flaky container must
+# not block merges. The tests themselves
 # env-gate on CUEFN_INTEGRATION (set by the moon tasks), so plain `go test ./...`
 # never runs them.
 
@@ -78,9 +78,9 @@ jobs:
       - name: Build runtime image
         run: mise run image-local
 
-      # The heavy suites, each excluded from `moon ci` (runInCI: false) and run
-      # here. The moon tasks set CUEFN_INTEGRATION=1 and run under `mise exec` so
-      # the pinned crossplane/cosign/syft/chainsaw win over any shims on PATH.
+      # The heavy suites, each intentionally absent from `root:check`, run here.
+      # The moon tasks set CUEFN_INTEGRATION=1 and run under `mise exec` so the
+      # pinned crossplane/cosign/syft/chainsaw win over any shims on PATH.
       - name: OCI loader integration
         run: moon run root:oci-test
 

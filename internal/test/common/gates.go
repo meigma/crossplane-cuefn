@@ -58,20 +58,24 @@ func RequireBinary(t *testing.T, bin string) string {
 	return path
 }
 
-// RequireDevImage skips the test unless Docker is usable and the dev image
-// (DevImage) has been built locally (via `mise run image-local`). It returns the
-// resolved docker path and the dev image tag.
+// RequireDevImage skips the test when integration mode is off. Once a caller
+// opts in, Docker and the dev image (built via `mise run image-local`) are hard
+// prerequisites. It returns the resolved docker path and the dev image tag.
 func RequireDevImage(t *testing.T) (dockerPath, image string) {
 	t.Helper()
 	if os.Getenv("CUEFN_INTEGRATION") == "" {
 		t.Skip("integration test: set CUEFN_INTEGRATION=1 to run (via the integration moon tasks/workflow)")
 	}
+	RequireDocker(t)
 	docker, err := exec.LookPath("docker")
-	if err != nil {
-		t.Skip("docker not on PATH; skipping image smoke test")
-	}
-	if out, err := exec.Command(docker, "image", "inspect", DevImage).CombinedOutput(); err != nil {
-		t.Skipf("image %s not present (run `mise run image-local`): %s", DevImage, out)
-	}
+	require.NoError(t, err, "docker must be on PATH when CUEFN_INTEGRATION is set")
+	out, err := exec.Command(docker, "image", "inspect", DevImage).CombinedOutput()
+	require.NoErrorf(
+		t,
+		err,
+		"image %s must be present when CUEFN_INTEGRATION is set (run `mise run image-local`): %s",
+		DevImage,
+		out,
+	)
 	return docker, DevImage
 }
