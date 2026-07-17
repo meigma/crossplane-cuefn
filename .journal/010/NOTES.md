@@ -67,3 +67,19 @@ adapter, no noxpkg work, dep: go-internal/txtar), dogfood acceptance via
 example/module tests/ + example-test moon task, 4-PR arc, 4 open questions
 (publish packaging of tests/, CI detection, diff polish, --run step
 addressing). Awaiting developer go-ahead to start PR 1.
+
+## 2026-07-17 16:05 — PR 1 open: snapshot extraction (#69)
+Worktree `.wt/refactor-snapshot-extraction` (branch
+`refactor/snapshot-extraction` off master 1fc594f). New `internal/snapshot`:
+`ParseObject`/`LoadObject` (single-doc XR/env), `ParseObjects` (multi-doc,
+embedded `---` safe), `LoadObservedObjects` + bytes-core `KeyObservedObjects`,
+`LoadRequiredObjects`, `MatchRequirements`, and
+`RenderWithRequiredObjects(ctx, engine, ref, inputs, objs)` (the moved
+two-pass fixpoint incl. the `cannot render module %q` wrapping — runRender now
+delegates). cli: render.go/validate.go rewired; observed_resources.go +
+required_resources.go (+tests) deleted; loader tests moved to snapshot with
+exported names + new direct tests (ParseObject, embedded-separator
+ParseObjects, KeyObservedObjects). `moduleLoader` deliberately stays in cli
+(adapter wiring). Local `moon run root:check` green; PR #69 checks ALL green
+(ci 48s, integration 3m04s, e2e 3m21s). Awaiting developer review/approval →
+then squash-merge + prune per the usual workflow.
