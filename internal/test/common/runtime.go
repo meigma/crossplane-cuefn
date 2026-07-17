@@ -15,8 +15,8 @@ import (
 
 // FakeRuntimeBase builds a synthetic runtime image base standing in for the apko
 // image: a valid linux image for the given arch with the entrypoint /usr/bin/cuefn
-// and cmd ["function"] the real image carries. The tests assert the package layer
-// rides on top of this without disturbing the runtime config. The layer count is
+// and cmd ["function"] the real image carries. The tests assert the Function
+// package specializes that generic base without mutating it. The layer count is
 // unified (256-byte, 2-layer) across the previously divergent copies.
 func FakeRuntimeBase(t *testing.T, arch string) v1.Image {
 	t.Helper()

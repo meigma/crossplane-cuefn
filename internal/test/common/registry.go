@@ -3,6 +3,7 @@ package common
 import (
 	"bytes"
 	"context"
+	"net"
 	"testing"
 
 	"cuelang.org/go/mod/modregistry"
@@ -60,6 +61,27 @@ func (r *Registry) Host() string { return r.host }
 
 // CUERegistry returns the matching CUE_REGISTRY value (plain HTTP via "+insecure").
 func (r *Registry) CUERegistry() string { return r.cueRegistry }
+
+// DockerHostAddress returns the registry's host-published port through Docker's
+// bridge gateway. Crossplane's render CLI places Function containers on an
+// isolated bridge, where the registry container's private IP is not reachable.
+func (r *Registry) DockerHostAddress(t *testing.T) string {
+	t.Helper()
+
+	provider, err := testcontainers.NewDockerProvider(
+		testcontainers.WithDefaultBridgeNetwork(testcontainers.Bridge),
+	)
+	require.NoError(t, err, "create Docker provider")
+	defer func() {
+		require.NoError(t, provider.Close(), "close Docker provider")
+	}()
+	gateway, err := provider.GetGatewayIP(context.Background())
+	require.NoError(t, err, "Docker bridge gateway IP")
+
+	_, port, err := net.SplitHostPort(r.host)
+	require.NoError(t, err, "registry host address %q", r.host)
+	return net.JoinHostPort(gateway, port)
+}
 
 // Env returns the environment a loader should use to reach this registry: a
 // CUE_REGISTRY pointing at the plain-HTTP container and a CUE_CACHE_DIR rooted at

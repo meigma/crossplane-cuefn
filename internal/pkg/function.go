@@ -79,11 +79,9 @@ func (f Function) PackageYAML() ([]byte, error) {
 }
 
 // BuildFunctionImage assembles a single-arch Function xpkg: the package.yaml
-// layer (meta + Input CRD) appended over the apko runtime image base, so the
-// package image IS the runtime image plus the package layer. base's entrypoint,
-// config, and runtime layers are preserved — the package layer never alters
-// serving. This is the first real embed-runtime use of BuildXpkgImage
-// (base != empty.Image).
+// layer (meta + Input CRD) appended over the apko runtime image base. It moves
+// the base's default command into the package entrypoint so Crossplane can
+// replace Cmd with runtime flags while the standalone base remains generic.
 func BuildFunctionImage(base v1.Image, f Function) (v1.Image, error) {
 	if base == nil {
 		return nil, errors.New("function image requires a runtime base image")
@@ -92,7 +90,23 @@ func BuildFunctionImage(base v1.Image, f Function) (v1.Image, error) {
 	if err != nil {
 		return nil, err
 	}
-	return BuildXpkgImage(base, stream)
+	img, err := BuildXpkgImage(base, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	cfg, err := img.ConfigFile()
+	if err != nil {
+		return nil, fmt.Errorf("cannot read assembled Function image config: %w", err)
+	}
+	cfg.Config.Entrypoint = append(cfg.Config.Entrypoint, cfg.Config.Cmd...)
+	cfg.Config.Cmd = nil
+
+	img, err = mutate.ConfigFile(img, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("cannot normalize Function image config: %w", err)
+	}
+	return img, nil
 }
 
 // BuildFunctionIndex wraps each per-arch runtime base into a Function xpkg image

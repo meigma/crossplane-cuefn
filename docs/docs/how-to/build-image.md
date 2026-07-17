@@ -16,8 +16,10 @@ mise run image-local                       # builds crossplane-cuefn:dev and ima
 docker run --rm crossplane-cuefn:dev --version
 ```
 
-`crossplane-cuefn:dev --version` runs the image's default command path; the
-image's entry point is `cuefn function`, so a no-args run serves gRPC.
+The generic image has `/usr/bin/cuefn` as its entrypoint and `function` as its
+default command, so a no-args run serves gRPC while callers can replace the
+subcommand (for example, with `render`). Function xpkg assembly specializes this
+config for Crossplane without changing the generic image.
 
 ## Use the image to package the Function
 

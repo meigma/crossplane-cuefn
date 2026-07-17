@@ -132,15 +132,17 @@ tasks:
     options:
       cache: false
 
-  # End-to-end crossplane render loop: publishes the hermetic fixture module to a
-  # throwaway OCI registry, serves `cuefn function --insecure`, and runs
-  # `crossplane render` over the hermetic render-loop assets. Needs a Docker daemon and the
-  # pinned crossplane CLI. The heavy tests env-gate on CUEFN_INTEGRATION (set
-  # here) so plain `go test ./...` / `root:test` skips them; this task is NOT a
-  # dependency of `check` (the blocking `ci` gate runs `moon run root:check`), so
-  # it runs only in the separate, non-blocking integration workflow — keeping `ci`
-  # fast and reliable. Run under `mise exec` so the pinned crossplane CLI wins
-  # over any proto shim on PATH.
+  # End-to-end crossplane render loops: publish hermetic fixture modules to a
+  # throwaway OCI registry and run the real CLI over environment, required, and
+  # observed-resource assets. The observed-resource case uses an assembled cuefn
+  # Function xpkg through Crossplane's standard Docker runtime; the other cases
+  # use a locally served Development function. Needs a Docker daemon, the pinned
+  # crossplane CLI, and the local dev image. The heavy tests env-gate on
+  # CUEFN_INTEGRATION (set here) so plain `go test ./...` / `root:test` skips
+  # them; this task is NOT a dependency of `check` (the blocking `ci` gate runs
+  # `moon run root:check`), so it runs only in the separate, non-blocking
+  # integration workflow — keeping `ci` fast and reliable. Run under `mise exec`
+  # so the pinned crossplane CLI wins over any proto shim on PATH.
   render-test:
     command: "mise exec -- go test -v ./internal/test/integration/... -run '^(TestRenderLoop_CrossplaneRender|TestRequiredResources_CrossplaneRender|TestObservedResources_CrossplaneRender)$' -count 1"
     env:
@@ -189,14 +191,16 @@ tasks:
   # Function image + publish-function proof: runs the apko dev-image smoke test
   # (TestImageServesFunction_NoArgs — the image's default `cmd: function` reaches
   # the gRPC serve path rather than printing root help), assembles the Function
-  # package over the real apko runtime base and confirms the PACKAGED image still
-  # serves the gRPC FunctionRunnerService (TestFunctionPackageServesGRPC), and
-  # drives the `cuefn publish-function` command end-to-end including the multi-arch
-  # index (TestPublishFunction_*). Needs a Docker daemon and the locally built
-  # `crossplane-cuefn:dev` image; the cases self-skip when absent, so the task is
-  # kept OUT of the default `check` graph (mirroring render-test/publish-test).
-  # Build the dev image first with `mise run image-local`. Run under `mise exec` so
-  # the pinned crossplane CLI wins over any binary on PATH.
+  # package over the real apko runtime base, confirms Crossplane-style
+  # `--insecure` replacement serves gRPC (TestFunctionPackageServesGRPC), and
+  # drives the `cuefn publish-function` command end-to-end including the
+  # multi-arch index (TestPublishFunction_*). Needs a Docker daemon and the
+  # locally built `crossplane-cuefn:dev` image; once integration mode is enabled,
+  # either missing prerequisite fails the task rather than producing a skipped
+  # green. The task is kept OUT of the default `check` graph (mirroring
+  # render-test/publish-test). Build the dev image first with `mise run
+  # image-local`. Run under `mise exec` so the pinned crossplane CLI wins over any
+  # binary on PATH.
   funcpkg-test:
     command: "mise exec -- go test ./internal/test/integration/... -run 'TestImageServesFunction|TestFunctionPackageServesGRPC|TestPublishFunction' -count 1"
     env:
