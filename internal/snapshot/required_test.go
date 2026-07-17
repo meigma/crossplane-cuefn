@@ -1,4 +1,4 @@
-package cli
+package snapshot
 
 import (
 	"os"
@@ -130,7 +130,7 @@ func TestMatchRequirements(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got := matchRequirements(tt.objs, tt.reqs)
+			got := MatchRequirements(tt.objs, tt.reqs)
 
 			require.Len(t, got, len(tt.want))
 			for key, names := range tt.want {
@@ -175,7 +175,7 @@ metadata:
 
 	t.Run("empty path returns nil", func(t *testing.T) {
 		t.Parallel()
-		objs, err := loadRequiredObjects("")
+		objs, err := LoadRequiredObjects("")
 		require.NoError(t, err)
 		assert.Nil(t, objs)
 	})
@@ -185,7 +185,7 @@ metadata:
 		path := filepath.Join(t.TempDir(), "cm.yaml")
 		require.NoError(t, os.WriteFile(path, []byte(single), 0o600))
 
-		objs, err := loadRequiredObjects(path)
+		objs, err := LoadRequiredObjects(path)
 		require.NoError(t, err)
 		require.Len(t, objs, 1)
 		assert.Equal(t, "ConfigMap", objs[0]["kind"])
@@ -196,7 +196,7 @@ metadata:
 		path := filepath.Join(t.TempDir(), "cms.yaml")
 		require.NoError(t, os.WriteFile(path, []byte(multi), 0o600))
 
-		objs, err := loadRequiredObjects(path)
+		objs, err := LoadRequiredObjects(path)
 		require.NoError(t, err)
 		require.Len(t, objs, 2)
 		assert.Equal(t, "one", objName(t, objs[0]))
@@ -210,7 +210,7 @@ metadata:
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "b.yml"), []byte(multi), 0o600))
 		require.NoError(t, os.WriteFile(filepath.Join(dir, "README.md"), []byte("ignored"), 0o600))
 
-		objs, err := loadRequiredObjects(dir)
+		objs, err := LoadRequiredObjects(dir)
 		require.NoError(t, err)
 		// 1 from a.yaml + 2 from b.yml; README.md ignored.
 		assert.Len(t, objs, 3)
@@ -218,7 +218,7 @@ metadata:
 
 	t.Run("missing path errors", func(t *testing.T) {
 		t.Parallel()
-		_, err := loadRequiredObjects(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
+		_, err := LoadRequiredObjects(filepath.Join(t.TempDir(), "does-not-exist.yaml"))
 		require.Error(t, err)
 	})
 }

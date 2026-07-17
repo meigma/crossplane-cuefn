@@ -3,13 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
-	"os"
-	"reflect"
 
 	"github.com/spf13/cobra"
 	"sigs.k8s.io/yaml"
 
 	"github.com/meigma/crossplane-cuefn/internal/render"
+	"github.com/meigma/crossplane-cuefn/internal/snapshot"
 )
 
 // renderFlags holds the flags for the render subcommand.
@@ -68,7 +67,7 @@ func runRender(ctx context.Context, options Options, f renderFlags, ref string) 
 	if err != nil {
 		return err
 	}
-	inputs.ObservedResources, err = loadObservedObjects(f.observedResources)
+	inputs.ObservedResources, err = snapshot.LoadObservedObjects(f.observedResources)
 	if err != nil {
 		return err
 	}
@@ -80,32 +79,14 @@ func runRender(ctx context.Context, options Options, f renderFlags, ref string) 
 
 	// A flat bag of real cluster objects (file or directory), nil when the flag
 	// is unset.
-	objs, err := loadRequiredObjects(f.requiredResources)
+	objs, err := snapshot.LoadRequiredObjects(f.requiredResources)
 	if err != nil {
 		return err
 	}
 
-	result, err := render.New(loader).Render(ctx, ref, inputs)
+	result, err := snapshot.RenderWithRequiredObjects(ctx, render.New(loader), ref, inputs, objs)
 	if err != nil {
-		return fmt.Errorf("cannot render module %q: %w", ref, err)
-	}
-
-	// Requirements are by design a pure function of stable inputs, so the offline
-	// loop provably converges in exactly two passes: render to discover the
-	// emitted selectors, match the supplied objects against them, then re-render
-	// with the matched objects delivered. We assert stabilization the way
-	// Crossplane does rather than silently print a bogus render.
-	if len(objs) > 0 && len(result.Requirements) > 0 {
-		inputs.RequiredResources = matchRequirements(objs, result.Requirements)
-		second, err := render.New(loader).Render(ctx, ref, inputs)
-		if err != nil {
-			return fmt.Errorf("cannot render module %q: %w", ref, err)
-		}
-		if !reflect.DeepEqual(second.Requirements, result.Requirements) {
-			return fmt.Errorf("requirements did not stabilize for module %q: "+
-				"out.requirements must be a pure function of stable inputs", ref)
-		}
-		result = second
+		return err
 	}
 
 	return printRenderResult(options, result)
@@ -120,7 +101,7 @@ func renderLoader(f renderFlags) (render.ModuleLoader, error) {
 // readRenderInputs reads the XR (required) and environment (optional) YAML files
 // into the curated engine inputs.
 func readRenderInputs(f renderFlags) (render.Inputs, error) {
-	xr, err := readYAMLObject(f.xr)
+	xr, err := snapshot.LoadObject(f.xr)
 	if err != nil {
 		return render.Inputs{}, fmt.Errorf("cannot read XR %q: %w", f.xr, err)
 	}
@@ -136,7 +117,7 @@ func readRenderInputs(f renderFlags) (render.Inputs, error) {
 	}
 
 	if f.env != "" {
-		env, err := readYAMLObject(f.env)
+		env, err := snapshot.LoadObject(f.env)
 		if err != nil {
 			return render.Inputs{}, fmt.Errorf("cannot read environment %q: %w", f.env, err)
 		}
@@ -144,19 +125,6 @@ func readRenderInputs(f renderFlags) (render.Inputs, error) {
 	}
 
 	return inputs, nil
-}
-
-// readYAMLObject reads a YAML file into a map.
-func readYAMLObject(path string) (map[string]any, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var out map[string]any
-	if err := yaml.Unmarshal(data, &out); err != nil {
-		return nil, err
-	}
-	return out, nil
 }
 
 // renderResource is the printed shape of one rendered resource: its readiness

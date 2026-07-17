@@ -1,4 +1,4 @@
-package cli
+package snapshot
 
 import (
 	"fmt"
@@ -7,15 +7,22 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-// loadObservedObjects reads the raw composed objects accepted by Crossplane's
+// LoadObservedObjects reads the raw composed objects accepted by Crossplane's
 // render --observed-resources flag and keys them by their standard composition-
 // resource-name annotation. Missing, empty, and duplicate stable names are
 // rejected rather than silently changing the observation map.
-func loadObservedObjects(path string) (map[string]map[string]any, error) {
-	objects, err := loadResourceObjects(path, "observed resources")
+func LoadObservedObjects(path string) (map[string]map[string]any, error) {
+	objects, err := loadObjects(path, "observed resources")
 	if err != nil {
 		return nil, err
 	}
+	return KeyObservedObjects(objects)
+}
+
+// KeyObservedObjects keys raw composed objects by their standard composition-
+// resource-name annotation, applying the same stable-name validation as
+// LoadObservedObjects.
+func KeyObservedObjects(objects []map[string]any) (map[string]map[string]any, error) {
 	if len(objects) == 0 {
 		return map[string]map[string]any{}, nil
 	}
