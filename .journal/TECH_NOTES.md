@@ -720,3 +720,28 @@ tag, re-run `release-distribute` via `workflow_dispatch tag=vX.Y.Z`.
 - Contract releases are distributed through CUE Central. Keep their GitHub release
   drafts unpublished while the shared release distributor remains product-only and
   expects `checksums.txt` plus binary assets.
+
+## Function xpkg command normalization (session 009, product v0.1.5)
+
+- **The runtime and Function xpkg intentionally have different command shapes.**
+  The generic runtime stays `Entrypoint=[/usr/bin/cuefn]`, `Cmd=[function]` so
+  consumers can replace the subcommand. The assembled Function xpkg must instead
+  have `Entrypoint=[/usr/bin/cuefn,function]` and no `Cmd`, because Crossplane's
+  Docker render runtime replaces `Cmd` with flags such as `--insecure`.
+- **Normalize the assembled package, not `apko.yaml`.** Copy the inherited image
+  config, append its `Cmd` to `Entrypoint`, clear `Cmd`, and write the copy to every
+  multi-architecture child. Preserve the base/runtime layers and xpkg metadata;
+  never mutate the source image or hard-code the inherited command.
+- **Acceptance must exercise published artifacts through the ordinary consumer
+  path.** Inspect both architecture configs, run `docker run FUNCTION --insecure`,
+  then render without Development mode, local binaries, entrypoint overrides, or
+  runtime-image substitution. For v0.1.5 the verified runtime digest is
+  `sha256:01e3edbd344ffe839a887ef3d959a93dae94c2ba3692eecc8bf4143aba72fa19`
+  and the Function digest is
+  `sha256:59b86653c05d73f17ad5f3f1b1cb772d4420b4e81fb8c34ae116737739f5d7ad`.
+- Crossplane CLI 2.3.3 can leave empty `crossplane-render-*` Docker networks even
+  after its containers are removed. A test may delete only the exact networks it
+  created after confirming they are empty; unrelated networks remain off-limits.
+- Non-fatal release `artifact-metadata:write` storage warnings do not establish
+  supply-chain failure. Verify the immutable OCI signatures, SLSA provenance, SPDX
+  SBOM attestations, and downloadable binary subjects directly before deciding.
