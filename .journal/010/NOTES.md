@@ -43,3 +43,14 @@ the developer: A CUE-native suites, B Crossplane-native YAML dirs (#5710
 shape, subset match), C txtar one-file-per-case (YAML inputs + CUE want), D
 golden-first snapshots. My lean: A or C; D better as a mode than a design.
 Next: developer picks a direction (or hybrid) → then design doc.
+
+## 2026-07-17 15:10 — DECISION: Candidate C (txtar cases)
+The developer reviewed expanded C and an example A suite, and chose **C**:
+one self-contained `.txtar` file per case under `tests/`, YAML input sections
+mirroring the render flags (xr/environment/required/observed), expectations as
+partial CUE (`want.cue`, Unify+Validate(Concrete)), exact golden (`want.yaml`,
+seeded on first run, `--update` rewrites, never in CI), `error.txt` for
+negative tests, numbered step dirs (`1/observed.yaml`…) for readiness
+sequences. Assertion core stays format-agnostic in `internal/testharness` so
+an A-style suite format could be added later. Next: implementation-work
+breakdown delivered to developer; awaiting go-ahead on plan/PR arc.
