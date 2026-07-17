@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.5](https://github.com/meigma/crossplane-cuefn/compare/v0.1.4...v0.1.5) (2026-07-17)
+
+
+### Bug Fixes
+
+* **pkg:** normalize Function xpkg entrypoint ([#68](https://github.com/meigma/crossplane-cuefn/issues/68)) ([e09e720](https://github.com/meigma/crossplane-cuefn/commit/e09e7207a3732037be4ecc522349ae8eb86c813f))
+* **release:** retry transient asset uploads ([#66](https://github.com/meigma/crossplane-cuefn/issues/66)) ([8eebd92](https://github.com/meigma/crossplane-cuefn/commit/8eebd929b75346d5a5672a5c858546c562b5b560))
+
 ## [0.1.4](https://github.com/meigma/crossplane-cuefn/compare/v0.1.3...v0.1.4) (2026-07-16)
 
 
