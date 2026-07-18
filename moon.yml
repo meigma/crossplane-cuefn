@@ -272,6 +272,17 @@ tasks:
     options:
       cache: false
 
+  # Dogfood proof for `cuefn test`: runs the example module's txtar cases in CI
+  # mode (seeding and --update refused, golden drift fails) through the real
+  # CLI. Like example-check it resolves the example's registry dependencies.
+  example-test:
+    command: 'go run ./cmd/cuefn test --dir example/module --ci'
+    inputs:
+      - '@group(goSources)'
+      - 'example/module/**/*'
+    options:
+      cache: false
+
   # Kind end-to-end proof: boots a throwaway kind cluster, stands up a CA-trusted
   # HTTPS registry (Crossplane xpkgs) and a plain-HTTP registry (CUE modules),
   # installs Crossplane via helm, publishes + installs the Function (P6) and the
@@ -306,6 +317,7 @@ tasks:
       - 'root:generate-check'
       - 'root:xrd-check'
       - 'root:example-check'
+      - 'root:example-test'
       - 'docs:build'
     inputs:
       - '@group(goSources)'

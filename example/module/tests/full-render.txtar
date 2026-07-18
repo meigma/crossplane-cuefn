@@ -1,0 +1,73 @@
+Pins the complete rendered output for the quickstart XR (example/xr.yaml).
+The want.yaml golden below is machine-maintained: `cuefn test` seeded it and
+`cuefn test --update` re-blesses it after intentional module changes.
+
+-- xr.yaml --
+apiVersion: platform.meigma.io/v1alpha1
+kind: XApp
+metadata:
+  name: demo
+  namespace: default
+spec:
+  image: ghcr.io/stefanprodan/podinfo:6.7.0
+  replicas: 2
+-- want.yaml --
+requirements: {}
+resources:
+  config:
+    object:
+      apiVersion: v1
+      data:
+        tier: unset
+      kind: ConfigMap
+      metadata:
+        labels:
+          app: demo
+          tier: unset
+        name: demo
+    ready: Unspecified
+  deployment:
+    object:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        labels:
+          app: demo
+          tier: unset
+        name: demo
+      spec:
+        replicas: 2
+        selector:
+          matchLabels:
+            app: demo
+        template:
+          metadata:
+            labels:
+              app: demo
+              tier: unset
+          spec:
+            containers:
+            - image: ghcr.io/stefanprodan/podinfo:6.7.0
+              name: app
+              ports:
+              - containerPort: 9898
+    ready: Ready
+  service:
+    object:
+      apiVersion: v1
+      kind: Service
+      metadata:
+        labels:
+          app: demo
+          tier: unset
+        name: demo
+      spec:
+        ports:
+        - port: 80
+          targetPort: 9898
+        selector:
+          app: demo
+    ready: NotReady
+status:
+  ready: true
+  url: http://demo.svc
