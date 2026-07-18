@@ -103,3 +103,22 @@ case.txtar/want.cue:13:13`. GOTCHA CONFIRMED: local lint green while CI lint
 red (goconst/modernize) — the golangci cache must be cleaned IMMEDIATELY
 before the final local lint, not just once early. Fix pushed (f2b0cbc);
 waiting on PR #70 checks.
+
+## 2026-07-17 18:40 — PR 2 merged; PR 3 (cuefn test command) open (#72)
+PR #70 merged (master 099a4c3; user asked whether txtar handling was
+hand-rolled — no: rogpeppe/go-internal/txtar Parse/Format, only the ~10-line
+sectionContentLine offset scan is ours since txtar.File has no positions).
+PR 3 in `.wt/feat-cuefn-test-command`: internal/cli/test.go (newTestCommand +
+runTest/runTestCase/seedCase/updateCase; flags --dir/.-default, --run regex,
+--update, --fail-fast, --ci, --cache-dir; CI = --ci OR CI env truthy; PASS/
+FAIL/SEED/UPDATE lines + summary; non-zero exit on fail OR seed; --update
+re-runs after rewrite so want.cue failures still fail; gosec G703 suppressed
+in writeCaseFile with justification — first #nosec in repo). RESOLVED design
+open question #1: modzip empirically DOES package tests/*.txtar into
+published modules → documented-as-intended (embedded tests travel with the
+module; caveat in PR 4 docs). Dogfood: example/module/tests/{defaults,
+environment-tier,rejects-replicas-over-max,full-render}.txtar — full-render
+golden SEEDED BY THE REAL BINARY (whole loop proven live: 3 pass + 1 seed →
+exit 1 → --ci re-run 4 pass). New blocking moon task root:example-test
+(`cuefn test --dir example/module --ci`) in check. moon check green; PR #72
+open, checks running.
