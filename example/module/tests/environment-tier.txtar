@@ -1,0 +1,25 @@
+An EnvironmentConfig tier must override the module's "unset" default and
+propagate to every labeled object and the ConfigMap datum.
+
+-- xr.yaml --
+apiVersion: platform.meigma.io/v1alpha1
+kind: XApp
+metadata:
+  name: demo
+  namespace: default
+spec:
+  replicas: 2
+-- environment.yaml --
+tier: production
+-- want.cue --
+resources: {
+	deployment: object: {
+		metadata: labels: tier: "production"
+		spec: {
+			replicas: 2
+			template: metadata: labels: tier: "production"
+		}
+	}
+	service: object: metadata: labels: tier: "production"
+	config: object: data: tier: "production"
+}

@@ -1,0 +1,31 @@
+The #Spec defaults must materialize when the XR omits them: one replica, the
+podinfo image, and the "unset" environment tier — proving XRD defaulting and
+render defaulting come from the same schema.
+
+-- xr.yaml --
+apiVersion: platform.meigma.io/v1alpha1
+kind: XApp
+metadata:
+  name: demo
+  namespace: default
+spec: {}
+-- want.cue --
+resources: {
+	deployment: {
+		ready: "Ready"
+		object: spec: {
+			replicas: 1
+			template: spec: containers: [{image: "ghcr.io/stefanprodan/podinfo:6.7.0"}]
+		}
+	}
+	service: ready: "NotReady"
+	config: {
+		ready: "Unspecified"
+		object: data: tier: "unset"
+	}
+}
+requirements: close({})
+status: {
+	ready: true
+	url:   "http://demo.svc"
+}

@@ -83,6 +83,7 @@ func NewRootCommand(options Options) *cobra.Command {
 		newRenderCommand(options),
 		newGenerateCommand(options),
 		newValidateCommand(options),
+		newTestCommand(options),
 	)
 	// Packaging commands (publish, publish-function) are registered through a
 	// build-tagged seam: the default build wires them in, the `noxpkg` image
