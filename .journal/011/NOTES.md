@@ -79,3 +79,10 @@ comment-tolerant compare means the headerless golden already matches, so
 Full gate green incl. the dogfooded xrd-check; fresh-cache final lint
 green. PR #76 open, CI watch running. Next: checks green → developer
 review → merge → PR 3 (docs).
+
+## 2026-07-17 22:10 — PR 3 (docs) drafted in parallel (#77)
+While #76 CI runs: wrote the docs PR in worktree feat/check-docs (disjoint
+files, branched from master): how-to/check-a-module.md, cli.md check section
++ eight-command table + three-verb delineation table, mkdocs nav, README
+row, quickstart bullet, cross-links in test-a-module.md and generate-xrd.md.
+Strict docs:build green. Opened as DRAFT #77 (merge only after #76).
