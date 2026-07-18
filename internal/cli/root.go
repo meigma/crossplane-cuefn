@@ -83,6 +83,7 @@ func NewRootCommand(options Options) *cobra.Command {
 		newRenderCommand(options),
 		newGenerateCommand(options),
 		newValidateCommand(options),
+		newCheckCommand(options),
 		newTestCommand(options),
 	)
 	// Packaging commands (publish, publish-function) are registered through a

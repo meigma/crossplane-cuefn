@@ -241,14 +241,14 @@ tasks:
       - '@group(chainsawAssets)'
     options:
       cache: false
-  # Guard the committed, generated example/xrd.yaml against drift: regenerate the
-  # XRD from the example module with `cuefn generate` and diff it against the
-  # checked-in file. Like generate-check this is pure CUE codegen (no Docker), so
-  # it lives in the default check graph. Regenerate the committed file with:
-  #   go run ./cmd/cuefn generate cuefn.example/app@v0 --dir example/module \
-  #     --output example/xrd.yaml
+  # Guard the example module's static health with the real `cuefn check` CLI:
+  # canonical CUE formatting, a clean vet, and XRD generation matching the
+  # committed, machine-owned example/xrd.yaml golden. Like generate-check this
+  # is pure CUE codegen (no Docker), so it lives in the default check graph.
+  # Re-bless the committed golden after an intentional schema change with:
+  #   go run ./cmd/cuefn check --dir example/module --xrd example/xrd.yaml --update
   xrd-check:
-    command: 'bash -c "mkdir -p bin && go run ./cmd/cuefn generate cuefn.example/app@v0 --dir example/module --output bin/xrd.gen.yaml && diff -u example/xrd.yaml bin/xrd.gen.yaml"'
+    command: 'go run ./cmd/cuefn check --dir example/module --xrd example/xrd.yaml --ci'
     inputs:
       - '@group(goSources)'
       - '@group(cueModules)'
