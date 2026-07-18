@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.6](https://github.com/meigma/crossplane-cuefn/compare/v0.1.5...v0.1.6) (2026-07-18)
+
+
+### Features
+
+* **cli:** add cuefn test command ([#72](https://github.com/meigma/crossplane-cuefn/issues/72)) ([1632e30](https://github.com/meigma/crossplane-cuefn/commit/1632e3008cbf7875c0833f6ff7791bc866dd5080))
+* **testharness:** txtar case model and assertion core ([#70](https://github.com/meigma/crossplane-cuefn/issues/70)) ([099a4c3](https://github.com/meigma/crossplane-cuefn/commit/099a4c3112adf86592f7dd82c0a56197602c99fb))
+
 ## [0.1.5](https://github.com/meigma/crossplane-cuefn/compare/v0.1.4...v0.1.5) (2026-07-17)
 
 

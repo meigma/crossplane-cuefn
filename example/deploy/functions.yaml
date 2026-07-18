@@ -48,7 +48,7 @@ kind: Function
 metadata:
   name: cuefn
 spec:
-  package: REGISTRY/function-cuefn:v0.1.5 # x-release-please-version
+  package: REGISTRY/function-cuefn:v0.1.6 # x-release-please-version
   runtimeConfigRef:
     name: cuefn-runtime
 ---
