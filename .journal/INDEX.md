@@ -12,3 +12,4 @@
 | 008 | 2026-07-16 | Native observed-resource readiness | complete | Shipped observed composed resources and conservative readiness end-to-end, released contract v0.3.0 and product v0.1.4, and proved the published pair plus distribution. |
 | 009 | 2026-07-16 | Resolve Function xpkg render compatibility | complete | Normalized only the Function xpkg launch config, merged PRs #68 and #67, published and verified v0.1.5, and passed ordinary-render plus live published-artifact X0 proofs. |
 | 010 | 2026-07-17 | Design and ship the first-class `cuefn test` harness | complete | Researched four candidate designs, shipped the chosen txtar-based `cuefn test` command across PRs #69/#70/#72/#73 (snapshot extraction, testharness core, CLI + dogfood, docs), and released + fully verified product v0.1.6. |
+| 011 | 2026-07-17 | New session (goal pending) | in-progress | Session opened; awaiting the developer's first request. |
