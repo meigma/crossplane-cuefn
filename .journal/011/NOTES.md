@@ -61,3 +61,21 @@ the fmt fixtures with the pinned CLI; fixture modules are cue-fmt-clean.
 Gotchas hit: new worktree needs `mise trust`; nonamedreturns forbids the
 design's named-return XRD signature (now unnamed).
 Next: developer review/merge of #74, then PR 2 (CLI adapter + dogfood).
+
+## 2026-07-17 21:55 — #74 merged; PR 2 (#76) up
+Developer approved #74; squash-merged (2d1de17), master ff'd, worktree
+removed per the merge-workflow memory. Release-please opened routine #75
+(release 0.1.7) — left for a later release decision.
+PR 2 implemented in feat/check-cli: internal/cli/check.go (fmt/vet/xrd
+units, test-command lifecycle vocabulary, load-failure→vet-unit rule,
+golden seed/update/CI-refusal, collectCUEFiles via fs.WalkDir over
+os.DirFS after gosec G122 rejected os.ReadFile in a WalkDir callback);
+root.go registers newCheckCommand; moon xrd-check swapped to
+`cuefn check --dir example/module --xrd example/xrd.yaml --ci`;
+example/xrd.yaml reseeded machine-owned (+2 header lines only).
+DEVIATION from design: header gained via delete+reseed, NOT --update —
+comment-tolerant compare means the headerless golden already matches, so
+--update (drift-only, mirroring test) is correctly a no-op there.
+Full gate green incl. the dogfooded xrd-check; fresh-cache final lint
+green. PR #76 open, CI watch running. Next: checks green → developer
+review → merge → PR 3 (docs).
