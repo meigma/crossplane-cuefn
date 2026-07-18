@@ -42,3 +42,22 @@ xrd header follow-up); core in `internal/check` + shared `internal/textdiff`
 extraction; dogfood = replace root:xrd-check body; 3-PR arc. Grounded in
 test.go/generate.go/moon.yml reads; noted the repo has no CUE fmt gate today.
 Awaiting developer review of the design (3 open questions with defaults).
+
+## 2026-07-17 21:25 — PR 1 up (#74), all checks green
+Developer approved the design. Implemented PR 1 in worktree feat/check-core:
+`internal/textdiff` (Lines + Normalize extracted from testharness; its
+normalizeText and diffLines call sites in evaluate.go/update.go rewired;
+TestDiffLines superseded by textdiff's table test) and `internal/check`
+(Fmt/Vet/XRD/GoldenBytes + offline testdata modules good/disjunction + fmt
+fixtures). PR #74 open; ci/integration/e2e all pass at head.
+FINDING (affects PR 2): CUE evalv3 surfaces conflicts EAGERLY — regular,
+definition-nested, and hidden conflicts all fail render.LoadModule at
+BUILD, before any Validate walk. Probed empirically (throwaway TestProbe);
+real `cue vet -c=false` v0.16.1 agrees with our Vet on what passes
+(optional bottoms pass both). So the CLI must report load failure AS the
+vet unit's failure; Vet is the documented recursive backstop, tested via a
+directly compiled value. Also: `cue fmt --check` parity verified against
+the fmt fixtures with the pinned CLI; fixture modules are cue-fmt-clean.
+Gotchas hit: new worktree needs `mise trust`; nonamedreturns forbids the
+design's named-return XRD signature (now unnamed).
+Next: developer review/merge of #74, then PR 2 (CLI adapter + dogfood).
