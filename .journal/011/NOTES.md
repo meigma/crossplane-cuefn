@@ -86,3 +86,12 @@ files, branched from master): how-to/check-a-module.md, cli.md check section
 + eight-command table + three-verb delineation table, mkdocs nav, README
 row, quickstart bullet, cross-links in test-a-module.md and generate-xrd.md.
 Strict docs:build green. Opened as DRAFT #77 (merge only after #76).
+
+## 2026-07-17 22:25 — #76 merged; release flow started
+Developer approved #76 + #77 and the 0.1.7 release. #76 squash-merged
+(30aa6ae), master ff'd, worktree removed. #77 marked ready + rebased on
+master; checks running. Release-please refreshed #75: v0.1.7 changelog now
+lists both feats (#74 2d1de17, #76 30aa6ae). Plan: merge #77 (docs,
+non-bumping) → merge #75 → verify tag-push release run per session-008/009
+rules (event/tag/SHA, checksums, attestations, cosign, Function entrypoint)
+→ publish → verify distribution.
