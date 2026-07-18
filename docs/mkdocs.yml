@@ -41,6 +41,7 @@ nav:
   - How-to:
       - Install the CLI: how-to/install-the-cli.md
       - Render a module locally: how-to/render-locally.md
+      - Test a module: how-to/test-a-module.md
       - Derive readiness from observed resources: how-to/derive-readiness-from-observed-resources.md
       - Require cluster resources: how-to/require-resources.md
       - Generate an XRD: how-to/generate-xrd.md
@@ -54,6 +55,7 @@ nav:
       - Build the runtime image: how-to/build-image.md
   - Reference:
       - Module contract: reference/module-contract.md
+      - Test cases: reference/test-cases.md
       - CLI: reference/cli.md
       - Configuration & environment: reference/configuration.md
       - Input CRD: reference/input.md

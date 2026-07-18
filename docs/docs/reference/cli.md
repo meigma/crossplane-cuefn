@@ -30,19 +30,21 @@ failure prints the error once to stderr with no usage dump.
 
 ## Shipped subcommands
 
-The default build ships exactly six subcommands:
+The default build ships exactly seven subcommands:
 
 | Command | Purpose |
 |---------|---------|
 | [`function`](#function) | Serve the composition function over gRPC. |
 | [`render`](#render) | Render a module against an XR locally. |
+| [`test`](#test) | Run a module's txtar test cases. |
 | [`generate`](#generate) | Generate a structural XRD from a module. |
 | [`validate`](#validate) | Validate an XR's spec against a module's `#Spec`. |
 | [`publish`](#publish) | Build and push a Configuration package. |
 | [`publish-function`](#publish-function) | Build and push the Function package. |
 
 The `noxpkg` build (the binary embedded in the runtime image) omits `publish`
-and `publish-function`; see [Lean runtime image](../explanation/noxpkg-split.md).
+and `publish-function` (all other commands, including `test`, are present in
+both builds); see [Lean runtime image](../explanation/noxpkg-split.md).
 
 ---
 
@@ -172,6 +174,48 @@ declares `#Status`.
 failure or when the module's `#Spec`/`#Status` contains a type-crossing
 disjunction (a `DisjunctionError` naming the field). See the
 [module contract](module-contract.md#authoring-guardrails).
+
+---
+
+## test
+
+```
+cuefn test [flags]
+```
+
+Runs the module's declarative test cases: one txtar file per case under the
+module directory's `tests/` subdirectory, discovered as `tests/*.txtar` and run
+in filename order. Each case supplies render inputs through named sections that
+mirror `render`'s flags (`xr.yaml`, `environment.yaml`, `required.yaml`,
+`observed.yaml`) and declares expectations: `want.cue` (partial CUE unified
+with the normalized result), `want.yaml` (an exact machine-maintained golden),
+or `error.txt` (substrings a failing render must report). Numbered step
+sections (`1/observed.yaml`, `1/want.cue`, ...) replay readiness sequences
+against successive observed snapshots. The section vocabulary is closed —
+unknown section names are errors. See the
+[test case format](test-cases.md) for the full contract and
+[How to test a module](../how-to/test-a-module.md) for the authoring guide.
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--dir <string>` | `.` | Module directory; cases are discovered in its `tests/` subdirectory. The module is served from this directory (dependencies resolve from the configured/default registry). |
+| `--run <string>` | _(empty)_ | Run only cases whose name (filename without `.txtar`) matches this regular expression. |
+| `--update` | `false` | Rewrite drifted `want.yaml` goldens from the rendered output, then re-run so remaining failures still fail. Never touches `want.cue` or `error.txt`. Refused in CI mode. |
+| `--fail-fast` | `false` | Stop after the first failing case. |
+| `--ci` | `false` | CI mode: golden seeding and `--update` are refused, so a case without expectations or with golden drift fails. Auto-enabled when the `CI` environment variable is set (not `0`/`false`). |
+| `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
+
+**Output.** One line per case — `PASS`, `FAIL`, `SEED` (a case with no
+expectations had its rendered output written to a `want.yaml` section for
+review), or `UPDATE` (`--update` rewrote a drifted golden) — with failure
+details indented beneath (the case description, then each failure:
+path-qualified CUE conflicts for `want.cue`, a line diff for `want.yaml`, the
+render error for `error.txt` mismatches). A summary line follows:
+`N passed, N failed, N seeded, N updated`.
+
+**Exit.** Zero only when every selected case passes with no seeding. Failures,
+freshly seeded goldens, an empty `tests/` directory, and a `--run` pattern
+matching nothing all exit non-zero.
 
 ---
 
