@@ -19,3 +19,17 @@ apiextensions-apiserver — full gate + integration if merged); contract/v0.3.0
 GitHub release intentionally draft. Developer-owned untracked `.claude/` and
 `xr.yaml` in the main worktree.
 Plan: await the developer's first request.
+
+## 2026-07-17 20:40 — Goal: evaluate a `cuefn check` command
+Developer shared a consuming agent's argument: `generate` goldens test a
+different failure surface than render tests (schema translation drift vs
+resource-graph behavior), and asked whether a `cuefn check` command (cue
+fmt/tidy/vet + generate-succeeds + optional golden XRD compare) is worth
+adding. Feasibility verified against cuelang.org/go v0.16.1 in the module
+cache: `cue/format` (format.Source) is public → in-process fmt check; vet
+equivalent = load + non-concrete Validate (we own loading); generate is
+internal/schema; BUT `cue mod tidy` lives in `internal/mod/modload` — the
+public `mod/*` packages expose no tidy → not implementable in-process.
+Recommendation delivered: yes, tightly-scoped v1 (fmt/vet/generate/golden
+with the test-harness seed/--update/--ci lifecycle), tidy excluded,
+dogfood by replacing root:xrd-check. Awaiting developer decision.
