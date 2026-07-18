@@ -353,6 +353,8 @@ transform the runtime evaluates — from a single source of truth. To go deeper:
 
 - The [module contract](reference/module-contract.md) — the full schema and
   transform surface.
+- [Test a module](how-to/test-a-module.md) — declarative test cases for the
+  behavior you just rendered.
 - [Configure the function runtime](how-to/configure-the-runtime.md) — registry
   routing, the cache, and RBAC for composed kinds.
 - [One module, two outputs](explanation/one-module-two-outputs.md) — why it is

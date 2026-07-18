@@ -127,6 +127,7 @@ whole loop — module to a running XR — step by step.
 | Command | What it does |
 | --- | --- |
 | `cuefn render` | Render a module against an XR locally — no cluster. |
+| `cuefn test` | Run the module's declarative test cases (`tests/*.txtar`). |
 | `cuefn generate` | Emit the structural XRD from the module's schema. |
 | `cuefn validate` | Check an XR's spec against the module's schema before apply. |
 | `cuefn publish` | Package an installable Crossplane Configuration from the module. |
