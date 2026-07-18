@@ -7,7 +7,8 @@ render inputs and declare what the output must look like. The harness renders
 through the exact engine the in-cluster function uses, so a passing case is a
 statement about production behavior. This page teaches the workflow; the
 [test case format](../reference/test-cases.md) reference specifies the full
-contract.
+contract. For the module's *static* health — formatting, vet, and XRD schema
+drift — see [How to check a module](check-a-module.md).
 
 ## Write your first case
 

@@ -41,6 +41,7 @@ nav:
   - How-to:
       - Install the CLI: how-to/install-the-cli.md
       - Render a module locally: how-to/render-locally.md
+      - Check a module: how-to/check-a-module.md
       - Test a module: how-to/test-a-module.md
       - Derive readiness from observed resources: how-to/derive-readiness-from-observed-resources.md
       - Require cluster resources: how-to/require-resources.md

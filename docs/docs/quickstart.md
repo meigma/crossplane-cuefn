@@ -353,6 +353,8 @@ transform the runtime evaluates — from a single source of truth. To go deeper:
 
 - The [module contract](reference/module-contract.md) — the full schema and
   transform surface.
+- [Check a module](how-to/check-a-module.md) — the static health gate:
+  formatting, vet, and XRD schema drift.
 - [Test a module](how-to/test-a-module.md) — declarative test cases for the
   behavior you just rendered.
 - [Configure the function runtime](how-to/configure-the-runtime.md) — registry
