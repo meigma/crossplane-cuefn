@@ -33,3 +33,12 @@ public `mod/*` packages expose no tidy → not implementable in-process.
 Recommendation delivered: yes, tightly-scoped v1 (fmt/vet/generate/golden
 with the test-harness seed/--update/--ci lifecycle), tidy excluded,
 dogfood by replacing root:xrd-check. Awaiting developer decision.
+
+## 2026-07-17 20:55 — Design drafted
+Wrote `.journal/011/DESIGN.md`: three units (fmt/vet/xrd) mirroring the
+`cuefn test` PASS/FAIL/SEED/UPDATE lifecycle; `--xrd` golden with
+comment-stripping byte compare + machine-owned header (closes the Phase-8
+xrd header follow-up); core in `internal/check` + shared `internal/textdiff`
+extraction; dogfood = replace root:xrd-check body; 3-PR arc. Grounded in
+test.go/generate.go/moon.yml reads; noted the repo has no CUE fmt gate today.
+Awaiting developer review of the design (3 open questions with defaults).
