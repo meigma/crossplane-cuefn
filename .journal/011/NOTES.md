@@ -103,3 +103,17 @@ squash-merged (4577625). RP run cut tag v0.1.7 + draft release targeting
 4577625. Tag-push release.yml run now watched in background. Next:
 verify event/ref/SHA + all jobs green, then checksums/attestations/
 cosign/Function-entrypoint before publishing, then distribution.
+
+## 2026-07-17 23:00 — v0.1.7 verified, published
+Tag-push run 29630705541: event=push ref=v0.1.7 sha=4577625 (release
+commit), all 10 jobs green. Pre-publication verification ALL PASS:
+5 archives + 5 SBOMs + checksums.txt present, shasum -c clean; gh
+attestation verify OK on all five archives (cert workflowRef
+refs/tags/v0.1.7); cosign verify OK on both images with the
+tag-bound release.yml identity; Function xpkg both arches
+Entrypoint=[/usr/bin/cuefn,function] Cmd=null; runtime image keeps
+Entrypoint=[/usr/bin/cuefn] Cmd=[function]. Published the release;
+release-distribute watched in background. Note: gh attestation verify
+is SILENT (exit 0, no output) in non-tty — use --format json to inspect.
+Next: distribution green → tap checksum verify → install.sh consumer
+smoke incl. `cuefn check` from the released binary.
