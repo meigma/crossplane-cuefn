@@ -135,3 +135,16 @@ mkdocs nav + quickstart pointer. docs:build strict + root:check green
 locally; PR #73 open, checks running. Release-please has an updated
 release PR queued on master (v0.1.6 candidate) — release decision belongs to
 the developer, out of scope for this arc.
+
+## 2026-07-17 19:50 — Arc complete; v0.1.6 release in flight
+PR #73 merged (13432b4) after adding reference/test-cases.md (developer asked
+for a thorough test-contract reference — sibling of module-contract.md in
+nav; how-to keeps workflow, cli.md keeps command). ALL FOUR ARC PRs MERGED
+(#69/#70/#72/#73). Developer approved cutting the release: PR #71
+(release 0.1.6) verified (changelog #70+#72, all x-release-please-version
+stamps bumped) and merged → master cf310ab → release-please tagged v0.1.6 +
+draft release targeting cf310ab ✓. release.yml run 29624978103 triggered by
+tag PUSH (correct provenance event per session-008 lesson), in progress.
+Next: verify all release jobs, then draft assets (5 archives + 5 SBOMs +
+checksums.txt), attestation subjects/signer, image + Function xpkg digests;
+publication → release-distribute (brew/scoop) verification.
