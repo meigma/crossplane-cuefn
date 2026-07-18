@@ -2,7 +2,8 @@
 
 `cuefn generate` turns a module's `#API`/`#Spec`/`#Status` into a structural
 Crossplane v2 XRD. Use it to inspect the schema the API server will enforce, or
-to commit a generated XRD as an artifact.
+to commit a generated XRD as an artifact. To *guard* a committed XRD against
+schema drift in CI, use [`cuefn check --xrd`](check-a-module.md#pin-the-xrd-with-a-golden).
 
 ## Generate from a local directory
 
