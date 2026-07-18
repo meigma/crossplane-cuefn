@@ -26,7 +26,7 @@
 
           # Regenerate after any go.sum change: set to pkgs.lib.fakeHash, run
           # `nix build`, and copy the sha256 from the mismatch error.
-          vendorHash = "sha256-lW2VBTyB1YFRciMh5Vp5pztnQ3g2RkFlpH2ykg8Pm5I=";
+          vendorHash = "sha256-yYEwrnjwT3VgHm2Psp+WqChCtTcvUpgbJEEjZDPDu2M=";
 
           subPackages = [ "cmd/cuefn" ];
           env.CGO_ENABLED = 0;

@@ -1,6 +1,9 @@
 package testharness
 
-import "strings"
+import (
+	"slices"
+	"strings"
+)
 
 // diffLines renders a plain line diff between two texts: unchanged lines are
 // prefixed with two spaces, removals with "- ", additions with "+ ". Golden
@@ -15,8 +18,8 @@ func diffLines(want, got string) string {
 	for i := range lcs {
 		lcs[i] = make([]int, len(b)+1)
 	}
-	for i := len(a) - 1; i >= 0; i-- {
-		for j := len(b) - 1; j >= 0; j-- {
+	for i := range slices.Backward(a) {
+		for j := range slices.Backward(b) {
 			if a[i] == b[j] {
 				lcs[i][j] = lcs[i+1][j+1] + 1
 			} else {

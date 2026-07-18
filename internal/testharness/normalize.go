@@ -11,6 +11,12 @@ import (
 	"github.com/meigma/crossplane-cuefn/internal/render"
 )
 
+// Field keys of the normalized document.
+const (
+	keyReady = "ready"
+	keyKind  = "kind"
+)
+
 // normalizeResult flattens a render result into the one concrete document all
 // expectations are evaluated against:
 //
@@ -26,7 +32,7 @@ func normalizeResult(res render.Result) map[string]any {
 	resources := make(map[string]any, len(res.Resources))
 	for name, r := range res.Resources {
 		resources[name] = map[string]any{
-			"ready":  readyString(r.Ready),
+			keyReady: readyString(r.Ready),
 			"object": r.Object,
 		}
 	}
@@ -35,7 +41,7 @@ func normalizeResult(res render.Result) map[string]any {
 	for name, req := range res.Requirements {
 		entry := map[string]any{
 			"apiVersion": req.APIVersion,
-			"kind":       req.Kind,
+			keyKind:      req.Kind,
 		}
 		if req.MatchName != "" {
 			entry["matchName"] = req.MatchName

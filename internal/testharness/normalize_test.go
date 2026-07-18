@@ -15,9 +15,9 @@ func TestNormalizeResult(t *testing.T) {
 
 	res := render.Result{
 		Resources: map[string]render.Resource{
-			"a": {Object: map[string]any{"kind": "ConfigMap"}, Ready: resource.ReadyTrue},
-			"b": {Object: map[string]any{"kind": "Secret"}, Ready: resource.ReadyFalse},
-			"c": {Object: map[string]any{"kind": "Service"}, Ready: resource.ReadyUnspecified},
+			"a": {Object: map[string]any{keyKind: "ConfigMap"}, Ready: resource.ReadyTrue},
+			"b": {Object: map[string]any{keyKind: "Secret"}, Ready: resource.ReadyFalse},
+			"c": {Object: map[string]any{keyKind: "Service"}, Ready: resource.ReadyUnspecified},
 		},
 	}
 
@@ -25,9 +25,9 @@ func TestNormalizeResult(t *testing.T) {
 
 	resources, ok := doc["resources"].(map[string]any)
 	require.True(t, ok)
-	assert.Equal(t, "Ready", resources["a"].(map[string]any)["ready"])
-	assert.Equal(t, "NotReady", resources["b"].(map[string]any)["ready"])
-	assert.Equal(t, "Unspecified", resources["c"].(map[string]any)["ready"])
+	assert.Equal(t, "Ready", resources["a"].(map[string]any)[keyReady])
+	assert.Equal(t, "NotReady", resources["b"].(map[string]any)[keyReady])
+	assert.Equal(t, "Unspecified", resources["c"].(map[string]any)[keyReady])
 
 	// Absences are explicit so unification can assert them.
 	assert.Nil(t, doc["status"], "absent status must normalize to an explicit null")
@@ -81,7 +81,7 @@ func TestMarshalNormalizedDeterministicGolden(t *testing.T) {
 	doc := normalizeResult(render.Result{
 		Resources: map[string]render.Resource{
 			"config": {
-				Object: map[string]any{"kind": "ConfigMap", "data": map[string]any{"k": "v"}},
+				Object: map[string]any{keyKind: "ConfigMap", "data": map[string]any{"k": "v"}},
 				Ready:  resource.ReadyUnspecified,
 			},
 		},
