@@ -10,6 +10,8 @@ import (
 
 	"cuelang.org/go/cue"
 	cueerrors "cuelang.org/go/cue/errors"
+
+	"github.com/meigma/crossplane-cuefn/internal/textdiff"
 )
 
 // Failure is one assertion failure within a unit. Kind names the failing
@@ -63,12 +65,12 @@ func stripSyntheticPositions(details string) string {
 // endings and a trailing newline) against the normalized result's YAML. The
 // returned message is "" on success and a line diff on mismatch.
 func evalWantYAML(want, got []byte) string {
-	w := normalizeText(want)
-	g := normalizeText(got)
+	w := textdiff.Normalize(want)
+	g := textdiff.Normalize(got)
 	if w == g {
 		return ""
 	}
-	return "golden mismatch (-want.yaml +rendered):\n" + diffLines(w, g)
+	return "golden mismatch (-want.yaml +rendered):\n" + textdiff.Lines(w, g)
 }
 
 // evalError checks an expected-failure unit: the render must have failed and
@@ -95,11 +97,4 @@ func evalError(substrings []string, renderErr error, resources []string) string 
 		)
 	}
 	return ""
-}
-
-// normalizeText strips carriage returns and enforces one trailing newline so
-// golden comparison is stable across platforms and editors.
-func normalizeText(data []byte) string {
-	s := strings.ReplaceAll(string(data), "\r\n", "\n")
-	return strings.TrimRight(s, "\n") + "\n"
 }

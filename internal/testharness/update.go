@@ -4,6 +4,8 @@ import (
 	"slices"
 
 	"github.com/rogpeppe/go-internal/txtar"
+
+	"github.com/meigma/crossplane-cuefn/internal/textdiff"
 )
 
 // SeedGoldens returns the txtar file rewritten with a want.yaml section for
@@ -43,7 +45,7 @@ func UpdateGoldens(raw []byte, res *CaseResult) ([]byte, bool) {
 			if file.Name != name {
 				continue
 			}
-			if normalizeText(file.Data) != normalizeText(u.Golden) {
+			if textdiff.Normalize(file.Data) != textdiff.Normalize(u.Golden) {
 				arch.Files[i].Data = u.Golden
 				changed = true
 			}
