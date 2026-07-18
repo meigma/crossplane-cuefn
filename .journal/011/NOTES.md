@@ -130,3 +130,16 @@ binary reports 0.1.7 @ 4577625; released binary ran
 `check --dir example/module --xrd example/xrd.yaml --ci` (3/3 PASS) and
 `test --ci` (4/4 PASS). The cuefn check arc (#74/#76/#77) + release 0.1.7
 (#75) is fully done.
+
+## 2026-07-17 23:30 — Session closed
+All work landed: #74 (check core + textdiff), #76 (CLI + dogfood), #77
+(docs) squash-merged; release #75 merged; product v0.1.7 published,
+verified pre-publication (checksums/attestations/cosign/entrypoint), taps
+verified post-distribution, consumer-proven via real install.sh (released
+binary: example check 3/3, test 4/4). master at 4577625; implementation
+worktrees removed; only pre-existing Dependabot PRs remain open.
+SUMMARY.md written; INDEX.md row complete; TECH_NOTES.md gained §011
+(check architecture, evalv3 eagerness contract, golden semantics,
+release-ops gotchas). Hand-off: next session can pick up the deferred
+fast-follows (--fix, OCI-ref check/test) or the Dependabot stack (#60
+needs the parity fixtures re-verified).
