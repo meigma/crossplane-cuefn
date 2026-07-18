@@ -148,3 +148,20 @@ tag PUSH (correct provenance event per session-008 lesson), in progress.
 Next: verify all release jobs, then draft assets (5 archives + 5 SBOMs +
 checksums.txt), attestation subjects/signer, image + Function xpkg digests;
 publication → release-distribute (brew/scoop) verification.
+
+## 2026-07-17 20:40 — v0.1.6 RELEASED AND VERIFIED
+release.yml run 29624978103: ALL 10 jobs success. Draft assets exactly 5
+archives + 5 SBOMs + checksums.txt. Verified before publication:
+darwin_arm64 sha256 8b8af956… matches checksums.txt; `gh attestation verify`
+binds subjects to source SHA cf310ab via the isolated attest.yml at
+refs/tags/v0.1.6; binary stamps `0.1.6 (cf310ab)` and ships `cuefn test`;
+cosign verify OK for ghcr.io/meigma/{crossplane-cuefn,function-cuefn}:v0.1.6;
+Function xpkg config Entrypoint=[/usr/bin/cuefn,function] Cmd=null (v0.1.5
+normalization holds). Published (gh release edit --draft=false, 01:36Z) →
+release-distribute run 29625508567 success; brew formula bumped to 0.1.6 with
+hashes == checksums.txt. Real `curl|bash install.sh` end-to-end: resolved
+v0.1.6 as latest, checksum + SLSA verified, installed to ~/.local/bin
+(NOTE: the developer's local cuefn was thereby upgraded to 0.1.6). Installed
+release binary ran `cuefn test --dir example/module --ci` → 4/4 PASS. The
+session goal is fully shipped: design → 4 PRs → released v0.1.6 with the
+harness proving itself via its own dogfood suite.
