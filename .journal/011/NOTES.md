@@ -117,3 +117,16 @@ release-distribute watched in background. Note: gh attestation verify
 is SILENT (exit 0, no output) in non-tty — use --format json to inspect.
 Next: distribution green → tap checksum verify → install.sh consumer
 smoke incl. `cuefn check` from the released binary.
+
+## 2026-07-17 23:15 — v0.1.7 released, distributed, and consumer-proven
+Distribution run 29631172558 (v0.1.7) succeeded. NOTE-TO-SELF: my first
+watch grabbed the OLD v0.1.6 distribute run (wait loop matched any
+non-queued run) — always select the run by displayTitle/tag.
+Taps verified: brew formula 0.1.7 with all 4 sha256s present in published
+checksums.txt; scoop manifest at BUCKET REPO ROOT cuefn.json (not
+bucket/cuefn.json), 0.1.7, hash == windows zip. Consumer proof: real
+install.sh → resolved latest to v0.1.7, gh-attestation-verified in-script,
+binary reports 0.1.7 @ 4577625; released binary ran
+`check --dir example/module --xrd example/xrd.yaml --ci` (3/3 PASS) and
+`test --ci` (4/4 PASS). The cuefn check arc (#74/#76/#77) + release 0.1.7
+(#75) is fully done.
