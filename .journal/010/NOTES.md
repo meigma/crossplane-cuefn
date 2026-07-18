@@ -83,3 +83,23 @@ ParseObjects, KeyObservedObjects). `moduleLoader` deliberately stays in cli
 (adapter wiring). Local `moon run root:check` green; PR #69 checks ALL green
 (ci 48s, integration 3m04s, e2e 3m21s). Awaiting developer review/approval →
 then squash-merge + prune per the usual workflow.
+
+## 2026-07-17 17:20 — PR 1 merged; PR 2 (testharness core) open (#70)
+PR #69 squash-merged (master 2e3fbfc), worktree pruned. PR 2 built in
+`.wt/feat-testharness-core`: `internal/testharness` = case.go (txtar parse,
+closed vocabulary, step grouping/validation), normalize.go (ready→
+Ready/NotReady/Unspecified, status:null, requirements always present; JSON→
+CompileBytes for the CUE value), evaluate.go (want.cue Unify+Validate(Concrete),
+newline-padded so positions cite `<case>.txtar/want.cue:<line>`, synthetic
+result-side `N:M` positions filtered; want.yaml exact + LCS diff; error.txt
+substrings), run.go (Runner{Loader,Ref}, per-unit runUnit, observed opt-in
+check via NEW exported render.UsesObservedResources), update.go
+(SeedGoldens inserts after observed section / UpdateGoldens only rewrites
+drifted machine-owned want.yaml). go-internal/txtar promoted to direct dep →
+flake vendorHash updated (sha256-yYEwrn…, from CI's mismatch report). Failure
+output verified by eye — path-qualified conflicts + txtar coordinates, e.g.
+`resources.deployment.object.spec.replicas: conflicting values 3 and 5:
+case.txtar/want.cue:13:13`. GOTCHA CONFIRMED: local lint green while CI lint
+red (goconst/modernize) — the golangci cache must be cleaned IMMEDIATELY
+before the final local lint, not just once early. Fix pushed (f2b0cbc);
+waiting on PR #70 checks.
