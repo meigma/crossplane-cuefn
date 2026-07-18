@@ -228,6 +228,14 @@ type inputEnvelope struct {
 	ObservedResources *map[string]map[string]any  `json:"observedResources,omitempty"`
 }
 
+// UsesObservedResources reports whether the module explicitly materializes
+// out.input.observedResources as a regular field — the opt-in that makes the
+// engine deliver observed composed resources. Tooling uses it to reject
+// observed fixtures against modules that would silently ignore them.
+func UsesObservedResources(v cue.Value) (bool, error) {
+	return usesObservedResources(v)
+}
+
 // usesObservedResources reports whether the module explicitly materializes
 // out.input.observedResources as a regular field. The public contract permits
 // that field optionally; inspecting the field constraint distinguishes a
