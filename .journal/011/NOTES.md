@@ -95,3 +95,11 @@ lists both feats (#74 2d1de17, #76 30aa6ae). Plan: merge #77 (docs,
 non-bumping) → merge #75 → verify tag-push release run per session-008/009
 rules (event/tag/SHA, checksums, attestations, cosign, Function entrypoint)
 → publish → verify distribution.
+
+## 2026-07-17 22:45 — #77 + #75 merged; v0.1.7 tag cut
+#77 (docs) squash-merged (9b9551d); RP refreshed #75 (still 0.1.7, docs
+non-bumping); #75 checks all green (incl. melange dry-runs) →
+squash-merged (4577625). RP run cut tag v0.1.7 + draft release targeting
+4577625. Tag-push release.yml run now watched in background. Next:
+verify event/ref/SHA + all jobs green, then checksums/attestations/
+cosign/Function-entrypoint before publishing, then distribution.
