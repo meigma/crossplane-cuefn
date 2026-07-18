@@ -192,7 +192,8 @@ with the normalized result), `want.yaml` (an exact machine-maintained golden),
 or `error.txt` (substrings a failing render must report). Numbered step
 sections (`1/observed.yaml`, `1/want.cue`, ...) replay readiness sequences
 against successive observed snapshots. The section vocabulary is closed —
-unknown section names are errors. See
+unknown section names are errors. See the
+[test case format](test-cases.md) for the full contract and
 [How to test a module](../how-to/test-a-module.md) for the authoring guide.
 
 | Flag | Default | Description |

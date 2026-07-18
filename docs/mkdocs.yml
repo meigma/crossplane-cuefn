@@ -55,6 +55,7 @@ nav:
       - Build the runtime image: how-to/build-image.md
   - Reference:
       - Module contract: reference/module-contract.md
+      - Test cases: reference/test-cases.md
       - CLI: reference/cli.md
       - Configuration & environment: reference/configuration.md
       - Input CRD: reference/input.md

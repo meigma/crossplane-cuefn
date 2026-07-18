@@ -5,7 +5,9 @@
 file under the module's `tests/` directory: a few named sections supply the
 render inputs and declare what the output must look like. The harness renders
 through the exact engine the in-cluster function uses, so a passing case is a
-statement about production behavior.
+statement about production behavior. This page teaches the workflow; the
+[test case format](../reference/test-cases.md) reference specifies the full
+contract.
 
 ## Write your first case
 
