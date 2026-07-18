@@ -1,0 +1,174 @@
+package check_test
+
+import (
+	"context"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"cuelang.org/go/cue"
+	"cuelang.org/go/cue/cuecontext"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/meigma/crossplane-cuefn/internal/check"
+	"github.com/meigma/crossplane-cuefn/internal/render"
+	"github.com/meigma/crossplane-cuefn/internal/schema"
+)
+
+// loadModule builds a testdata module value offline, registering its cleanup
+// with the test.
+func loadModule(t *testing.T, dir string) cue.Value {
+	t.Helper()
+	val, cleanup, err := render.LoadModule(context.Background(), render.LocalLoader{Dir: dir}, "ignored")
+	require.NoError(t, err)
+	t.Cleanup(cleanup)
+	return val
+}
+
+// fmtFixture reads one file from testdata/fmt keyed by its base name.
+func fmtFixture(t *testing.T, name string) map[string][]byte {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join("testdata", "fmt", name))
+	require.NoError(t, err)
+	return map[string][]byte{name: data}
+}
+
+func TestFmt_CanonicalFilePasses(t *testing.T) {
+	t.Parallel()
+
+	unformatted, err := check.Fmt(fmtFixture(t, "formatted.cue"))
+	require.NoError(t, err)
+	assert.Empty(t, unformatted)
+}
+
+func TestFmt_ReportsUnformattedFiles(t *testing.T) {
+	t.Parallel()
+
+	files := fmtFixture(t, "formatted.cue")
+	files["unformatted.cue"] = fmtFixture(t, "unformatted.cue")["unformatted.cue"]
+
+	unformatted, err := check.Fmt(files)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"unformatted.cue"}, unformatted)
+}
+
+func TestFmt_SortsReportedNames(t *testing.T) {
+	t.Parallel()
+
+	src := fmtFixture(t, "unformatted.cue")["unformatted.cue"]
+	unformatted, err := check.Fmt(map[string][]byte{"z.cue": src, "a.cue": src})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"a.cue", "z.cue"}, unformatted)
+}
+
+func TestFmt_UnparseableFileIsAnError(t *testing.T) {
+	t.Parallel()
+
+	_, err := check.Fmt(fmtFixture(t, "invalid.cue"))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid.cue")
+}
+
+func TestVet_PassesRequiredFieldWithoutDefault(t *testing.T) {
+	t.Parallel()
+
+	// The good module's #Spec declares name! with no default — the exact case
+	// bare `cue vet` rejects and the -c=false semantics must accept.
+	assert.NoError(t, check.Vet(loadModule(t, filepath.Join("testdata", "good"))))
+}
+
+func TestVet_ReportsTypeConflict(t *testing.T) {
+	t.Parallel()
+
+	// A conflicting value in a loaded module errors at build (render.LoadModule)
+	// before Vet ever sees it — verified empirically for regular, definition,
+	// and hidden fields — so the backstop walk is exercised on a directly
+	// compiled value instead.
+	broken := cuecontext.New().CompileString(`answer: int & "forty-two"`)
+	err := check.Vet(broken)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "answer")
+	assert.Contains(t, err.Error(), "conflicting values")
+}
+
+func TestXRD_GeneratesWithoutGolden(t *testing.T) {
+	t.Parallel()
+
+	generated, diff, err := check.XRD(loadModule(t, filepath.Join("testdata", "good")), nil, false)
+	require.NoError(t, err)
+	assert.Empty(t, diff)
+	assert.Contains(t, string(generated), "CompositeResourceDefinition")
+	assert.Contains(t, string(generated), "xgadgets.platform.example.com")
+}
+
+func TestXRD_GoldenComparison(t *testing.T) {
+	t.Parallel()
+
+	module := loadModule(t, filepath.Join("testdata", "good"))
+	generated, _, err := check.XRD(module, nil, false)
+	require.NoError(t, err)
+
+	tests := []struct {
+		name    string
+		golden  []byte
+		matches bool
+	}{
+		{
+			name:    "exact generation matches",
+			golden:  generated,
+			matches: true,
+		},
+		{
+			name:    "machine-written golden with header matches",
+			golden:  check.GoldenBytes(generated, "example/xrd.yaml"),
+			matches: true,
+		},
+		{
+			name:    "CRLF line endings match",
+			golden:  []byte(strings.ReplaceAll(string(generated), "\n", "\r\n")),
+			matches: true,
+		},
+		{
+			name:    "drifted content mismatches",
+			golden:  []byte(strings.ReplaceAll(string(generated), "xgadgets", "xwidgets")),
+			matches: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, diff, err := check.XRD(module, tt.golden, true)
+			require.NoError(t, err)
+			if tt.matches {
+				assert.Empty(t, diff)
+				return
+			}
+			assert.Contains(t, diff, "- ")
+			assert.Contains(t, diff, "+ ")
+			assert.Contains(t, diff, "xwidgets")
+		})
+	}
+}
+
+func TestXRD_RejectsTypeCrossingDisjunction(t *testing.T) {
+	t.Parallel()
+
+	_, _, err := check.XRD(loadModule(t, filepath.Join("testdata", "disjunction")), nil, false)
+	require.Error(t, err)
+
+	var derr *schema.DisjunctionError
+	require.ErrorAs(t, err, &derr, "the typed schema error must survive XRD's wrap")
+	assert.Contains(t, err.Error(), "port")
+}
+
+func TestGoldenBytes_HeaderNamesReblessCommand(t *testing.T) {
+	t.Parallel()
+
+	golden := check.GoldenBytes([]byte("apiVersion: v1\n"), "example/xrd.yaml")
+	assert.Contains(t, string(golden), "# Generated by cuefn check; DO NOT EDIT.")
+	assert.Contains(t, string(golden), "cuefn check --xrd example/xrd.yaml --update")
+	assert.True(t, strings.HasSuffix(string(golden), "apiVersion: v1\n"),
+		"the generation follows the header verbatim")
+}

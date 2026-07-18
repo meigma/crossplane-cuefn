@@ -100,13 +100,3 @@ resources:
 status: null
 `, string(golden))
 }
-
-func TestDiffLines(t *testing.T) {
-	t.Parallel()
-
-	diff := diffLines("a\nb\nc\n", "a\nx\nc\n")
-	assert.Contains(t, diff, "  a\n")
-	assert.Contains(t, diff, "- b\n")
-	assert.Contains(t, diff, "+ x\n")
-	assert.Contains(t, diff, "  c\n")
-}
