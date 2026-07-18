@@ -122,3 +122,16 @@ golden SEEDED BY THE REAL BINARY (whole loop proven live: 3 pass + 1 seed →
 exit 1 → --ci re-run 4 pass). New blocking moon task root:example-test
 (`cuefn test --dir example/module --ci`) in check. moon check green; PR #72
 open, checks running.
+
+## 2026-07-17 19:20 — PR 3 merged; PR 4 (docs) open (#73)
+PR #72 merged (master 1632e30; its ci run included the example-test dogfood
+gate). PR 4 in `.wt/docs-cuefn-test`: new how-to
+docs/docs/how-to/test-a-module.md (first case, section↔render-flag mirror
+table, partial-CUE semantics incl. close()/constraints/positional lists,
+golden lifecycle, error.txt, readiness steps, CI mode, published-modules-
+include-tests note); reference/cli.md gains a full `test` section + table
+six→seven commands + noxpkg note (`test` in both builds); README command row;
+mkdocs nav + quickstart pointer. docs:build strict + root:check green
+locally; PR #73 open, checks running. Release-please has an updated
+release PR queued on master (v0.1.6 candidate) — release decision belongs to
+the developer, out of scope for this arc.
