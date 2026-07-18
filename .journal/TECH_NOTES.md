@@ -745,3 +745,45 @@ tag, re-run `release-distribute` via `workflow_dispatch tag=vX.Y.Z`.
 - Non-fatal release `artifact-metadata:write` storage warnings do not establish
   supply-chain failure. Verify the immutable OCI signatures, SLSA provenance, SPDX
   SBOM attestations, and downloadable binary subjects directly before deciding.
+
+## The `cuefn test` harness (session 010, PRs #69/#70/#72/#73, product v0.1.6)
+
+One txtar file per case under `<module>/tests/`; sections mirror the render
+flags (`xr.yaml`/`environment.yaml`/`required.yaml`/`observed.yaml`) plus
+expectations `want.cue` (partial CUE, unified) / `want.yaml` (exact golden,
+machine-owned) / `error.txt` (required substrings of a failing render);
+`N/observed.yaml`+`N/want.*` steps replay readiness sequences. Authoritative
+spec: `docs/docs/reference/test-cases.md` (+ `.journal/010/DESIGN.md`).
+
+- **Architecture:** `internal/snapshot` (bytes-core fixture loaders +
+  `MatchRequirements` + the two-pass fixpoint `RenderWithRequiredObjects`,
+  extracted from cli); `internal/testharness` (format-agnostic case model /
+  normalization / evaluators / seed-update); `internal/cli/test.go` thin
+  adapter. `render.UsesObservedResources` is exported so observed fixtures
+  against non-opted-in modules HARD-ERROR (never silently no-op).
+- **Assertion mechanics (do not relearn):** `want.Unify(actual).Validate(
+  cue.Concrete(true))` — NEVER `Subsume` (cryptic messages, mode-dependent
+  optional-field semantics, `cue.Schema()` drops closedness). Compile
+  `want.cue` newline-padded with `cue.Filename("<case>.txtar/want.cue")` so
+  errors cite real txtar coordinates; strip bare `N:M` positions (they point
+  into the JSON-encoded actual). Negative assertions are IMPOSSIBLE in pure
+  CUE (bottom uncatchable) — `error.txt` is harness-owned. `*_test.cue` is
+  reserved but INERT in all current CUE tooling (cue#209).
+- **Normalized doc:** `ready: "Ready"|"NotReady"|"Unspecified"` (SDK enum
+  True/False/Unspecified remapped), `status: null` when absent,
+  `requirements` always present (`{}`) — explicit absences because open
+  structs can't assert missing fields.
+- **Golden lifecycle:** seed writes `want.yaml` on first run (non-zero exit);
+  `--update` rewrites ONLY drifted `want.yaml` then re-runs; CI mode (`--ci`
+  or CI env truthy) refuses both. Hand-written sections never machine-touched.
+- **`cue mod publish` packages `tests/*.txtar`** (verified via modzip) —
+  documented as intended; keep fixtures trimmed.
+- **Dogfood gate:** `example/module/tests/` + blocking moon task
+  `root:example-test` (`cuefn test --dir example/module --ci`) in `check`.
+- **GOTCHA:** the shared golangci-lint cache can serve stale/green results —
+  clean it IMMEDIATELY before the final local lint in a worktree, or CI-only
+  findings slip through (goconst counts _test.go literals; modernize).
+  Also: promoting a go.mod dep indirect→direct changes the flake
+  `vendorHash` (take the new hash from CI's mismatch error).
+- Deferred fast-follows: OCI-ref module testing, `--output json`/JUnit,
+  `--run` step addressing, an A-style CUE-suite front-end on the same core.

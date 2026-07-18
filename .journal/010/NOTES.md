@@ -165,3 +165,13 @@ v0.1.6 as latest, checksum + SLSA verified, installed to ~/.local/bin
 release binary ran `cuefn test --dir example/module --ci` → 4/4 PASS. The
 session goal is fully shipped: design → 4 PRs → released v0.1.6 with the
 harness proving itself via its own dogfood suite.
+
+## 2026-07-17 21:05 — Close
+Session closed. Merged PRs: #69 (snapshot extraction), #70 (testharness
+core), #72 (cuefn test command + dogfood), #73 (docs incl. test-cases
+reference), #71 (release 0.1.6). master fast-forwarded to cf310ab; all
+session worktrees removed; v0.1.6 published + distribution verified.
+Hand-off: SUMMARY.md written; TECH_NOTES.md gained the session-010 harness
+section (architecture, assertion mechanics, golden lifecycle, gotchas);
+deferred fast-follows listed there and in SUMMARY Open Threads. Pre-existing
+Dependabot PRs untouched.
