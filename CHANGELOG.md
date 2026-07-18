@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.7](https://github.com/meigma/crossplane-cuefn/compare/v0.1.6...v0.1.7) (2026-07-18)
+
+
+### Features
+
+* **check:** static check core and textdiff extraction ([#74](https://github.com/meigma/crossplane-cuefn/issues/74)) ([2d1de17](https://github.com/meigma/crossplane-cuefn/commit/2d1de17ff9972cb6bab015e5e2c386a676bceab7))
+* **cli:** add cuefn check command ([#76](https://github.com/meigma/crossplane-cuefn/issues/76)) ([30aa6ae](https://github.com/meigma/crossplane-cuefn/commit/30aa6ae4fa10f29b5120bb9463501bac18830e65))
+
 ## [0.1.6](https://github.com/meigma/crossplane-cuefn/compare/v0.1.5...v0.1.6) (2026-07-18)
 
 
