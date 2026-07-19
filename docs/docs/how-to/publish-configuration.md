@@ -5,28 +5,51 @@ one CUE module in a single command: it generates the XRD, builds a pipeline
 Composition wired to the cuefn function, records the module's resolved digest,
 and pushes the package.
 
-## Prerequisite: publish the module first
+## Publish both artifacts from local source
 
-The Composition records the module's **registry** digest, so the module must
-already be published to its OCI registry before you build the Configuration:
+Point CUE at the module registry, check that dependencies are tidy, then ask
+cuefn to publish the local module and Configuration as one transaction:
 
 ```sh
 export CUE_REGISTRY=registry.example.com
-cue mod publish v0.1.0      # from the module directory
+cue mod tidy --check
+
+cuefn publish cuefn.example/app@v0.1.0 \
+  --dir . \
+  --publish-module \
+  --metadata org.opencontainers.image.source=https://github.com/example/platform-modules \
+  --package packages.example.com/xapp-configuration:v0.1.0
 ```
 
-!!! warning "Order matters"
-    Publish the module with `cue mod publish` **before** `cuefn publish`. With
-    `--dir`, the XRD/Composition are built from the local directory but the
-    digest is resolved from the registry — running out of order can ship a
-    package whose digest does not match the local source.
+cuefn prepares and validates both artifacts before mutation. It publishes the
+CUE module first, re-resolves its manifest digest, then pushes the Configuration.
+An identical retry reuses the module version; if that version already points at
+different bytes or metadata, cuefn rejects it instead of moving the tag.
 
-## Publish the Configuration
+`source.kind: "self"` includes the module directory as CUE normally does.
+`source.kind: "git"` requires a clean Git worktree (including linked worktrees),
+publishes tracked module files only, records the HEAD revision/time, and inherits
+a tracked repository-root `LICENSE` for a nested module.
+
+The repeatable `--metadata key=value` flag uses the first `=` as the separator.
+In combined mode the same map becomes CUE module manifest annotations and
+Configuration image-config labels. Metadata is public artifact data; do not put
+credentials or other secrets in it.
+
+## Use an already-published module
+
+Omit `--publish-module` to preserve the existing workflow. The module must
+already exist because cuefn resolves its live registry digest:
 
 ```sh
 cuefn publish cuefn.example/app@v0.1.0 \
   --package registry.example.com/xapp-configuration:v0.1.0
 ```
+
+With this form, `--metadata` labels only the Configuration. cuefn does not alter
+an existing module artifact it does not own. If you also pass `--dir`, make sure
+that local source is exactly what was published; otherwise prefer the combined
+form above.
 
 The destination `--package` registry must serve **HTTPS** — Crossplane's package
 manager pulls Configurations over HTTPS only. (The CUE module registry can be
@@ -45,7 +68,9 @@ On success: `pushed registry.example.com/xapp-configuration:v0.1.0`.
 | `--environment-config-function-ref` / `--environment-config-function-version` | Override the env-config function package/version recorded in `dependsOn` (defaults to crossplane-contrib's `function-environment-configs`). |
 | `--name` | Configuration `metadata.name` (default `<plural>-configuration`). |
 | `--crossplane-constraint` | Restrict the supported Crossplane version. |
-| `--dir` | Build the XRD/Composition from a local directory (digest still from the registry). |
+| `--dir` | Build the XRD/Composition from a local directory. |
+| `--publish-module` | Publish the local `--dir` module before the Configuration, using the prepared digest in the Composition. |
+| `--metadata` | Add repeatable `key=value` OCI metadata; combined publication applies it to both artifacts. |
 | `--insecure` | Push over plain HTTP to a throwaway dev registry. |
 
 ## Verify the package

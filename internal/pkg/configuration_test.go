@@ -81,3 +81,44 @@ func TestBuildConfigurationImage_Errors(t *testing.T) {
 	_, err := pkg.BuildConfigurationImage(pkg.Configuration{})
 	require.Error(t, err)
 }
+
+func TestBuildConfigurationImage_Labels(t *testing.T) {
+	t.Parallel()
+
+	labels := map[string]string{
+		"org.opencontainers.image.source": "https://github.com/meigma/example",
+		"dev.meigma.owner":                "platform=team",
+	}
+	img, err := pkg.BuildConfigurationImage(
+		common.BuildFixtureConfiguration(t),
+		pkg.WithConfigurationLabels(labels),
+	)
+	require.NoError(t, err)
+	config, err := img.ConfigFile()
+	require.NoError(t, err)
+	for key, value := range labels {
+		assert.Equal(t, value, config.Config.Labels[key])
+	}
+}
+
+func TestBuildConfigurationImage_RejectsLabelCollision(t *testing.T) {
+	t.Parallel()
+
+	base, err := pkg.BuildConfigurationImage(common.BuildFixtureConfiguration(t))
+	require.NoError(t, err)
+	config, err := base.ConfigFile()
+	require.NoError(t, err)
+	require.NotEmpty(t, config.Config.Labels)
+
+	var generatedKey string
+	for key := range config.Config.Labels {
+		generatedKey = key
+		break
+	}
+	_, err = pkg.BuildConfigurationImage(
+		common.BuildFixtureConfiguration(t),
+		pkg.WithConfigurationLabels(map[string]string{generatedKey: "override"}),
+	)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "conflicts")
+}

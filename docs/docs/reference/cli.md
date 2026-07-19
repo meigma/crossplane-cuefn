@@ -307,7 +307,7 @@ field path — and exits non-zero.
 cuefn publish <module-ref> --package <oci-ref> [flags]
 ```
 
-The one-command generate → package → push flow. It loads the module, generates
+The generate → package → push flow. It loads the module, generates
 its XRD, resolves the module's live OCI manifest digest, builds a pipeline
 Composition (the `cuefn` step, plus a leading `function-environment-configs` step
 when `--environment-config` is given) recording the module ref **and** that digest,
@@ -315,12 +315,19 @@ assembles a Crossplane **Configuration** xpkg, and pushes it. Recording the
 resolved digest is the author half of the
 [digest lock-step](../explanation/digest-lockstep.md).
 
+With `--publish-module`, cuefn first prepares the canonical CUE module artifact
+from `--dir`, uses its exact digest in the Composition, publishes that immutable
+module version, then pushes the Configuration. All validation and both artifact
+builds finish before the first registry mutation.
+
 **Argument.** `<module-ref>` — `path@version`.
 
 | Flag | Default | Description |
 |------|---------|-------------|
 | `--package <string>` | _(required)_ | Destination OCI reference for the Configuration package. |
-| `--dir <string>` | _(empty)_ | Build the XRD/Composition from this local module directory instead of fetching it over OCI. The digest is still resolved from the registry. |
+| `--dir <string>` | _(empty)_ | Build the XRD/Composition from this local module directory instead of fetching it over OCI. Without `--publish-module`, the digest is still resolved from the registry. |
+| `--publish-module` | `false` | Publish the local `--dir` module version before pushing the Configuration. Requires `--dir`; an identical existing version is reused and a different digest is rejected. |
+| `--metadata <key=value>` | _(none)_ | Add OCI metadata (repeatable). Labels the Configuration image config; with `--publish-module`, the same map also annotates the CUE module manifest. Splits on the first `=`, rejects duplicates and empty fields, and requires `org.opencontainers.image.source` to be an absolute HTTP(S) URL. Do not put secrets in metadata. |
 | `--cache-dir <string>` | _(empty)_ | Writable directory for the CUE module cache (defaults to `CUE_CACHE_DIR`, the OS cache, then a temp dir). |
 | `--function-ref <string>` | `ghcr.io/meigma/function-cuefn` | cuefn Function package OCI ref recorded in the Configuration's `dependsOn`. |
 | `--function-name <string>` | _(the name Crossplane derives for the `--function-ref` dependency)_ | In-cluster Function resource name the Composition's `cuefn` step references. The default matches the name Crossplane gives the auto-installed `dependsOn` Function, so a single Configuration install resolves. |
@@ -332,15 +339,21 @@ resolved digest is the author half of the
 | `--environment-config-function-version <string>` | `>=v0.7.2` | Semver constraint for the function-environment-configs dependency. |
 | `--insecure` | `false` | Push over plain HTTP (development only; for a non-loopback throwaway registry). |
 
-**Output.** Prints `pushed <ref>` to stdout on success. Exits non-zero if the
+**Output.** Prints `pushed <ref>` to stdout on success. With
+`--publish-module`, it first prints `published module <module-ref>@<digest>` (or
+`reused module ...` on an identical retry). Exits non-zero if the
 module cannot be loaded, the XRD cannot be generated, the digest cannot be
 resolved from the registry, or the push fails.
 
 !!! warning "`--dir` footgun"
-    With `--dir`, the XRD and Composition are built from the **local** directory
-    while `ExpectedDigest` is resolved from the **registry**. Publish the module
-    with `cue mod publish` *before* `cuefn publish`, or the package can ship a
-    digest that does not match the local source.
+    With `--dir` but without `--publish-module`, the XRD and Composition are built
+    from the **local** directory while `ExpectedDigest` is resolved from the
+    **registry**. Publish the module first, or use `--publish-module` to bind both
+    artifacts to the same prepared bytes.
+
+Run `cue mod tidy --check` in the module directory before publishing. cuefn
+validates the module archive through CUE's public APIs, but CUE's tidy checker is
+not a public library API.
 
 The Configuration package needs an **HTTPS** destination registry — Crossplane's
 package manager is HTTPS-only. (The CUE module registry may be any OCI registry,

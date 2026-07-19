@@ -6,12 +6,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"strings"
 
+	xv2 "github.com/crossplane/crossplane/apis/v2/apiextensions/v2"
 	"github.com/google/go-containerregistry/pkg/authn"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"github.com/spf13/cobra"
 
+	"github.com/meigma/crossplane-cuefn/internal/modulepublish"
 	"github.com/meigma/crossplane-cuefn/internal/pkg"
 	"github.com/meigma/crossplane-cuefn/internal/render"
 	"github.com/meigma/crossplane-cuefn/internal/schema"
@@ -28,8 +32,10 @@ type publishFlags struct {
 	name               string
 	crossplane         string
 	environmentRefs    []string
+	metadata           []string
 	envFunctionRef     string
 	envFunctionVersion string
+	publishModule      bool
 	insecure           bool
 }
 
@@ -63,9 +69,10 @@ func newPublishCommand(options Options) *cobra.Command {
 		Long: "Generate the XRD and a pipeline Composition from a CUE module, assemble a " +
 			"Crossplane Configuration package (xpkg), and push it to an OCI registry. The " +
 			"module's resolved manifest digest is recorded in the Composition so the runtime " +
-			"verifies the module has not drifted. With --dir the XRD/Composition are built " +
-			"from a local module directory, but the manifest digest is still resolved from " +
-			"the registry the module was published to.",
+			"verifies the module has not drifted. With --publish-module, the local --dir module " +
+			"is prepared and published first and its exact digest is recorded. Otherwise, with " +
+			"--dir the XRD/Composition are local but the manifest digest is resolved from the " +
+			"registry the module was published to.",
 		Args:          cobra.ExactArgs(1),
 		SilenceUsage:  true,
 		SilenceErrors: true,
@@ -98,6 +105,10 @@ func newPublishCommand(options Options) *cobra.Command {
 	cmd.Flags().StringArrayVar(&f.environmentRefs, "environment-config", nil,
 		"name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable); "+
 			"each is referenced by name so its values reach the module under input.environment")
+	cmd.Flags().StringArrayVar(&f.metadata, "metadata", nil,
+		"OCI metadata key=value applied as Configuration labels and, with --publish-module, module annotations (repeatable)")
+	cmd.Flags().BoolVar(&f.publishModule, "publish-module", false,
+		"publish the local --dir module version before pushing the Configuration")
 	cmd.Flags().BoolVar(&f.insecure, "insecure", false,
 		"push over plain HTTP (development only; for a non-loopback throwaway registry)")
 	_ = cmd.MarkFlagRequired("package")
@@ -107,40 +118,110 @@ func newPublishCommand(options Options) *cobra.Command {
 
 // runPublish executes the generate -> package -> push flow for the module ref.
 func runPublish(ctx context.Context, options Options, f publishFlags, ref string) error {
-	if strings.TrimSpace(f.pkgRef) == "" {
-		return errors.New("a destination --package reference is required")
-	}
-
-	// Load the module (local or OCI) and generate the typed XRD; the typed XRD
-	// (not the YAML wrapper) supplies the Composition's compositeTypeRef.
-	loader, err := moduleLoader(f.dir, f.cacheDir)
+	metadata, moduleArtifact, err := preparePublishInputs(ctx, f, ref)
 	if err != nil {
 		return err
 	}
-	module, cleanup, err := render.LoadModule(ctx, loader, ref)
+	xrd, cleanup, err := loadPublishXRD(ctx, f, ref)
 	if err != nil {
 		return err
 	}
 	defer cleanup()
-
-	xrd, err := schema.GenerateXRD(module)
+	digest, err := publishModuleDigest(ctx, moduleArtifact, ref, f.cacheDir)
 	if err != nil {
-		return fmt.Errorf("cannot generate XRD for module %q: %w", ref, err)
+		return err
 	}
-
-	// Resolve the live manifest digest from the registry. This is always an OCI
-	// operation: even with --dir, publish records the real published digest so the
-	// runtime lock-step is meaningful.
-	digest, err := resolveModuleDigest(ctx, ref, f.cacheDir)
+	img, err := buildPublishImage(f, ref, digest, metadata, xrd)
+	if err != nil {
+		return err
+	}
+	moduleResult, err := publishPreparedModule(ctx, moduleArtifact)
 	if err != nil {
 		return err
 	}
 
+	dst, err := pkg.Push(ctx, f.pkgRef, img, f.insecure, remotePushOptions()...)
+	if err != nil {
+		return configurationPushError(err, f.pkgRef, moduleArtifact, moduleResult)
+	}
+	if err := printModuleResult(options, moduleArtifact, moduleResult); err != nil {
+		return err
+	}
+	return printLine(options.Out, "pushed "+dst.String())
+}
+
+func preparePublishInputs(
+	ctx context.Context,
+	f publishFlags,
+	ref string,
+) (map[string]string, *modulepublish.Artifact, error) {
+	if strings.TrimSpace(f.pkgRef) == "" {
+		return nil, nil, errors.New("a destination --package reference is required")
+	}
+	metadata, err := parseMetadata(f.metadata)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !f.publishModule {
+		return metadata, nil, nil
+	}
+	if strings.TrimSpace(f.dir) == "" {
+		return nil, nil, errors.New("--publish-module requires a local module --dir")
+	}
+	if validationErr := pkg.ValidateDestination(f.pkgRef, f.insecure); validationErr != nil {
+		return nil, nil, validationErr
+	}
+	artifact, err := modulepublish.Prepare(ctx, ref, f.dir, metadata)
+	if err != nil {
+		return nil, nil, err
+	}
+	return metadata, artifact, nil
+}
+
+func loadPublishXRD(
+	ctx context.Context,
+	f publishFlags,
+	ref string,
+) (*xv2.CompositeResourceDefinition, func(), error) {
+	loader, err := moduleLoader(f.dir, f.cacheDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	loaded, cleanup, err := render.LoadModule(ctx, loader, ref)
+	if err != nil {
+		return nil, nil, err
+	}
+	xrd, err := schema.GenerateXRD(loaded)
+	if err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("cannot generate XRD for module %q: %w", ref, err)
+	}
+	return xrd, cleanup, nil
+}
+
+func publishModuleDigest(
+	ctx context.Context,
+	artifact *modulepublish.Artifact,
+	ref string,
+	cacheDir string,
+) (string, error) {
+	if artifact != nil {
+		return artifact.Digest(), nil
+	}
+	return resolveModuleDigest(ctx, ref, cacheDir)
+}
+
+func buildPublishImage(
+	f publishFlags,
+	ref string,
+	digest string,
+	metadata map[string]string,
+	xrd *xv2.CompositeResourceDefinition,
+) (v1.Image, error) {
 	fnName, err := functionName(f)
 	if err != nil {
-		return err
+		return nil, err
 	}
-
 	compInput := pkg.CompositionInput{
 		Module:                ref,
 		ExpectedDigest:        digest,
@@ -153,42 +234,124 @@ func runPublish(ctx context.Context, options Options, f publishFlags, ref string
 		FunctionPackage:      f.functionRef,
 		FunctionVersion:      f.functionVersion,
 	}
-
-	// When the Composition uses EnvironmentConfigs, the env-config Function must be
-	// referenced by its Crossplane-derived name and declared as a dependency, so a
-	// single Configuration install pulls it and the step resolves.
 	if hasEnvironmentConfigs(f.environmentRefs) {
-		var envName string
-		envName, err = pkg.DerivedFunctionName(f.envFunctionRef)
-		if err != nil {
-			return err
+		envName, envErr := pkg.DerivedFunctionName(f.envFunctionRef)
+		if envErr != nil {
+			return nil, envErr
 		}
 		compInput.EnvironmentConfigFunctionName = envName
 		metaInput.EnvironmentConfigFunctionPackage = f.envFunctionRef
 		metaInput.EnvironmentConfigFunctionVersion = f.envFunctionVersion
 	}
-
 	comp, err := pkg.GenerateComposition(xrd, compInput)
 	if err != nil {
-		return fmt.Errorf("cannot build composition for module %q: %w", ref, err)
+		return nil, fmt.Errorf("cannot build composition for module %q: %w", ref, err)
 	}
-
 	meta, err := pkg.GenerateConfigurationMeta(metaInput)
 	if err != nil {
-		return fmt.Errorf("cannot build configuration metadata: %w", err)
+		return nil, fmt.Errorf("cannot build configuration metadata: %w", err)
 	}
-
-	img, err := pkg.BuildConfigurationImage(pkg.Configuration{Meta: meta, XRD: xrd, Composition: comp})
+	var imageOptions []pkg.ConfigurationImageOption
+	if len(metadata) > 0 {
+		imageOptions = append(imageOptions, pkg.WithConfigurationLabels(metadata))
+	}
+	img, err := pkg.BuildConfigurationImage(
+		pkg.Configuration{Meta: meta, XRD: xrd, Composition: comp},
+		imageOptions...,
+	)
 	if err != nil {
-		return fmt.Errorf("cannot build configuration image: %w", err)
+		return nil, fmt.Errorf("cannot build configuration image: %w", err)
 	}
+	return img, nil
+}
 
-	dst, err := pkg.Push(ctx, f.pkgRef, img, f.insecure, remotePushOptions()...)
+func publishPreparedModule(
+	ctx context.Context,
+	artifact *modulepublish.Artifact,
+) (modulepublish.PublishResult, error) {
+	if artifact == nil {
+		return modulepublish.PublishResult{}, nil
+	}
+	resolver, err := modulepublish.NewResolver(nil)
 	if err != nil {
-		return err
+		return modulepublish.PublishResult{}, err
 	}
+	return artifact.Publish(ctx, resolver)
+}
 
-	return printLine(options.Out, "pushed "+dst.String())
+func configurationPushError(
+	pushErr error,
+	pkgRef string,
+	artifact *modulepublish.Artifact,
+	result modulepublish.PublishResult,
+) error {
+	if artifact == nil {
+		return pushErr
+	}
+	return fmt.Errorf(
+		"module %s@%s is published but Configuration %q failed: %w; retrying the same command is safe",
+		result.Module,
+		result.Digest,
+		pkgRef,
+		pushErr,
+	)
+}
+
+func printModuleResult(
+	options Options,
+	artifact *modulepublish.Artifact,
+	result modulepublish.PublishResult,
+) error {
+	if artifact == nil {
+		return nil
+	}
+	action := "published"
+	if result.Reused {
+		action = "reused"
+	}
+	return printLine(options.Out, fmt.Sprintf(
+		"%s module %s@%s",
+		action,
+		result.Module,
+		result.Digest,
+	))
+}
+
+func parseMetadata(values []string) (map[string]string, error) {
+	metadata := make(map[string]string, len(values))
+	for _, pair := range values {
+		key, value, found := strings.Cut(pair, "=")
+		if !found {
+			return nil, fmt.Errorf("invalid metadata %q: expected key=value", pair)
+		}
+		if key == "" {
+			return nil, fmt.Errorf("invalid metadata %q: key cannot be empty", pair)
+		}
+		if value == "" {
+			return nil, fmt.Errorf("invalid metadata %q: value cannot be empty", pair)
+		}
+		if _, exists := metadata[key]; exists {
+			return nil, fmt.Errorf("duplicate metadata key %q", key)
+		}
+		if key == "org.opencontainers.image.source" {
+			if err := validateSourceMetadata(value); err != nil {
+				return nil, err
+			}
+		}
+		metadata[key] = value
+	}
+	return metadata, nil
+}
+
+func validateSourceMetadata(value string) error {
+	parsed, err := url.Parse(value)
+	if err != nil || parsed.Host == "" || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return fmt.Errorf(
+			"metadata org.opencontainers.image.source must be an absolute HTTP(S) URL, got %q",
+			value,
+		)
+	}
+	return nil
 }
 
 // resolveModuleDigest builds an OCI loader honoring CUE_REGISTRY and resolves

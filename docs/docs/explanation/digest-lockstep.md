@@ -25,11 +25,12 @@ content after a republish.
 cuefn cannot simply reference the module by digest — CUE's loader works in
 semver terms. Instead it **verifies the digest after fetch**:
 
-1. **Author side (`cuefn publish`).** When building the Configuration, cuefn
-   resolves the module ref's **live** OCI manifest digest from the registry and
-   records it in the Composition's cuefn `Input` as `expectedDigest`. This always
-   queries the live registry — no cache fallback — so the recorded digest is the
-   real published one.
+1. **Author side (`cuefn publish`).** For an existing module, cuefn resolves the
+   ref's **live** OCI manifest digest and records it in the Composition's cuefn
+   `Input` as `expectedDigest`. With `--publish-module`, it instead prepares the
+   exact canonical manifest locally, builds the Configuration around that digest,
+   publishes the immutable module version, and re-resolves the tag before pushing
+   the Configuration. Neither path takes a digest from the module cache.
 2. **Runtime side (`cuefn function`).** The function reads `expectedDigest` and
    passes it to the loader's expectation map. On every load the loader
    re-resolves the tag, computes the fetched module's manifest digest, and

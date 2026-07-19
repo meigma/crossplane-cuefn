@@ -114,7 +114,10 @@ Then package it as an installable Configuration — the XRD, a Composition wired
 the function, and the function as a dependency — in one command:
 
 ```sh
-cuefn publish example.com/app@v0.1.0 --package registry.example.com/xapp:v0.1.0
+cuefn publish example.com/app@v0.1.0 \
+  --dir . --publish-module \
+  --metadata org.opencontainers.image.source=https://github.com/example/platform-modules \
+  --package registry.example.com/xapp:v0.1.0
 ```
 
 `kubectl apply` that package as a Crossplane `Configuration` and the `XApp` API is
@@ -131,7 +134,7 @@ whole loop — module to a running XR — step by step.
 | `cuefn test` | Run the module's declarative test cases (`tests/*.txtar`). |
 | `cuefn generate` | Emit the structural XRD from the module's schema. |
 | `cuefn validate` | Check an XR's spec against the module's schema before apply. |
-| `cuefn publish` | Package an installable Crossplane Configuration from the module. |
+| `cuefn publish` | Publish a module and package its installable Crossplane Configuration. |
 | `cuefn publish-function` | Package the composition function as a Crossplane Function. |
 | `cuefn function` | Serve the composition function over gRPC (the runtime). |
 
