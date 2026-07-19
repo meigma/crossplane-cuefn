@@ -51,3 +51,9 @@ Final local evidence is green: focused package tests, `root:oci-test`, `root:pub
 Opened PR #79, `feat(publish): publish modules with generic metadata`, from `feat/publish-metadata` into `master`. The first hosted Nix run exposed the expected fixed-output maintenance consequence of the new Go dependency graph: `flake.nix` still carried the old `vendorHash`. Updated only that hash to the exact value reported by Nix, reproduced the workflow command locally with a successful binary smoke test, and pushed the focused `fix(nix): refresh Go module vendor hash` follow-up.
 
 The final PR head is `86a0fbda6d7deeb6f2637dcf3b3f20ca8ea72322`. Hosted checks are green on that exact SHA: CI, integration, E2E, Nix flake build, GitHub Pages, Kusari Inspector, amd64/arm64 Melange dry runs, container image dry run, and binary release dry run. PR: https://github.com/meigma/crossplane-cuefn/pull/79. It remains open and unmerged; no release was created.
+
+## 2026-07-19 14:12 — Close
+
+PR #79 was squash-merged at `f0c68157ed6c352a39329333ffd43a4669690da5` after approval. Release PR #80 was then reviewed and squash-merged at `ae226d05b6dc38a6652c117c1713f5c63df75d87`; product v0.1.8 was built, independently inspected, published, and distributed. Release Please run 29702509159, release run 29702515936, and distribution run 29703014106 all completed successfully on the exact release commit. Checksums, archive and OCI provenance, Cosign signatures, two-platform runtime/Function indexes, runtime execution, Crossplane Function extraction, and matching Homebrew/Scoop manifests were verified.
+
+Local `master` and `origin/master` both resolve to the release commit. The feature and Release Please branches and implementation worktree are gone, no `.journal` files are tracked on `master`, and developer-owned `.claude/` and `xr.yaml` remain untouched. Session handoff is in `SUMMARY.md`; durable publication semantics were added to `TECH_NOTES.md`.

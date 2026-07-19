@@ -830,3 +830,31 @@ module health, test = instance-driven behavior, validate = one XR vs schema.
   `gh attestation verify` is SILENT on success in non-tty (use
   `--format json`); the scoop manifest lives at the BUCKET REPO ROOT
   (`cuefn.json`), not `bucket/cuefn.json`.
+
+## Combined module publication and generic metadata (session 012, PR #79, product v0.1.8)
+
+- `cuefn publish` accepts repeatable `--metadata key=value`. Parsing splits on
+  the first `=`, preserves values exactly, rejects empty/duplicate keys, and
+  validates `org.opencontainers.image.source` as an absolute HTTP(S) URL.
+  Metadata ordering never changes the digest.
+- `--publish-module` is the explicit registry-mutation switch and requires
+  `--dir`. In combined mode the same metadata becomes CUE module manifest
+  annotations and Configuration image-config labels. Without the switch,
+  metadata labels only the Configuration; the existing module is not mutated.
+- Combined publication prepares both artifacts before any push, embeds the
+  prepared module digest in the Composition, publishes/reuses the module, then
+  pushes the Configuration. A partial failure reports both refs and safe-retry
+  guidance.
+- `internal/modulepublish` uses public CUE `modregistry` APIs for canonical
+  scratch-config/two-layer assembly, intercepts only the public OCI manifest
+  push to add annotations, and promotes through the standard CUE registry
+  resolver. Publication is immutable: absent pushes, identical digest reuses,
+  conflicting digest rejects, and every success re-resolves the exact digest.
+- Git source mode packages only tracked module files, requires the whole
+  worktree clean, inherits a tracked repository-root license for nested
+  modules, and records HEAD revision/committer time. go-git v6 alpha is pinned
+  because v5 does not support repositories with `extensions.worktreeConfig`;
+  keep the linked-worktree regression when upgrading it.
+- The publish path remains behind `!noxpkg`; no credential flags,
+  registry-specific APIs, shell-outs, low-level annotation/label flags, or
+  artifact-specific metadata overrides were added.
