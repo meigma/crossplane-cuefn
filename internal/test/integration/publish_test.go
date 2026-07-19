@@ -7,8 +7,12 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"strings"
 	"testing"
 
+	"cuelabs.dev/go/oci/ociregistry/ociclient"
+	"cuelang.org/go/mod/modregistry"
+	"cuelang.org/go/mod/module"
 	xpkg "github.com/crossplane/crossplane-runtime/v2/pkg/xpkg"
 	"github.com/google/go-containerregistry/pkg/name"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
@@ -96,6 +100,157 @@ func TestPublish_EndToEnd(t *testing.T) {
 	require.NoError(t, err)
 	_, err = badLoader.Load(context.Background(), common.ExampleModuleRef)
 	require.Error(t, err, "runtime must reject a digest that does not match the module")
+}
+
+func TestPublish_ModuleAndConfigurationEndToEnd(t *testing.T) {
+	reg := common.StartRegistry(t)
+	cache := t.TempDir()
+	t.Setenv("CUE_REGISTRY", reg.CUERegistry())
+	t.Setenv("CUE_CACHE_DIR", cache)
+
+	pkgRef := reg.Host() + "/combined-configuration:v0.1.0"
+	metadata := []string{
+		"org.opencontainers.image.source=https://github.com/meigma/example?ref=v0.1.0",
+		"dev.meigma.owner=platform=team",
+	}
+	stdout := executeCombinedPublish(t, common.ExampleModuleRef, pkgRef, metadata)
+	assert.Contains(t, stdout, "published module "+common.ExampleModuleRef+"@sha256:")
+	assert.Contains(t, stdout, "pushed "+reg.Host()+"/combined-configuration@sha256:")
+
+	manifest, moduleDigest := pullModuleManifest(t, reg, common.ExampleModuleRef)
+	assert.Equal(t, "https://github.com/meigma/example?ref=v0.1.0",
+		manifest.Annotations["org.opencontainers.image.source"])
+	assert.Equal(t, "platform=team", manifest.Annotations["dev.meigma.owner"])
+	require.Len(t, manifest.Layers, 2)
+	assert.Equal(t, "application/zip", string(manifest.Layers[0].MediaType))
+	assert.Equal(t, "application/vnd.cue.modulefile.v1", string(manifest.Layers[1].MediaType))
+
+	img := pullConfiguration(t, pkgRef)
+	config, err := img.ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, "https://github.com/meigma/example?ref=v0.1.0",
+		config.Config.Labels["org.opencontainers.image.source"])
+	assert.Equal(t, "platform=team", config.Config.Labels["dev.meigma.owner"])
+	assert.Equal(t, moduleDigest, compositionInput(t, img).ExpectedDigest)
+	loader, err := render.NewOCILoader(render.OCIConfig{
+		Env:    reg.Env(t.TempDir()),
+		Expect: map[string]string{common.ExampleModuleRef: moduleDigest},
+	})
+	require.NoError(t, err)
+	_, err = loader.Load(context.Background(), common.ExampleModuleRef)
+	require.NoError(t, err, "runtime loader should accept the digest from combined publication")
+
+	retryStdout := executeCombinedPublish(t, common.ExampleModuleRef, pkgRef, metadata)
+	assert.Contains(t, retryStdout, "reused module "+common.ExampleModuleRef+"@"+moduleDigest)
+	_, retryDigest := pullModuleManifest(t, reg, common.ExampleModuleRef)
+	assert.Equal(t, moduleDigest, retryDigest)
+
+	root := cli.NewRootCommand(cli.Options{Out: &bytes.Buffer{}})
+	root.SetArgs([]string{
+		"publish", common.ExampleModuleRef,
+		"--dir", common.HermeticModuleDir(t),
+		"--package", pkgRef,
+		"--publish-module",
+		"--metadata", "org.opencontainers.image.source=https://github.com/meigma/different",
+		"--insecure",
+	})
+	err = root.ExecuteContext(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "immutable")
+	_, unchangedDigest := pullModuleManifest(t, reg, common.ExampleModuleRef)
+	assert.Equal(t, moduleDigest, unchangedDigest)
+
+	metadataOnlyRef := reg.Host() + "/metadata-only-configuration:v0.1.0"
+	metadataOnlyRoot := cli.NewRootCommand(cli.Options{Out: &bytes.Buffer{}})
+	metadataOnlyRoot.SetArgs([]string{
+		"publish", common.ExampleModuleRef,
+		"--package", metadataOnlyRef,
+		"--metadata", "dev.meigma.configuration=only",
+		"--insecure",
+	})
+	require.NoError(t, metadataOnlyRoot.ExecuteContext(context.Background()))
+	metadataOnlyConfig, err := pullConfiguration(t, metadataOnlyRef).ConfigFile()
+	require.NoError(t, err)
+	assert.Equal(t, "only", metadataOnlyConfig.Config.Labels["dev.meigma.configuration"])
+	moduleAfterMetadataOnly, metadataOnlyDigest := pullModuleManifest(t, reg, common.ExampleModuleRef)
+	assert.Equal(t, moduleDigest, metadataOnlyDigest)
+	assert.NotContains(t, moduleAfterMetadataOnly.Annotations, "dev.meigma.configuration")
+}
+
+func TestPublish_ModuleSuccessConfigurationFailureIsRetrySafe(t *testing.T) {
+	reg := common.StartRegistry(t)
+	t.Setenv("CUE_REGISTRY", reg.CUERegistry())
+	t.Setenv("CUE_CACHE_DIR", t.TempDir())
+
+	ref := strings.Replace(common.ExampleModuleRef, "v0.1.0", "v0.1.1", 1)
+	pkgRef := "localhost:1/unreachable-configuration:v0.1.1"
+	root := cli.NewRootCommand(cli.Options{Out: &bytes.Buffer{}})
+	root.SetArgs([]string{
+		"publish", ref,
+		"--dir", common.HermeticModuleDir(t),
+		"--package", pkgRef,
+		"--publish-module",
+		"--insecure",
+	})
+
+	err := root.ExecuteContext(context.Background())
+	require.Error(t, err)
+	_, digest := pullModuleManifest(t, reg, ref)
+	assert.Contains(t, err.Error(), ref+"@"+digest)
+	assert.Contains(t, err.Error(), pkgRef)
+	assert.Contains(t, err.Error(), "retrying the same command is safe")
+}
+
+func executeCombinedPublish(
+	t *testing.T,
+	ref string,
+	pkgRef string,
+	metadata []string,
+) string {
+	t.Helper()
+	var stdout bytes.Buffer
+	root := cli.NewRootCommand(cli.Options{Out: &stdout})
+	args := []string{
+		"publish", ref,
+		"--dir", common.HermeticModuleDir(t),
+		"--package", pkgRef,
+		"--publish-module",
+		"--insecure",
+	}
+	for _, value := range metadata {
+		args = append(args, "--metadata", value)
+	}
+	root.SetArgs(args)
+	require.NoError(t, root.ExecuteContext(context.Background()))
+	return stdout.String()
+}
+
+func pullModuleManifest(t *testing.T, reg *common.Registry, ref string) (v1.Manifest, string) {
+	t.Helper()
+	mv, err := module.ParseVersion(ref)
+	require.NoError(t, err)
+	client, err := ociclient.New(reg.Host(), &ociclient.Options{Insecure: true})
+	require.NoError(t, err)
+	reader, err := client.GetTag(context.Background(), mv.BasePath(), mv.Version())
+	require.NoError(t, err)
+	digest := reader.Descriptor().Digest.String()
+	defer reader.Close()
+	var manifest v1.Manifest
+	require.NoError(t, json.NewDecoder(reader).Decode(&manifest))
+
+	loaded, err := modregistry.NewClient(client).GetModule(context.Background(), mv)
+	require.NoError(t, err)
+	assert.Equal(t, digest, loaded.ManifestDigest().String())
+	return manifest, digest
+}
+
+func pullConfiguration(t *testing.T, ref string) v1.Image {
+	t.Helper()
+	parsed, err := name.ParseReference(ref, name.Insecure)
+	require.NoError(t, err)
+	img, err := remote.Image(parsed)
+	require.NoError(t, err)
+	return img
 }
 
 // assertBaseLayerAnnotation asserts the image has a layer annotated as the xpkg

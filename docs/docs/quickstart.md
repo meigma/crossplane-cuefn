@@ -190,7 +190,7 @@ cuefn render cuefn.example/app@v0 --dir . --xr xr.yaml --env env.yaml
 The `tier` label and ConfigMap datum change from `unset` to `production`. This
 `--dir` render is your fast inner loop — iterate here until the output is right.
 
-## Step 3 — Publish the module
+## Step 3 — Configure module publication
 
 Publish the module to its CUE registry. Start a throwaway local registry first —
 the container listens on 5000, and we publish it on host port 5001 to avoid the
@@ -200,13 +200,12 @@ it. A plain-HTTP registry needs the `+insecure` suffix:
 ```sh
 docker run -d -p 5001:5000 --name cuefn-registry registry:2
 export CUE_REGISTRY=localhost:5001+insecure
-cue mod publish v0.1.0
+cue mod tidy --check
 ```
 
-!!! warning "Publish the module before the Configuration"
-    `cuefn publish` records the module's **registry** digest. Always
-    `cue mod publish` first; otherwise the Configuration can pin a digest that
-    does not match your source. This ordering avoids the `--dir` footgun.
+The next command publishes the module and Configuration together, avoiding the
+ordering hazard of separately publishing local source and then resolving its
+registry digest.
 
 !!! note "The cluster fetches the module too"
     The in-cluster function pulls this module at render time, so for Steps 5–6 the
@@ -223,6 +222,9 @@ HTTPS-only), distinct from the CUE module registry:
 
 ```sh
 cuefn publish cuefn.example/app@v0.1.0 \
+  --dir . \
+  --publish-module \
+  --metadata org.opencontainers.image.source=https://github.com/example/platform-modules \
   --package registry.example.com/xapp-configuration:v0.1.0 \
   --environment-config app-environment
 ```
@@ -232,7 +234,8 @@ By default `cuefn publish` builds a single-step `cuefn` Composition. Passing
 (so the named EnvironmentConfig's values reach the module under
 `out.input.environment`) **and** declares both functions in the Configuration's
 `dependsOn`, so installing it pulls them automatically. It also records the module
-ref and its resolved manifest digest (the runtime
+ref and the exact manifest digest prepared and published in the same transaction
+(the runtime
 [digest lock-step](explanation/digest-lockstep.md)). Confirm the package parses:
 
 ```sh

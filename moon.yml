@@ -180,7 +180,7 @@ tasks:
   # the default `check` graph so `moon run root:check` needs none of them. Run
   # under `mise exec` so the pinned crossplane/cosign/syft win over any binary on PATH.
   publish-test:
-    command: "mise exec -- go test ./internal/test/integration/... -run 'TestPublish_EndToEnd|TestXpkgValidate|TestFunctionXpkgSupplyChain' -count 1"
+    command: "mise exec -- go test ./internal/test/integration/... -run 'TestPublish_|TestXpkgValidate|TestFunctionXpkgSupplyChain' -count 1"
     env:
       CUEFN_INTEGRATION: 'true'
     inputs:

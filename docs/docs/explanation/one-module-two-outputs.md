@@ -57,8 +57,9 @@ the same engine.
 A consequence worth calling out: cuefn deals with two distinct kinds of OCI
 artifact, and they have different registry requirements.
 
-- The **CUE module** is pushed with `cue mod publish`. It may live on any OCI
-  registry, including a plain-HTTP local one (`CUE_REGISTRY=…+insecure`).
+- The **CUE module** is pushed with `cue mod publish`, or together with its
+  Configuration via `cuefn publish --publish-module --dir …`. It may live on any
+  OCI registry, including a plain-HTTP local one (`CUE_REGISTRY=…+insecure`).
 - The **Configuration** and **Function** packages are Crossplane xpkgs, pushed by
   `cuefn publish` / `cuefn publish-function`. Crossplane's package manager pulls
   them over **HTTPS only**, so their destination registry must serve HTTPS.

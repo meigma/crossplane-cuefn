@@ -16,6 +16,13 @@ type digestable interface {
 	Digest() (v1.Hash, error)
 }
 
+// ValidateDestination verifies that ref is a valid package push target without
+// performing any registry operation.
+func ValidateDestination(ref string, insecure bool) error {
+	_, err := parseDestination(ref, insecure)
+	return err
+}
+
 // Push writes img to the OCI reference ref and returns the pushed image's
 // digest. It is the only network seam in the package: callers assemble the image
 // purely, then push it here.
