@@ -13,7 +13,7 @@
       let
         pkgs = nixpkgs.legacyPackages.${system};
         # Kept in sync with releases by release-please (see release-please-config.json).
-        version = "0.1.7"; # x-release-please-version
+        version = "0.1.8"; # x-release-please-version
       in
       {
         packages.default = pkgs.buildGoModule {
