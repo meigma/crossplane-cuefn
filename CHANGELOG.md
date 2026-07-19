@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/meigma/crossplane-cuefn/compare/v0.1.7...v0.1.8) (2026-07-19)
+
+
+### Features
+
+* **publish:** publish modules with generic metadata ([#79](https://github.com/meigma/crossplane-cuefn/issues/79)) ([f0c6815](https://github.com/meigma/crossplane-cuefn/commit/f0c68157ed6c352a39329333ffd43a4669690da5))
+
 ## [0.1.7](https://github.com/meigma/crossplane-cuefn/compare/v0.1.6...v0.1.7) (2026-07-18)
 
 
