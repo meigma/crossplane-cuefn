@@ -1,6 +1,6 @@
 # First-class publication metadata and module publishing — implementation plan
 
-Status: approved; implementation complete pending PR verification
+Status: complete; PR open for review
 
 Session: 012
 
