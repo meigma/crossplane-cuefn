@@ -23,20 +23,21 @@ import (
 
 // publishFlags holds the flags for the publish subcommand.
 type publishFlags struct {
-	dir                string
-	cacheDir           string
-	pkgRef             string
-	functionRef        string
-	functionName       string
-	functionVersion    string
-	name               string
-	crossplane         string
-	environmentRefs    []string
-	metadata           []string
-	envFunctionRef     string
-	envFunctionVersion string
-	publishModule      bool
-	insecure           bool
+	dir                  string
+	cacheDir             string
+	pkgRef               string
+	functionRef          string
+	functionName         string
+	functionVersion      string
+	name                 string
+	crossplane           string
+	environmentRefs      []string
+	environmentSelectors []string
+	metadata             []string
+	envFunctionRef       string
+	envFunctionVersion   string
+	publishModule        bool
+	insecure             bool
 }
 
 const (
@@ -105,6 +106,10 @@ func newPublishCommand(options Options) *cobra.Command {
 	cmd.Flags().StringArrayVar(&f.environmentRefs, "environment-config", nil,
 		"name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable); "+
 			"each is referenced by name so its values reach the module under input.environment")
+	cmd.Flags().StringArrayVar(&f.environmentSelectors, "environment-config-selector", nil,
+		"label matchers selecting exactly one EnvironmentConfig per composite, as comma-separated "+
+			"labelKey=compositeFieldPath pairs (e.g. \"a.io/name=metadata.name,a.io/namespace=metadata.namespace\"); "+
+			"each occurrence adds one Single-mode Selector source merged after the --environment-config references (repeatable)")
 	cmd.Flags().StringArrayVar(&f.metadata, "metadata", nil,
 		"OCI metadata key=value applied as Configuration labels and, with --publish-module, module annotations (repeatable)")
 	cmd.Flags().BoolVar(&f.publishModule, "publish-module", false,
@@ -222,11 +227,16 @@ func buildPublishImage(
 	if err != nil {
 		return nil, err
 	}
+	selectors, err := parseEnvironmentSelectors(f.environmentSelectors)
+	if err != nil {
+		return nil, err
+	}
 	compInput := pkg.CompositionInput{
-		Module:                ref,
-		ExpectedDigest:        digest,
-		FunctionName:          fnName,
-		EnvironmentConfigRefs: f.environmentRefs,
+		Module:                     ref,
+		ExpectedDigest:             digest,
+		FunctionName:               fnName,
+		EnvironmentConfigRefs:      f.environmentRefs,
+		EnvironmentConfigSelectors: selectors,
 	}
 	metaInput := pkg.ConfigurationMeta{
 		Name:                 configurationName(f, xrd.Spec.Names.Plural),
@@ -234,7 +244,7 @@ func buildPublishImage(
 		FunctionPackage:      f.functionRef,
 		FunctionVersion:      f.functionVersion,
 	}
-	if hasEnvironmentConfigs(f.environmentRefs) {
+	if hasEnvironmentConfigs(f.environmentRefs) || len(selectors) > 0 {
 		envName, envErr := pkg.DerivedFunctionName(f.envFunctionRef)
 		if envErr != nil {
 			return nil, envErr
@@ -398,6 +408,35 @@ func hasEnvironmentConfigs(refs []string) bool {
 		}
 	}
 	return false
+}
+
+// parseEnvironmentSelectors parses each --environment-config-selector value —
+// comma-separated labelKey=compositeFieldPath pairs — into one Selector source.
+func parseEnvironmentSelectors(values []string) ([]pkg.EnvironmentConfigSelector, error) {
+	selectors := make([]pkg.EnvironmentConfigSelector, 0, len(values))
+	for _, value := range values {
+		var matches []pkg.EnvironmentConfigLabelMatch
+		seen := make(map[string]bool)
+		for pair := range strings.SplitSeq(value, ",") {
+			key, path, found := strings.Cut(strings.TrimSpace(pair), "=")
+			if !found || key == "" || path == "" {
+				return nil, fmt.Errorf(
+					"invalid environment-config selector %q: expected comma-separated labelKey=compositeFieldPath pairs",
+					value,
+				)
+			}
+			if seen[key] {
+				return nil, fmt.Errorf("invalid environment-config selector %q: duplicate label key %q", value, key)
+			}
+			seen[key] = true
+			matches = append(matches, pkg.EnvironmentConfigLabelMatch{Key: key, ValueFromFieldPath: path})
+		}
+		if len(matches) == 0 {
+			return nil, fmt.Errorf("invalid environment-config selector %q: no label matchers", value)
+		}
+		selectors = append(selectors, pkg.EnvironmentConfigSelector{MatchLabels: matches})
+	}
+	return selectors, nil
 }
 
 // configurationName resolves the Configuration metadata.name: the explicit flag,
