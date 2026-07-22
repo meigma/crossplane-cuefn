@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/meigma/crossplane-cuefn/compare/v0.1.8...v0.1.9) (2026-07-22)
+
+
+### Features
+
+* **publish:** add selector-based EnvironmentConfig sources ([#81](https://github.com/meigma/crossplane-cuefn/issues/81)) ([3fb753b](https://github.com/meigma/crossplane-cuefn/commit/3fb753b3288efa4a553fe7d46638b24cd1908174))
+
 ## [0.1.8](https://github.com/meigma/crossplane-cuefn/compare/v0.1.7...v0.1.8) (2026-07-19)
 
 

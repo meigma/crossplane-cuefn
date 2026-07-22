@@ -45,4 +45,4 @@ annotations:
   org.opencontainers.image.title: crossplane-cuefn
   org.opencontainers.image.description: Crossplane v2 composition function that renders Kubernetes resources from CUE modules
   org.opencontainers.image.source: https://github.com/meigma/crossplane-cuefn
-  org.opencontainers.image.version: "0.1.8" # x-release-please-version
+  org.opencontainers.image.version: "0.1.9" # x-release-please-version
