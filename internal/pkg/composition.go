@@ -40,6 +40,10 @@ const (
 	// function-environment-configs step consumes to select EnvironmentConfigs.
 	envConfigInputAPIVersion = "environmentconfigs.fn.crossplane.io/v1beta1"
 	envConfigInputKind       = "Input"
+
+	// envSourceTypeField discriminates the entries in the env-config Input:
+	// environmentConfigs sources (Reference/Selector) and their label matchers.
+	envSourceTypeField = "type"
 )
 
 // CompositionInput is the author half of the schema<->runtime digest lock-step:
@@ -62,12 +66,37 @@ type CompositionInput struct {
 	// entirely, so a default install needs only the cuefn Function. Each name
 	// becomes a `type: Reference` entry in the step's Input.
 	EnvironmentConfigRefs []string
+	// EnvironmentConfigSelectors select additional EnvironmentConfigs by labels
+	// whose values are read from the composite resource at render time. Each
+	// selector becomes a `type: Selector` entry (mode Single) after the Reference
+	// entries, so its data merges over theirs. Single mode fails the render when
+	// zero or multiple EnvironmentConfigs match.
+	EnvironmentConfigSelectors []EnvironmentConfigSelector
 	// EnvironmentConfigFunctionName is the in-cluster Function resource name the
 	// function-environment-configs step references. Like FunctionName it must match
 	// the auto-installed Function name (DerivedFunctionName of the env-config
-	// function package). Only used when EnvironmentConfigRefs is non-empty;
-	// defaults to "function-environment-configs" when blank.
+	// function package). Only used when EnvironmentConfigRefs or
+	// EnvironmentConfigSelectors is non-empty; defaults to
+	// "function-environment-configs" when blank.
 	EnvironmentConfigFunctionName string
+}
+
+// EnvironmentConfigSelector selects exactly one EnvironmentConfig by labels
+// (function-environment-configs Selector source, mode Single).
+type EnvironmentConfigSelector struct {
+	// MatchLabels are the label matchers the selected EnvironmentConfig must
+	// satisfy. At least one is required.
+	MatchLabels []EnvironmentConfigLabelMatch
+}
+
+// EnvironmentConfigLabelMatch matches one EnvironmentConfig label against a
+// value read from the composite resource (FromCompositeFieldPath).
+type EnvironmentConfigLabelMatch struct {
+	// Key is the label key on the EnvironmentConfig.
+	Key string
+	// ValueFromFieldPath is the composite-resource field path whose value the
+	// label must equal (for example "metadata.name").
+	ValueFromFieldPath string
 }
 
 // GenerateComposition builds a pipeline-mode Composition for xrd. Its
@@ -99,8 +128,8 @@ func GenerateComposition(xrd *xv2.CompositeResourceDefinition, in CompositionInp
 	// so the first reconcile failed "cannot find an active FunctionRevision"; and
 	// when no refs were selected the step merged nothing — a silent no-op.
 	var pipeline []apiextv1.PipelineStep
-	if refs := nonBlank(in.EnvironmentConfigRefs); len(refs) > 0 {
-		envStep, err := envConfigPipelineStep(in.EnvironmentConfigFunctionName, refs)
+	if refs := nonBlank(in.EnvironmentConfigRefs); len(refs) > 0 || len(in.EnvironmentConfigSelectors) > 0 {
+		envStep, err := envConfigPipelineStep(in.EnvironmentConfigFunctionName, refs, in.EnvironmentConfigSelectors)
 		if err != nil {
 			return nil, err
 		}
@@ -177,11 +206,17 @@ func referenceableVersion(xrd *xv2.CompositeResourceDefinition) string {
 }
 
 // envConfigPipelineStep builds the function-environment-configs step, selecting
-// each EnvironmentConfig in refs by Reference so the step merges them into the
-// pipeline context for cuefn. funcName is the in-cluster Function resource name
-// the step references; it must match the auto-installed env-config Function name
-// (it defaults to envConfigFunctionName when blank). refs must be non-empty.
-func envConfigPipelineStep(funcName string, refs []string) (apiextv1.PipelineStep, error) {
+// each EnvironmentConfig in refs by Reference and each selector by labels
+// (mode Single) so the step merges them into the pipeline context for cuefn.
+// References come first, then selectors, so selector data merges over reference
+// data. funcName is the in-cluster Function resource name the step references;
+// it must match the auto-installed env-config Function name (it defaults to
+// envConfigFunctionName when blank). refs and selectors must not both be empty.
+func envConfigPipelineStep(
+	funcName string,
+	refs []string,
+	selectors []EnvironmentConfigSelector,
+) (apiextv1.PipelineStep, error) {
 	if funcName == "" {
 		funcName = envConfigFunctionName
 	}
@@ -190,11 +225,36 @@ func envConfigPipelineStep(funcName string, refs []string) (apiextv1.PipelineSte
 		FunctionRef: apiextv1.FunctionReference{Name: funcName},
 	}
 
-	configs := make([]map[string]any, 0, len(refs))
+	configs := make([]map[string]any, 0, len(refs)+len(selectors))
 	for _, name := range refs {
 		configs = append(configs, map[string]any{
-			"type": "Reference",
-			"ref":  map[string]any{"name": name},
+			envSourceTypeField: "Reference",
+			"ref":              map[string]any{"name": name},
+		})
+	}
+	for i, sel := range selectors {
+		if len(sel.MatchLabels) == 0 {
+			return apiextv1.PipelineStep{}, fmt.Errorf(
+				"environment-config selector %d requires at least one label matcher", i)
+		}
+		labels := make([]map[string]any, 0, len(sel.MatchLabels))
+		for _, m := range sel.MatchLabels {
+			if strings.TrimSpace(m.Key) == "" || strings.TrimSpace(m.ValueFromFieldPath) == "" {
+				return apiextv1.PipelineStep{}, fmt.Errorf(
+					"environment-config selector %d requires a label key and a composite field path", i)
+			}
+			labels = append(labels, map[string]any{
+				envSourceTypeField:   "FromCompositeFieldPath",
+				"key":                m.Key,
+				"valueFromFieldPath": m.ValueFromFieldPath,
+			})
+		}
+		configs = append(configs, map[string]any{
+			envSourceTypeField: "Selector",
+			"selector": map[string]any{
+				"mode":        "Single",
+				"matchLabels": labels,
+			},
 		})
 	}
 

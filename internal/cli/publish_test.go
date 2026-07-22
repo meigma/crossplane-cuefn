@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/meigma/crossplane-cuefn/internal/pkg"
 	"github.com/meigma/crossplane-cuefn/internal/test/common"
 )
 
@@ -85,6 +86,59 @@ func TestParseMetadata(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			got, err := parseMetadata(tt.values)
+			if tt.match != "" {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.match)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestParseEnvironmentSelectors(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		values []string
+		want   []pkg.EnvironmentConfigSelector
+		match  string
+	}{
+		{
+			name:   "two labels in one selector",
+			values: []string{"example.io/name=metadata.name, example.io/namespace=metadata.namespace"},
+			want: []pkg.EnvironmentConfigSelector{{
+				MatchLabels: []pkg.EnvironmentConfigLabelMatch{
+					{Key: "example.io/name", ValueFromFieldPath: "metadata.name"},
+					{Key: "example.io/namespace", ValueFromFieldPath: "metadata.namespace"},
+				},
+			}},
+		},
+		{
+			name:   "each occurrence is its own selector",
+			values: []string{"a=metadata.name", "b=metadata.namespace"},
+			want: []pkg.EnvironmentConfigSelector{
+				{MatchLabels: []pkg.EnvironmentConfigLabelMatch{{Key: "a", ValueFromFieldPath: "metadata.name"}}},
+				{MatchLabels: []pkg.EnvironmentConfigLabelMatch{{Key: "b", ValueFromFieldPath: "metadata.namespace"}}},
+			},
+		},
+		{name: "missing separator", values: []string{"example.io/name"}, match: "labelKey=compositeFieldPath"},
+		{name: "empty key", values: []string{"=metadata.name"}, match: "labelKey=compositeFieldPath"},
+		{name: "empty field path", values: []string{"example.io/name="}, match: "labelKey=compositeFieldPath"},
+		{name: "empty value", values: []string{""}, match: "labelKey=compositeFieldPath"},
+		{
+			name:   "duplicate label key",
+			values: []string{"example.io/name=metadata.name,example.io/name=metadata.namespace"},
+			match:  "duplicate",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got, err := parseEnvironmentSelectors(tt.values)
 			if tt.match != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tt.match)

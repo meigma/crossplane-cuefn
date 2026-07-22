@@ -65,6 +65,7 @@ On success: `pushed registry.example.com/xapp-configuration:v0.1.0`.
 | `--function-name` | In-cluster Function name the `cuefn` step references. Defaults to the name Crossplane derives for the `dependsOn` Function, so a single install resolves; override only if you install the Function under a different name. |
 | `--function-version` | Semver constraint for that dependency (default `>=v0.0.0`). |
 | `--environment-config` | Name of an EnvironmentConfig to merge (repeatable). Supplying any adds the `function-environment-configs` step and declares it in `dependsOn`. |
+| `--environment-config-selector` | Comma-separated `labelKey=compositeFieldPath` pairs selecting exactly one EnvironmentConfig per composite by labels (repeatable). Each occurrence adds a Single-mode `Selector` source merged after the references. |
 | `--environment-config-function-ref` / `--environment-config-function-version` | Override the env-config function package/version recorded in `dependsOn` (defaults to crossplane-contrib's `function-environment-configs`). |
 | `--name` | Configuration `metadata.name` (default `<plural>-configuration`). |
 | `--crossplane-constraint` | Restrict the supported Crossplane version. |

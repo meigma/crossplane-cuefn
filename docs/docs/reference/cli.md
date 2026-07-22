@@ -310,7 +310,8 @@ cuefn publish <module-ref> --package <oci-ref> [flags]
 The generate → package → push flow. It loads the module, generates
 its XRD, resolves the module's live OCI manifest digest, builds a pipeline
 Composition (the `cuefn` step, plus a leading `function-environment-configs` step
-when `--environment-config` is given) recording the module ref **and** that digest,
+when `--environment-config` or `--environment-config-selector` is given) recording
+the module ref **and** that digest,
 assembles a Crossplane **Configuration** xpkg, and pushes it. Recording the
 resolved digest is the author half of the
 [digest lock-step](../explanation/digest-lockstep.md).
@@ -335,7 +336,8 @@ builds finish before the first registry mutation.
 | `--name <string>` | `<xrd-plural>-configuration` | Configuration package `metadata.name`. |
 | `--crossplane-constraint <string>` | _(empty)_ | Optional semver constraint on the supported Crossplane version. |
 | `--environment-config <string>` | _(none)_ | Name of an EnvironmentConfig the Composition merges into the pipeline context (repeatable). Each is referenced by name so its values reach the module under `out.input.environment`. Supplying any adds the `function-environment-configs` step and a second `dependsOn` entry. |
-| `--environment-config-function-ref <string>` | `xpkg.crossplane.io/crossplane-contrib/function-environment-configs` | Package ref recorded in `dependsOn` for the env-config function (only when `--environment-config` is used). |
+| `--environment-config-selector <string>` | _(none)_ | Label matchers selecting exactly one EnvironmentConfig per composite, as comma-separated `labelKey=compositeFieldPath` pairs (e.g. `a.io/name=metadata.name,a.io/namespace=metadata.namespace`). Repeatable; each occurrence adds one Single-mode `Selector` source after the `--environment-config` references, so its data merges over theirs. Single mode fails the render when zero or multiple EnvironmentConfigs match. |
+| `--environment-config-function-ref <string>` | `xpkg.crossplane.io/crossplane-contrib/function-environment-configs` | Package ref recorded in `dependsOn` for the env-config function (only when an `--environment-config*` source is used). |
 | `--environment-config-function-version <string>` | `>=v0.7.2` | Semver constraint for the function-environment-configs dependency. |
 | `--insecure` | `false` | Push over plain HTTP (development only; for a non-loopback throwaway registry). |
 

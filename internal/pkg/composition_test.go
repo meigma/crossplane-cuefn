@@ -140,6 +140,76 @@ func TestGenerateComposition_EnvironmentConfigs(t *testing.T) {
 		assert.Equal(t, "app-environment", in.Spec.EnvironmentConfigs[0].Ref.Name)
 		assert.Equal(t, "shared-env", in.Spec.EnvironmentConfigs[1].Ref.Name)
 	})
+
+	t.Run("selectors follow references", func(t *testing.T) {
+		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
+			Module:                "cuefn.example/app@v0.1.0",
+			EnvironmentConfigRefs: []string{"environment"},
+			EnvironmentConfigSelectors: []pkg.EnvironmentConfigSelector{{
+				MatchLabels: []pkg.EnvironmentConfigLabelMatch{
+					{Key: "example.io/name", ValueFromFieldPath: "metadata.name"},
+					{Key: "example.io/namespace", ValueFromFieldPath: "metadata.namespace"},
+				},
+			}},
+		})
+		require.NoError(t, err)
+
+		require.Len(t, comp.Spec.Pipeline, 2)
+		step := comp.Spec.Pipeline[0]
+		require.NotNil(t, step.Input)
+
+		var in struct {
+			Spec struct {
+				EnvironmentConfigs []struct {
+					Type string `json:"type"`
+					Ref  struct {
+						Name string `json:"name"`
+					} `json:"ref"`
+					Selector struct {
+						Mode        string `json:"mode"`
+						MatchLabels []struct {
+							Type               string `json:"type"`
+							Key                string `json:"key"`
+							ValueFromFieldPath string `json:"valueFromFieldPath"`
+						} `json:"matchLabels"`
+					} `json:"selector"`
+				} `json:"environmentConfigs"`
+			} `json:"spec"`
+		}
+		require.NoError(t, json.Unmarshal(step.Input.Raw, &in))
+		require.Len(t, in.Spec.EnvironmentConfigs, 2)
+		assert.Equal(
+			t,
+			"Reference",
+			in.Spec.EnvironmentConfigs[0].Type,
+			"references come first so selector data merges over them",
+		)
+		assert.Equal(t, "environment", in.Spec.EnvironmentConfigs[0].Ref.Name)
+
+		sel := in.Spec.EnvironmentConfigs[1]
+		assert.Equal(t, "Selector", sel.Type)
+		assert.Equal(t, "Single", sel.Selector.Mode)
+		require.Len(t, sel.Selector.MatchLabels, 2)
+		assert.Equal(t, "FromCompositeFieldPath", sel.Selector.MatchLabels[0].Type)
+		assert.Equal(t, "example.io/name", sel.Selector.MatchLabels[0].Key)
+		assert.Equal(t, "metadata.name", sel.Selector.MatchLabels[0].ValueFromFieldPath)
+		assert.Equal(t, "example.io/namespace", sel.Selector.MatchLabels[1].Key)
+		assert.Equal(t, "metadata.namespace", sel.Selector.MatchLabels[1].ValueFromFieldPath)
+	})
+
+	t.Run("selector only emits the env step", func(t *testing.T) {
+		comp, err := pkg.GenerateComposition(xrd, pkg.CompositionInput{
+			Module: "cuefn.example/app@v0.1.0",
+			EnvironmentConfigSelectors: []pkg.EnvironmentConfigSelector{{
+				MatchLabels: []pkg.EnvironmentConfigLabelMatch{
+					{Key: "example.io/name", ValueFromFieldPath: "metadata.name"},
+				},
+			}},
+		})
+		require.NoError(t, err)
+		require.Len(t, comp.Spec.Pipeline, 2)
+		assert.Equal(t, "function-environment-configs", comp.Spec.Pipeline[0].Step)
+	})
 }
 
 // TestGenerateComposition_Errors proves malformed inputs surface clear errors
@@ -153,5 +223,25 @@ func TestGenerateComposition_Errors(t *testing.T) {
 	t.Run("empty module", func(t *testing.T) {
 		_, err := pkg.GenerateComposition(common.FixtureXRD(t), pkg.CompositionInput{})
 		require.Error(t, err)
+	})
+
+	t.Run("selector without matchers", func(t *testing.T) {
+		_, err := pkg.GenerateComposition(common.FixtureXRD(t), pkg.CompositionInput{
+			Module:                     "x@v1",
+			EnvironmentConfigSelectors: []pkg.EnvironmentConfigSelector{{}},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "label matcher")
+	})
+
+	t.Run("selector with blank field path", func(t *testing.T) {
+		_, err := pkg.GenerateComposition(common.FixtureXRD(t), pkg.CompositionInput{
+			Module: "x@v1",
+			EnvironmentConfigSelectors: []pkg.EnvironmentConfigSelector{{
+				MatchLabels: []pkg.EnvironmentConfigLabelMatch{{Key: "example.io/name"}},
+			}},
+		})
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "field path")
 	})
 }
